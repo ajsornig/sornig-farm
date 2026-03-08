@@ -3,18 +3,30 @@ const fs = require('fs');
 const path = require('path');
 const config = require('../../config.json');
 const db = require('../db');
+const { sendApprovalRequest, sendApprovalNotification } = require('../mailer');
 
 const router = express.Router();
 
-router.post('/register', (req, res) => {
-  const { username, password } = req.body;
+router.post('/register', async (req, res) => {
+  const { username, password, email } = req.body;
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password required' });
   }
-  const result = db.createUser(username, password);
+  const result = db.createUser(username, password, false, email);
   if (result.error) {
     return res.status(400).json(result);
   }
+
+  // If approval is required, send notification and don't log them in yet
+  if (config.requireApproval && result.needsApproval) {
+    await sendApprovalRequest(username, result.approvalToken);
+    return res.json({
+      success: true,
+      pendingApproval: true,
+      message: 'Account created! Please wait for admin approval.'
+    });
+  }
+
   const loginResult = db.loginUser(username, password);
   res.json(loginResult);
 });
@@ -27,6 +39,14 @@ router.post('/login', (req, res) => {
   const result = db.loginUser(username, password);
   if (result.error) {
     return res.status(401).json(result);
+  }
+  // Check if user is approved
+  if (config.requireApproval && !db.isUserApproved(username)) {
+    return res.json({
+      success: true,
+      pendingApproval: true,
+      message: 'Your account is pending admin approval.'
+    });
   }
   res.json(result);
 });
@@ -48,10 +68,13 @@ router.get('/me', (req, res) => {
   if (!session) {
     return res.json({ loggedIn: false });
   }
+  const approved = db.isUserApproved(session.username);
   res.json({
     loggedIn: true,
     username: session.username,
-    isAdmin: session.isAdmin
+    isAdmin: session.isAdmin,
+    approved: approved,
+    requireApproval: config.requireApproval
   });
 });
 
@@ -107,6 +130,59 @@ router.post('/admin/users/:username/reset-password', requireAdmin, (req, res) =>
   res.json({ success: true });
 });
 
+// Get pending users awaiting approval
+router.get('/admin/pending', requireAdmin, (req, res) => {
+  res.json(db.getPendingUsers());
+});
+
+// Approve user (from admin panel)
+router.post('/admin/users/:username/approve', requireAdmin, async (req, res) => {
+  const result = db.approveUser(req.params.username);
+  if (result.error) {
+    return res.status(400).json(result);
+  }
+  await sendApprovalNotification(req.params.username, result.email, true);
+  res.json({ success: true });
+});
+
+// Deny user (from admin panel)
+router.post('/admin/users/:username/deny', requireAdmin, async (req, res) => {
+  const result = db.denyUser(req.params.username);
+  if (result.error) {
+    return res.status(400).json(result);
+  }
+  await sendApprovalNotification(req.params.username, result.email, false);
+  res.json({ success: true });
+});
+
+// Approve via email link (no auth required, uses token)
+router.get('/approve/:token', async (req, res) => {
+  const user = db.getUserByApprovalToken(req.params.token);
+  if (!user) {
+    return res.send('<h1>Invalid or expired approval link</h1><p><a href="/">Go to site</a></p>');
+  }
+  const result = db.approveUser(user.username);
+  if (result.error) {
+    return res.send(`<h1>Error</h1><p>${result.error}</p>`);
+  }
+  await sendApprovalNotification(user.username, user.email, true);
+  res.send(`<h1>Approved!</h1><p>User "${user.username}" has been approved.</p><p><a href="/">Go to site</a></p>`);
+});
+
+// Deny via email link (no auth required, uses token)
+router.get('/deny/:token', async (req, res) => {
+  const user = db.getUserByApprovalToken(req.params.token);
+  if (!user) {
+    return res.send('<h1>Invalid or expired link</h1><p><a href="/">Go to site</a></p>');
+  }
+  const result = db.denyUser(user.username);
+  if (result.error) {
+    return res.send(`<h1>Error</h1><p>${result.error}</p>`);
+  }
+  await sendApprovalNotification(user.username, user.email, false);
+  res.send(`<h1>Denied</h1><p>User "${user.username}" has been denied and removed.</p><p><a href="/">Go to site</a></p>`);
+});
+
 router.get('/recordings', (req, res) => {
   const recordingsDir = path.join(__dirname, '../../recordings');
 
@@ -144,6 +220,7 @@ router.get('/recordings/:filename', (req, res) => {
 router.get('/status', (req, res) => {
   res.json({
     authEnabled: config.authEnabled,
+    requireApproval: config.requireApproval || false,
     cameraCount: config.cameras.filter(c => c.enabled).length,
     recordingEnabled: config.recording.enabled
   });

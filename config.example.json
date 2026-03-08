@@ -1,0 +1,34 @@
+{
+  "port": 3000,
+  "siteUrl": "https://your-domain.com",
+  "requireApproval": true,
+  "notifications": {
+    "email": {
+      "enabled": true,
+      "from": "your-email@gmail.com",
+      "appPassword": "your-app-password",
+      "to": ["your-notification-email@gmail.com", "1234567890@vtext.com"]
+    }
+  },
+  "authEnabled": false,
+  "password": "changeme",
+  "cameras": [
+    {
+      "id": "cam1",
+      "name": "Coop Camera",
+      "streamUrl": "http://localhost:8554/cam1/stream.m3u8",
+      "enabled": true
+    }
+  ],
+  "recording": {
+    "enabled": true,
+    "retentionDays": 7
+  },
+  "chat": {
+    "maxMessages": 100,
+    "rateLimit": {
+      "messages": 5,
+      "windowSeconds": 10
+    }
+  }
+}

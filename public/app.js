@@ -5,17 +5,77 @@ let ws = null;
 let authToken = localStorage.getItem('authToken');
 let currentUser = null;
 let isAdmin = false;
+let isApproved = false;
+let requireApproval = false;
 let chatHistory = [];
 let visitorMap = null;
 let humanVerified = false;
 
 async function init() {
+  await checkStatus();
   await checkAuth();
-  await loadCameras();
+  updateContentVisibility();
+  if (isApproved || !requireApproval) {
+    await loadCameras();
+    loadRecordings();
+    loadVisitorStats();
+  }
   setupChat();
-  loadRecordings();
   setupAuthUI();
-  loadVisitorStats();
+}
+
+async function checkStatus() {
+  try {
+    const res = await fetch('/api/status');
+    const data = await res.json();
+    requireApproval = data.requireApproval || false;
+  } catch (err) {
+    console.error('Failed to check status:', err);
+  }
+}
+
+function updateContentVisibility() {
+  // If approval is required and user is not approved, hide content
+  if (requireApproval && !isApproved) {
+    document.getElementById('video-container').classList.add('hidden');
+    document.getElementById('chat-messages').classList.add('hidden');
+    document.getElementById('recordings-section').classList.add('hidden');
+    document.getElementById('visitors-section').classList.add('hidden');
+
+    // Show appropriate message based on login state
+    if (!currentUser) {
+      showLoginRequired();
+    } else {
+      showPendingApproval();
+    }
+  } else {
+    hideLoginRequired();
+    hidePendingApproval();
+    document.getElementById('video-container').classList.remove('hidden');
+    document.getElementById('chat-messages').classList.remove('hidden');
+    document.getElementById('recordings-section').classList.remove('hidden');
+    document.getElementById('visitors-section').classList.remove('hidden');
+  }
+}
+
+function showLoginRequired() {
+  let el = document.getElementById('login-required');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'login-required';
+    el.className = 'pending-approval-message';
+    el.innerHTML = `
+      <h2>Login Required</h2>
+      <p>You must register and be approved to view the live stream.</p>
+      <p>Please create an account using the form in the chat area.</p>
+    `;
+    document.querySelector('main').appendChild(el);
+  }
+}
+
+function hideLoginRequired() {
+  const el = document.getElementById('login-required');
+  if (el) el.remove();
 }
 
 async function checkAuth() {
@@ -30,6 +90,8 @@ async function checkAuth() {
     if (data.loggedIn) {
       currentUser = data.username;
       isAdmin = data.isAdmin;
+      isApproved = data.approved;
+      requireApproval = data.requireApproval;
       showLoggedInState();
     } else {
       localStorage.removeItem('authToken');
@@ -55,6 +117,38 @@ function showLoggedInState() {
     document.getElementById('admin-clear-btn').classList.remove('hidden');
     rerenderChat();
   }
+
+  updateContentVisibility();
+}
+
+function showPendingApproval() {
+  // Hide video and show pending message
+  document.getElementById('video-container').classList.add('hidden');
+  document.getElementById('chat-container').classList.add('hidden');
+  document.getElementById('recordings-section').classList.add('hidden');
+  document.getElementById('visitors-section').classList.add('hidden');
+
+  let pendingEl = document.getElementById('pending-approval');
+  if (!pendingEl) {
+    pendingEl = document.createElement('div');
+    pendingEl.id = 'pending-approval';
+    pendingEl.className = 'pending-approval-message';
+    pendingEl.innerHTML = `
+      <h2>Account Pending Approval</h2>
+      <p>Your account is awaiting admin approval. You'll receive an email once approved.</p>
+      <p>Check back soon!</p>
+    `;
+    document.querySelector('main').appendChild(pendingEl);
+  }
+}
+
+function hidePendingApproval() {
+  const pendingEl = document.getElementById('pending-approval');
+  if (pendingEl) pendingEl.remove();
+  document.getElementById('video-container').classList.remove('hidden');
+  document.getElementById('chat-container').classList.remove('hidden');
+  document.getElementById('recordings-section').classList.remove('hidden');
+  document.getElementById('visitors-section').classList.remove('hidden');
 }
 
 function rerenderChat() {
@@ -63,18 +157,7 @@ function rerenderChat() {
   chatHistory.forEach(msg => appendMessage(msg));
 }
 
-function showGuestState(nickname) {
-  document.getElementById('user-status').textContent = `Chatting as: ${nickname}`;
-  document.getElementById('auth-section').classList.add('hidden');
-  document.getElementById('chat-input-area').classList.remove('hidden');
-}
-
 function setupAuthUI() {
-  document.getElementById('nickname-btn').onclick = setGuestNickname;
-  document.getElementById('nickname-input').onkeypress = (e) => {
-    if (e.key === 'Enter') setGuestNickname();
-  };
-
   document.getElementById('login-btn').onclick = doLogin;
   document.getElementById('register-btn').onclick = doRegister;
   document.getElementById('auth-password').onkeypress = (e) => {
@@ -83,17 +166,6 @@ function setupAuthUI() {
 
   document.getElementById('logout-btn').onclick = doLogout;
   document.getElementById('admin-clear-btn').onclick = clearChat;
-}
-
-function setGuestNickname() {
-  const input = document.getElementById('nickname-input');
-  const nickname = input.value.trim();
-
-  if (nickname.length >= 2) {
-    ws.send(JSON.stringify({ type: 'set_nickname', nickname }));
-  } else {
-    showAuthError('Nickname must be at least 2 characters');
-  }
 }
 
 async function doLogin() {
@@ -118,6 +190,11 @@ async function doLogin() {
       return;
     }
 
+    if (data.pendingApproval) {
+      showAuthError(data.message);
+      return;
+    }
+
     authToken = data.token;
     currentUser = data.username;
     isAdmin = data.isAdmin;
@@ -134,6 +211,7 @@ async function doLogin() {
 async function doRegister() {
   const username = document.getElementById('auth-username').value.trim();
   const password = document.getElementById('auth-password').value;
+  const email = document.getElementById('auth-email').value.trim();
 
   if (!username || !password) {
     showAuthError('Please enter username and password');
@@ -144,12 +222,17 @@ async function doRegister() {
     const res = await fetch('/api/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({ username, password, email })
     });
     const data = await res.json();
 
     if (data.error) {
       showAuthError(data.error);
+      return;
+    }
+
+    if (data.pendingApproval) {
+      showSuccessMessage(data.message);
       return;
     }
 
@@ -164,6 +247,14 @@ async function doRegister() {
   } catch (err) {
     showAuthError('Registration failed');
   }
+}
+
+function showSuccessMessage(message) {
+  const el = document.getElementById('auth-error');
+  el.textContent = message;
+  el.classList.remove('hidden');
+  el.style.background = '#d4edda';
+  el.style.color = '#155724';
 }
 
 async function doLogout() {
@@ -382,11 +473,6 @@ function handleChatMessage(data) {
     case 'chat':
       chatHistory.push(data);
       appendMessage(data);
-      break;
-
-    case 'nickname_set':
-      showGuestState(data.nickname);
-      hideAuthError();
       break;
 
     case 'auth_success':

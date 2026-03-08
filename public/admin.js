@@ -53,7 +53,84 @@ function showAdminPanel() {
 
   setupAdminTabs();
   setupChatConnection();
+  loadPendingUsers();
   loadAdminData();
+}
+
+async function loadPendingUsers() {
+  try {
+    const res = await fetch('/api/admin/pending', {
+      headers: { 'x-auth-token': authToken }
+    });
+    const pending = await res.json();
+
+    const list = document.getElementById('pending-list');
+    if (pending.length === 0) {
+      list.innerHTML = '<p class="no-pending">No pending approval requests</p>';
+      return;
+    }
+
+    list.innerHTML = pending.map(user => `
+      <div class="pending-user">
+        <div class="pending-info">
+          <strong>${user.username}</strong>
+          ${user.email ? `<span class="pending-email">${user.email}</span>` : ''}
+          <span class="pending-date">Registered: ${new Date(user.createdAt).toLocaleString()}</span>
+        </div>
+        <div class="pending-actions">
+          <button class="approve-btn" onclick="approveUser('${user.username}')">Approve</button>
+          <button class="deny-btn" onclick="denyUser('${user.username}')">Deny</button>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    console.error('Failed to load pending users:', err);
+  }
+}
+
+async function approveUser(username) {
+  try {
+    const res = await fetch(`/api/admin/users/${username}/approve`, {
+      method: 'POST',
+      headers: { 'x-auth-token': authToken }
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      alert(`User "${username}" has been approved!`);
+      loadPendingUsers();
+      loadAdminData();
+    } else {
+      alert(data.error || 'Failed to approve user');
+    }
+  } catch (err) {
+    console.error('Failed to approve user:', err);
+    alert('Failed to approve user');
+  }
+}
+
+async function denyUser(username) {
+  if (!confirm(`Are you sure you want to deny and remove user "${username}"?`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/admin/users/${username}/deny`, {
+      method: 'POST',
+      headers: { 'x-auth-token': authToken }
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      alert(`User "${username}" has been denied and removed.`);
+      loadPendingUsers();
+    } else {
+      alert(data.error || 'Failed to deny user');
+    }
+  } catch (err) {
+    console.error('Failed to deny user:', err);
+    alert('Failed to deny user');
+  }
 }
 
 function setupAdminTabs() {
@@ -63,6 +140,7 @@ function setupAdminTabs() {
       tab.classList.add('active');
 
       const panel = tab.dataset.panel;
+      document.getElementById('admin-pending').classList.toggle('hidden', panel !== 'pending');
       document.getElementById('admin-users').classList.toggle('hidden', panel !== 'users');
       document.getElementById('admin-stats').classList.toggle('hidden', panel !== 'stats');
       document.getElementById('admin-chat').classList.toggle('hidden', panel !== 'chat');

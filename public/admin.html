@@ -35,11 +35,16 @@
     <section id="admin-panel" class="hidden">
       <h2>Admin Panel</h2>
       <div id="admin-tabs">
-        <button class="admin-tab active" data-panel="users">Users</button>
+        <button class="admin-tab active" data-panel="pending">Pending</button>
+        <button class="admin-tab" data-panel="users">Users</button>
         <button class="admin-tab" data-panel="stats">Stats</button>
         <button class="admin-tab" data-panel="chat">Chat</button>
       </div>
-      <div id="admin-users" class="admin-content">
+      <div id="admin-pending" class="admin-content">
+        <h3>Pending Approval Requests</h3>
+        <div id="pending-list"></div>
+      </div>
+      <div id="admin-users" class="admin-content hidden">
         <table id="users-table">
           <thead>
             <tr>

@@ -45,7 +45,7 @@ function generateToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
-function createUser(username, password, isAdmin = false) {
+function createUser(username, password, isAdmin = false, email = null) {
   const usernameLower = username.toLowerCase();
   if (data.users[usernameLower]) {
     return { error: 'Username already exists' };
@@ -57,14 +57,18 @@ function createUser(username, password, isAdmin = false) {
     return { error: 'Password must be at least 4 characters' };
   }
 
+  const approvalToken = generateToken();
   data.users[usernameLower] = {
     username: username,
     passwordHash: hashPassword(password),
+    email: email,
     isAdmin: isAdmin,
+    approved: isAdmin, // Admins are auto-approved
+    approvalToken: approvalToken,
     createdAt: Date.now()
   };
   saveData();
-  return { success: true, username };
+  return { success: true, username, approvalToken, needsApproval: !isAdmin };
 }
 
 function loginUser(username, password) {
@@ -143,6 +147,55 @@ function resetPassword(username, newPassword) {
   return { success: true };
 }
 
+function getPendingUsers() {
+  return Object.values(data.users)
+    .filter(u => !u.approved && !u.isAdmin)
+    .map(u => ({
+      username: u.username,
+      email: u.email,
+      createdAt: u.createdAt
+    }));
+}
+
+function approveUser(username) {
+  const usernameLower = username.toLowerCase();
+  if (!data.users[usernameLower]) {
+    return { error: 'User not found' };
+  }
+  data.users[usernameLower].approved = true;
+  saveData();
+  return { success: true, email: data.users[usernameLower].email };
+}
+
+function denyUser(username) {
+  const usernameLower = username.toLowerCase();
+  if (!data.users[usernameLower]) {
+    return { error: 'User not found' };
+  }
+  const email = data.users[usernameLower].email;
+  delete data.users[usernameLower];
+  // Also delete any sessions
+  Object.keys(data.sessions).forEach(token => {
+    if (data.sessions[token].username.toLowerCase() === usernameLower) {
+      delete data.sessions[token];
+    }
+  });
+  saveData();
+  return { success: true, email };
+}
+
+function getUserByApprovalToken(token) {
+  return Object.values(data.users).find(u => u.approvalToken === token) || null;
+}
+
+function isUserApproved(username) {
+  const user = data.users[username.toLowerCase()];
+  if (!user) return false;
+  // Existing users without approved field and admins are considered approved
+  if (user.approved === undefined || user.isAdmin) return true;
+  return user.approved;
+}
+
 function getRecentMessages(limit = 50) {
   return data.messages.slice(-limit);
 }
@@ -214,6 +267,11 @@ module.exports = {
   getAllUsers,
   deleteUser,
   resetPassword,
+  getPendingUsers,
+  approveUser,
+  denyUser,
+  getUserByApprovalToken,
+  isUserApproved,
   getRecentMessages,
   saveMessage,
   deleteMessage,

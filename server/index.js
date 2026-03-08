@@ -8,11 +8,13 @@ const { initDb } = require('./db');
 const { setupChat } = require('./chat');
 const apiRoutes = require('./routes/api');
 const { authMiddleware } = require('./routes/auth');
+const { initMailer } = require('./mailer');
 
 const app = express();
 const server = http.createServer(app);
 
 initDb();
+initMailer();
 
 app.use(express.json());
 app.use(cookieParser());

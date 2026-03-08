@@ -815,6 +815,97 @@ main {
   font-size: 0.9rem;
 }
 
+.pending-approval-message {
+  text-align: center;
+  padding: 3rem;
+  background: var(--cream-dark);
+  border-radius: 12px;
+  border: 2px solid var(--wood-brown);
+  margin: 2rem auto;
+  max-width: 600px;
+}
+
+.pending-approval-message h2 {
+  color: var(--barn-red);
+  margin-bottom: 1rem;
+}
+
+.pending-approval-message p {
+  color: var(--text-dark);
+  margin-bottom: 0.5rem;
+}
+
+.no-pending {
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 1rem;
+}
+
+.pending-user {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: var(--cream);
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--wood-brown);
+}
+
+.pending-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pending-email {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.pending-date {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.pending-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.approve-btn {
+  padding: 0.5rem 1rem;
+  background: var(--forest-green);
+  border: none;
+  border-radius: 4px;
+  color: var(--cream);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.approve-btn:hover {
+  background: #3d7a37;
+}
+
+.deny-btn {
+  padding: 0.5rem 1rem;
+  background: var(--barn-red);
+  border: none;
+  border-radius: 4px;
+  color: var(--cream);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.deny-btn:hover {
+  background: var(--barn-red-light);
+}
+
+#admin-pending h3 {
+  margin-bottom: 1rem;
+  color: var(--wood-dark);
+}
+
 #admin-chat .admin-btn {
   padding: 0.8rem 1.5rem;
   font-size: 1rem;

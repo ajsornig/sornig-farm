@@ -3,3 +3,4 @@ recordings/
 data.json
 *.log
 .DS_Store
+config.json
