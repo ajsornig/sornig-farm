@@ -107,7 +107,10 @@ async function loadAdminData() {
         <td>${user.username}</td>
         <td>${user.isAdmin ? 'Admin' : 'User'}</td>
         <td>${new Date(user.createdAt).toLocaleDateString()}</td>
-        <td>
+        <td class="action-buttons">
+          <button class="reset-pwd-btn" onclick="resetPassword('${user.username}')">
+            Reset Password
+          </button>
           <button class="delete-user-btn" onclick="deleteUser('${user.username}')"
             ${user.username === currentUser ? 'disabled title="Cannot delete yourself"' : ''}>
             Delete
@@ -128,6 +131,38 @@ async function loadAdminData() {
 
   } catch (err) {
     console.error('Failed to load admin data:', err);
+  }
+}
+
+async function resetPassword(username) {
+  const newPassword = prompt(`Enter new password for "${username}":`);
+  if (!newPassword) {
+    return;
+  }
+  if (newPassword.length < 4) {
+    alert('Password must be at least 4 characters');
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/admin/users/${username}/reset-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-auth-token': authToken
+      },
+      body: JSON.stringify({ newPassword })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      alert(`Password for "${username}" has been reset successfully.`);
+    } else {
+      alert(data.error || 'Failed to reset password');
+    }
+  } catch (err) {
+    console.error('Failed to reset password:', err);
+    alert('Failed to reset password');
   }
 }
 

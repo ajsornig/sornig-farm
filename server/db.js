@@ -124,6 +124,25 @@ function deleteUser(username) {
   return false;
 }
 
+function resetPassword(username, newPassword) {
+  const usernameLower = username.toLowerCase();
+  if (!data.users[usernameLower]) {
+    return { error: 'User not found' };
+  }
+  if (newPassword.length < 4) {
+    return { error: 'Password must be at least 4 characters' };
+  }
+  data.users[usernameLower].passwordHash = hashPassword(newPassword);
+  // Invalidate all sessions for this user
+  Object.keys(data.sessions).forEach(token => {
+    if (data.sessions[token].username.toLowerCase() === usernameLower) {
+      delete data.sessions[token];
+    }
+  });
+  saveData();
+  return { success: true };
+}
+
 function getRecentMessages(limit = 50) {
   return data.messages.slice(-limit);
 }
@@ -194,6 +213,7 @@ module.exports = {
   getUser,
   getAllUsers,
   deleteUser,
+  resetPassword,
   getRecentMessages,
   saveMessage,
   deleteMessage,

@@ -95,6 +95,18 @@ router.delete('/admin/users/:username', requireAdmin, (req, res) => {
   }
 });
 
+router.post('/admin/users/:username/reset-password', requireAdmin, (req, res) => {
+  const { newPassword } = req.body;
+  if (!newPassword) {
+    return res.status(400).json({ error: 'New password required' });
+  }
+  const result = db.resetPassword(req.params.username, newPassword);
+  if (result.error) {
+    return res.status(400).json(result);
+  }
+  res.json({ success: true });
+});
+
 router.get('/recordings', (req, res) => {
   const recordingsDir = path.join(__dirname, '../../recordings');
 

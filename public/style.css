@@ -689,6 +689,25 @@ main {
   background: var(--cream);
 }
 
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.reset-pwd-btn {
+  padding: 0.3rem 0.8rem;
+  background: var(--forest-green);
+  border: none;
+  border-radius: 4px;
+  color: var(--cream);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.reset-pwd-btn:hover {
+  background: #3d7a37;
+}
+
 .delete-user-btn {
   padding: 0.3rem 0.8rem;
   background: var(--barn-red);
