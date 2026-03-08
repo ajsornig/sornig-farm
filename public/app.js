@@ -17,9 +17,9 @@ async function init() {
   updateContentVisibility();
   if (isApproved || !requireApproval) {
     await loadCameras();
-    loadRecordings();
-    loadVisitorStats();
   }
+  loadRecordings();
+  loadVisitorStats();
   setupChat();
   setupAuthUI();
 }
@@ -39,8 +39,6 @@ function updateContentVisibility() {
   if (requireApproval && !isApproved) {
     document.getElementById('video-container').classList.add('hidden');
     document.getElementById('chat-messages').classList.add('hidden');
-    document.getElementById('recordings-section').classList.add('hidden');
-    document.getElementById('visitors-section').classList.add('hidden');
 
     // Show appropriate message based on login state
     if (!currentUser) {
@@ -53,8 +51,6 @@ function updateContentVisibility() {
     hidePendingApproval();
     document.getElementById('video-container').classList.remove('hidden');
     document.getElementById('chat-messages').classList.remove('hidden');
-    document.getElementById('recordings-section').classList.remove('hidden');
-    document.getElementById('visitors-section').classList.remove('hidden');
   }
 }
 
