@@ -1,0 +1,30 @@
+{
+  "port": 3000,
+  "authEnabled": false,
+  "password": "changeme",
+  "cameras": [
+    {
+      "id": "cam1",
+      "name": "Coop Camera",
+      "streamUrl": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+      "enabled": true
+    },
+    {
+      "id": "cam2",
+      "name": "Yard Camera",
+      "streamUrl": "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8",
+      "enabled": true
+    }
+  ],
+  "recording": {
+    "enabled": true,
+    "retentionDays": 7
+  },
+  "chat": {
+    "maxMessages": 100,
+    "rateLimit": {
+      "messages": 5,
+      "windowSeconds": 10
+    }
+  }
+}

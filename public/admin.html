@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - Sornig Farm</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐔</text></svg>">
+</head>
+<body>
+  <header>
+    <div class="logo-section">
+      <span class="logo-icon">🐔</span>
+      <div class="logo-text">
+        <h1>Sornig Farm</h1>
+        <span class="tagline">Admin Panel</span>
+      </div>
+    </div>
+    <div id="user-area">
+      <span id="user-status"></span>
+      <a href="/" class="back-link">Back to Site</a>
+      <button id="logout-btn" class="hidden">Logout</button>
+    </div>
+  </header>
+
+  <main class="admin-main">
+    <div id="admin-loading">Checking authorization...</div>
+
+    <div id="admin-unauthorized" class="hidden">
+      <h2>Access Denied</h2>
+      <p>You must be logged in as an admin to view this page.</p>
+      <a href="/">Return to main site</a>
+    </div>
+
+    <section id="admin-panel" class="hidden">
+      <h2>Admin Panel</h2>
+      <div id="admin-tabs">
+        <button class="admin-tab active" data-panel="users">Users</button>
+        <button class="admin-tab" data-panel="stats">Stats</button>
+        <button class="admin-tab" data-panel="chat">Chat</button>
+      </div>
+      <div id="admin-users" class="admin-content">
+        <table id="users-table">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Role</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="admin-stats" class="admin-content hidden">
+        <div class="stat-card">
+          <div class="stat-label">Total Views</div>
+          <div id="admin-total-views" class="stat-value">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Registered Users</div>
+          <div id="admin-user-count" class="stat-value">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Unique Locations</div>
+          <div id="admin-locations" class="stat-value">0</div>
+        </div>
+      </div>
+      <div id="admin-chat" class="admin-content hidden">
+        <button id="admin-clear-btn" class="admin-btn">Clear All Chat Messages</button>
+        <p class="admin-note">This will permanently delete all chat messages.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Sornig Farm Admin Panel</p>
+  </footer>
+
+  <script src="admin.js"></script>
+</body>
+</html>

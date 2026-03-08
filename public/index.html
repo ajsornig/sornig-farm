@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sornig Farm - Live Chicken Cam</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐔</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+  <header>
+    <div class="logo-section">
+      <span class="logo-icon">🐔</span>
+      <div class="logo-text">
+        <h1>Sornig Farm</h1>
+        <span class="tagline">Live from the coop</span>
+      </div>
+    </div>
+    <div id="user-area">
+      <span id="viewer-count"></span>
+      <span id="user-status"></span>
+      <button id="logout-btn" class="hidden">Logout</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="video-container">
+      <div id="camera-tabs"></div>
+      <div id="video-wrapper">
+        <video id="video-player" controls autoplay muted></video>
+        <div id="video-overlay" class="hidden">
+          <p>Camera Offline</p>
+        </div>
+      </div>
+    </div>
+
+    <aside id="chat-container">
+      <div id="chat-header">
+        <span>Coop Chat</span>
+        <button id="admin-clear-btn" class="admin-btn hidden" title="Clear all chat">Clear</button>
+      </div>
+      <div id="chat-messages"></div>
+
+      <div id="auth-section">
+        <div id="guest-mode">
+          <input type="text" id="nickname-input" placeholder="Enter a nickname..." maxlength="20">
+          <button id="nickname-btn">Join as Guest</button>
+        </div>
+
+        <div class="auth-divider">
+          <span>or create an account</span>
+        </div>
+
+        <div id="account-form">
+          <input type="text" id="auth-username" placeholder="Username" maxlength="20">
+          <input type="password" id="auth-password" placeholder="Password">
+          <div class="auth-buttons">
+            <button id="login-btn">Login</button>
+            <button id="register-btn">Register</button>
+          </div>
+        </div>
+
+        <div id="auth-error" class="hidden"></div>
+      </div>
+
+      <div id="chat-input-area" class="hidden">
+        <input type="text" id="chat-input" placeholder="Say something..." maxlength="500">
+        <button id="send-btn">Send</button>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Ad Banner - Top -->
+  <div id="ad-banner-top" class="ad-banner">
+    <div class="ad-placeholder">Ad Space - 728x90</div>
+  </div>
+
+  <section id="recordings-section">
+    <h2>Past Recordings</h2>
+    <div id="recordings-list"></div>
+  </section>
+
+  <section id="visitors-section">
+    <h2>Visitor Map</h2>
+    <div id="total-views"></div>
+    <div id="visitor-map"></div>
+  </section>
+
+  <!-- Ad Banner - Bottom -->
+  <div id="ad-banner-bottom" class="ad-banner">
+    <div class="ad-placeholder">Ad Space - 728x90</div>
+  </div>
+
+  <footer>
+    <p>Welcome to Sornig Farm! Watch our chickens live, 24/7.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
