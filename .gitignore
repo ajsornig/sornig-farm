@@ -4,5 +4,6 @@ data.json
 *.log
 .DS_Store
 config.json
+.env
 *.pem
 SornigReadMe.txt

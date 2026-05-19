@@ -1,19 +1,23 @@
 const nodemailer = require('nodemailer');
-const config = require('../config.json');
+
+const emailFrom = process.env.EMAIL_FROM;
+const emailPass = process.env.EMAIL_APP_PASSWORD;
+const emailTo = process.env.EMAIL_TO ? process.env.EMAIL_TO.split(',') : [];
+const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
 
 let transporter = null;
 
 function initMailer() {
-  if (!config.notifications?.email?.enabled) {
-    console.log('Email notifications disabled');
+  if (!emailFrom || !emailPass) {
+    console.log('Email notifications disabled (EMAIL_FROM or EMAIL_APP_PASSWORD not set)');
     return;
   }
 
   transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-      user: config.notifications.email.from,
-      pass: config.notifications.email.appPassword
+      user: emailFrom,
+      pass: emailPass
     }
   });
 
@@ -23,8 +27,8 @@ function initMailer() {
 async function sendApprovalRequest(username, approvalToken) {
   if (!transporter) return;
 
-  const approveUrl = `${config.siteUrl}/api/approve/${approvalToken}`;
-  const denyUrl = `${config.siteUrl}/api/deny/${approvalToken}`;
+  const approveUrl = `${siteUrl}/api/approve/${approvalToken}`;
+  const denyUrl = `${siteUrl}/api/deny/${approvalToken}`;
 
   const emailBody = `
 New user registration request:
@@ -35,12 +39,12 @@ Approve: ${approveUrl}
 
 Deny: ${denyUrl}
 
-Or manage in admin panel: ${config.siteUrl}/admin.html
+Or manage in admin panel: ${siteUrl}/admin.html
 `;
 
   const smsBody = `New user: ${username}\nApprove: ${approveUrl}`;
 
-  const recipients = config.notifications.email.to;
+  const recipients = emailTo;
 
   for (const recipient of recipients) {
     try {
@@ -49,7 +53,7 @@ Or manage in admin panel: ${config.siteUrl}/admin.html
                     recipient.includes('@tmomail.net');
 
       await transporter.sendMail({
-        from: config.notifications.email.from,
+        from: emailFrom,
         to: recipient,
         subject: isSms ? '' : `Sornig Farm: New user "${username}" awaiting approval`,
         text: isSms ? smsBody : emailBody
@@ -69,12 +73,12 @@ async function sendApprovalNotification(username, email, approved) {
     : 'Sornig Farm: Your account request was denied';
 
   const text = approved
-    ? `Hi ${username},\n\nYour account has been approved! You can now view the live stream at ${config.siteUrl}\n\nWelcome to Sornig Farm!`
+    ? `Hi ${username},\n\nYour account has been approved! You can now view the live stream at ${siteUrl}\n\nWelcome to Sornig Farm!`
     : `Hi ${username},\n\nUnfortunately, your account request was not approved.\n\nIf you believe this was a mistake, please contact us.`;
 
   try {
     await transporter.sendMail({
-      from: config.notifications.email.from,
+      from: emailFrom,
       to: email,
       subject,
       text
