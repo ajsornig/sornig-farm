@@ -1,18 +1,28 @@
 {
   "port": 3000,
+  "siteUrl": "https://sornigfarm.com",
+  "requireApproval": true,
+  "notifications": {
+    "email": {
+      "enabled": true,
+      "from": "your-email@gmail.com",
+      "appPassword": "your-gmail-app-password",
+      "to": ["your-email@gmail.com", "your-phone@vtext.com"]
+    }
+  },
   "authEnabled": false,
   "password": "changeme",
   "cameras": [
     {
       "id": "cam1",
       "name": "Coop Camera",
-      "streamUrl": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+      "streamUrl": "http://localhost:8554/cam1/index.m3u8",
       "enabled": true
     },
     {
       "id": "cam2",
       "name": "Yard Camera",
-      "streamUrl": "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8",
+      "streamUrl": "http://localhost:8554/cam2/index.m3u8",
       "enabled": true
     }
   ],
