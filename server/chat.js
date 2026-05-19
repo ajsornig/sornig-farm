@@ -111,14 +111,16 @@ function setupChat(wss) {
               client.humanVerified = true;
               broadcastViewerCount();
 
-              // Record visit for map
+              // Record visit for map (skip admins)
               const pending = pendingVisits.get(clientId);
               if (pending && !pending.verified) {
                 pending.verified = true;
-                geolocateIP(pending.ip).then(location => {
-                  recordVisit(location);
-                  console.log(`Verified logged-in visitor from ${location?.city || 'unknown'}`);
-                });
+                if (!session.isAdmin) {
+                  geolocateIP(pending.ip).then(location => {
+                    recordVisit(location);
+                    console.log(`Verified logged-in visitor from ${location?.city || 'unknown'}`);
+                  });
+                }
               }
             }
             ws.send(JSON.stringify({
