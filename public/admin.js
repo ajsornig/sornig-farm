@@ -183,16 +183,22 @@ async function loadAdminData() {
     tbody.innerHTML = users.map(user => `
       <tr>
         <td>${user.username}</td>
+        <td>
+          <span class="email-display">${user.email || '<em>none</em>'}</span>
+          <button class="edit-email-btn" onclick="editEmail('${user.username}', '${user.email || ''}')" title="Edit email">&#9998;</button>
+        </td>
         <td>${user.isAdmin ? 'Admin' : 'User'}</td>
         <td>${new Date(user.createdAt).toLocaleDateString()}</td>
-        <td class="action-buttons">
-          <button class="reset-pwd-btn" onclick="resetPassword('${user.username}')">
-            Reset Password
-          </button>
-          <button class="delete-user-btn" onclick="deleteUser('${user.username}')"
-            ${user.username === currentUser ? 'disabled title="Cannot delete yourself"' : ''}>
-            Delete
-          </button>
+        <td>
+          <div class="action-buttons">
+            <button class="reset-pwd-btn" onclick="resetPassword('${user.username}')">
+              Reset Password
+            </button>
+            <button class="delete-user-btn" onclick="deleteUser('${user.username}')"
+              ${user.username === currentUser ? 'disabled title="Cannot delete yourself"' : ''}>
+              Delete
+            </button>
+          </div>
         </td>
       </tr>
     `).join('');
@@ -209,6 +215,32 @@ async function loadAdminData() {
 
   } catch (err) {
     console.error('Failed to load admin data:', err);
+  }
+}
+
+async function editEmail(username, currentEmail) {
+  const newEmail = prompt(`Edit email for "${username}":`, currentEmail);
+  if (newEmail === null) return;
+
+  try {
+    const res = await fetch(`/api/admin/users/${username}/email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-auth-token': authToken
+      },
+      body: JSON.stringify({ email: newEmail.trim() })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      loadAdminData();
+    } else {
+      alert(data.error || 'Failed to update email');
+    }
+  } catch (err) {
+    console.error('Failed to update email:', err);
+    alert('Failed to update email');
   }
 }
 

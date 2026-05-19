@@ -108,9 +108,21 @@ function getUser(username) {
 function getAllUsers() {
   return Object.values(data.users).map(u => ({
     username: u.username,
+    email: u.email || null,
     isAdmin: u.isAdmin,
+    approved: u.approved !== false,
     createdAt: u.createdAt
   }));
+}
+
+function updateUserEmail(username, email) {
+  const usernameLower = username.toLowerCase();
+  if (!data.users[usernameLower]) {
+    return { error: 'User not found' };
+  }
+  data.users[usernameLower].email = email || null;
+  saveData();
+  return { success: true };
 }
 
 function deleteUser(username) {
@@ -306,6 +318,7 @@ module.exports = {
   changePassword,
   createResetToken,
   getUserByResetToken,
+  updateUserEmail,
   getPendingUsers,
   approveUser,
   denyUser,

@@ -186,6 +186,19 @@ function setupAuthUI() {
   document.getElementById('change-password-btn').onclick = showChangePasswordModal;
   document.getElementById('change-password-cancel').onclick = hideChangePasswordModal;
   document.getElementById('change-password-submit').onclick = doChangePassword;
+
+  document.querySelectorAll('.toggle-password').forEach(btn => {
+    btn.onclick = () => {
+      const input = document.getElementById(btn.dataset.target);
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.classList.add('active');
+      } else {
+        input.type = 'password';
+        btn.classList.remove('active');
+      }
+    };
+  });
 }
 
 async function doLogin() {

@@ -30,9 +30,18 @@
     <div id="change-password-modal" class="modal hidden">
       <div class="modal-content">
         <h3>Change Password</h3>
-        <input type="password" id="current-password" placeholder="Current password">
-        <input type="password" id="new-password" placeholder="New password">
-        <input type="password" id="confirm-password" placeholder="Confirm new password">
+        <div class="password-field">
+          <input type="password" id="current-password" placeholder="Current password">
+          <button type="button" class="toggle-password" data-target="current-password">👁</button>
+        </div>
+        <div class="password-field">
+          <input type="password" id="new-password" placeholder="New password">
+          <button type="button" class="toggle-password" data-target="new-password">👁</button>
+        </div>
+        <div class="password-field">
+          <input type="password" id="confirm-password" placeholder="Confirm new password">
+          <button type="button" class="toggle-password" data-target="confirm-password">👁</button>
+        </div>
         <div class="modal-buttons">
           <button id="change-password-submit">Change</button>
           <button id="change-password-cancel">Cancel</button>
@@ -63,7 +72,10 @@
       <div id="auth-section">
         <div id="account-form">
           <input type="text" id="auth-username" placeholder="Username" maxlength="20">
-          <input type="password" id="auth-password" placeholder="Password">
+          <div class="password-field">
+            <input type="password" id="auth-password" placeholder="Password">
+            <button type="button" class="toggle-password" data-target="auth-password">👁</button>
+          </div>
           <input type="email" id="auth-email" placeholder="Email (for approval notification)">
           <div class="auth-buttons">
             <button id="login-btn">Login</button>

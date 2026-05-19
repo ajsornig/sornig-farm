@@ -204,6 +204,15 @@ router.post('/admin/users/:username/reset-password', requireAdmin, (req, res) =>
   res.json({ success: true });
 });
 
+router.post('/admin/users/:username/email', requireAdmin, (req, res) => {
+  const { email } = req.body;
+  const result = db.updateUserEmail(req.params.username, email);
+  if (result.error) {
+    return res.status(400).json(result);
+  }
+  res.json({ success: true });
+});
+
 // Get pending users awaiting approval
 router.get('/admin/pending', requireAdmin, (req, res) => {
   res.json(db.getPendingUsers());
