@@ -106,6 +106,7 @@ function showLoggedInState() {
     statusEl.textContent = `Welcome, ${currentUser}`;
   }
   document.getElementById('logout-btn').classList.remove('hidden');
+  document.getElementById('change-password-btn').classList.remove('hidden');
   document.getElementById('auth-section').classList.add('hidden');
   document.getElementById('chat-input-area').classList.remove('hidden');
 
@@ -162,6 +163,29 @@ function setupAuthUI() {
 
   document.getElementById('logout-btn').onclick = doLogout;
   document.getElementById('admin-clear-btn').onclick = clearChat;
+
+  document.getElementById('forgot-password-link').onclick = (e) => {
+    e.preventDefault();
+    document.getElementById('account-form').classList.add('hidden');
+    document.getElementById('forgot-form').classList.remove('hidden');
+    hideAuthError();
+  };
+
+  document.getElementById('forgot-back-link').onclick = (e) => {
+    e.preventDefault();
+    document.getElementById('forgot-form').classList.add('hidden');
+    document.getElementById('account-form').classList.remove('hidden');
+    hideAuthError();
+  };
+
+  document.getElementById('forgot-submit-btn').onclick = doForgotPassword;
+  document.getElementById('forgot-email').onkeypress = (e) => {
+    if (e.key === 'Enter') doForgotPassword();
+  };
+
+  document.getElementById('change-password-btn').onclick = showChangePasswordModal;
+  document.getElementById('change-password-cancel').onclick = hideChangePasswordModal;
+  document.getElementById('change-password-submit').onclick = doChangePassword;
 }
 
 async function doLogin() {
@@ -270,6 +294,7 @@ async function doLogout() {
 
   document.getElementById('user-status').textContent = '';
   document.getElementById('logout-btn').classList.add('hidden');
+  document.getElementById('change-password-btn').classList.add('hidden');
   document.getElementById('admin-clear-btn').classList.add('hidden');
   document.getElementById('auth-section').classList.remove('hidden');
   document.getElementById('chat-input-area').classList.add('hidden');
@@ -621,6 +646,89 @@ async function loadVisitorStats() {
 
   } catch (err) {
     console.error('Failed to load visitor stats:', err);
+  }
+}
+
+async function doForgotPassword() {
+  const email = document.getElementById('forgot-email').value.trim();
+  if (!email) {
+    showAuthError('Please enter your email');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    showSuccessMessage(data.message || 'If an account with that email exists, a reset link has been sent.');
+    document.getElementById('forgot-form').classList.add('hidden');
+    document.getElementById('account-form').classList.remove('hidden');
+  } catch (err) {
+    showAuthError('Request failed. Please try again.');
+  }
+}
+
+function showChangePasswordModal() {
+  document.getElementById('change-password-modal').classList.remove('hidden');
+  document.getElementById('current-password').value = '';
+  document.getElementById('new-password').value = '';
+  document.getElementById('confirm-password').value = '';
+  document.getElementById('change-password-error').classList.add('hidden');
+}
+
+function hideChangePasswordModal() {
+  document.getElementById('change-password-modal').classList.add('hidden');
+}
+
+async function doChangePassword() {
+  const currentPassword = document.getElementById('current-password').value;
+  const newPassword = document.getElementById('new-password').value;
+  const confirmPassword = document.getElementById('confirm-password').value;
+  const errorEl = document.getElementById('change-password-error');
+
+  if (!currentPassword || !newPassword) {
+    errorEl.textContent = 'All fields required';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  if (newPassword !== confirmPassword) {
+    errorEl.textContent = 'New passwords do not match';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  if (newPassword.length < 4) {
+    errorEl.textContent = 'Password must be at least 4 characters';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/change-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-auth-token': authToken
+      },
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      errorEl.textContent = data.error;
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    hideChangePasswordModal();
+    alert('Password changed successfully!');
+  } catch (err) {
+    errorEl.textContent = 'Failed to change password';
+    errorEl.classList.remove('hidden');
   }
 }
 

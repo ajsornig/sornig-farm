@@ -88,8 +88,30 @@ async function sendApprovalNotification(username, email, approved) {
   }
 }
 
+async function sendPasswordResetEmail(username, email, resetToken) {
+  if (!transporter) return;
+
+  const resetUrl = `${siteUrl}/api/reset-password/${resetToken}`;
+
+  const text = `Hi ${username},\n\nYou requested a password reset for your Sornig Farm account.\n\nClick here to reset your password:\n${resetUrl}\n\nThis link expires in 1 hour.\n\nIf you didn't request this, you can safely ignore this email.`;
+
+  try {
+    await transporter.sendMail({
+      from: emailFrom,
+      to: email,
+      subject: 'Sornig Farm: Password Reset Request',
+      text
+    });
+    return { success: true };
+  } catch (err) {
+    console.error('Failed to send reset email:', err.message);
+    return { error: 'Failed to send email' };
+  }
+}
+
 module.exports = {
   initMailer,
   sendApprovalRequest,
-  sendApprovalNotification
+  sendApprovalNotification,
+  sendPasswordResetEmail
 };

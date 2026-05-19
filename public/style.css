@@ -434,6 +434,166 @@ main {
   background: #3d7a37;
 }
 
+.forgot-link {
+  display: block;
+  text-align: center;
+  margin-top: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-decoration: none;
+}
+
+.forgot-link:hover {
+  color: var(--barn-red);
+  text-decoration: underline;
+}
+
+#forgot-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+#forgot-form input {
+  padding: 0.5rem 0.8rem;
+  border: 2px solid var(--wood-brown);
+  border-radius: 6px;
+  background: var(--cream);
+  color: var(--text-dark);
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+#forgot-form input:focus {
+  outline: none;
+  border-color: var(--forest-green);
+}
+
+#forgot-submit-btn {
+  padding: 0.6rem;
+  background: var(--barn-red);
+  border: none;
+  border-radius: 6px;
+  color: var(--cream);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: bold;
+}
+
+#forgot-submit-btn:hover {
+  background: var(--barn-red-light);
+}
+
+#change-password-btn {
+  padding: 0.4rem 0.8rem;
+  background: transparent;
+  border: 2px solid var(--cream);
+  border-radius: 4px;
+  color: var(--cream);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+#change-password-btn:hover {
+  background: var(--cream);
+  color: var(--barn-red);
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-content {
+  background: var(--cream-dark);
+  border-radius: 12px;
+  padding: 2rem;
+  border: 3px solid var(--wood-brown);
+  max-width: 400px;
+  width: 90%;
+}
+
+.modal-content h3 {
+  color: var(--wood-dark);
+  margin-bottom: 1rem;
+}
+
+.modal-content input {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 0.5rem;
+  border: 2px solid var(--wood-brown);
+  border-radius: 6px;
+  background: var(--cream);
+  color: var(--text-dark);
+  font-family: inherit;
+  font-size: 0.9rem;
+  box-sizing: border-box;
+}
+
+.modal-content input:focus {
+  outline: none;
+  border-color: var(--forest-green);
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.modal-buttons button {
+  flex: 1;
+  padding: 0.6rem;
+  border: none;
+  border-radius: 6px;
+  color: var(--cream);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: bold;
+}
+
+#change-password-submit {
+  background: var(--forest-green);
+}
+
+#change-password-submit:hover {
+  background: #3d7a37;
+}
+
+#change-password-cancel {
+  background: var(--text-muted);
+}
+
+#change-password-cancel:hover {
+  background: var(--wood-brown);
+}
+
+#change-password-error {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: #ffe0e0;
+  border-radius: 4px;
+  color: var(--barn-red);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+#change-password-error.hidden {
+  display: none;
+}
+
 #auth-error {
   margin-top: 0.5rem;
   padding: 0.5rem;

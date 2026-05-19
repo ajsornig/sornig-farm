@@ -137,7 +137,8 @@ function resetPassword(username, newPassword) {
     return { error: 'Password must be at least 4 characters' };
   }
   data.users[usernameLower].passwordHash = hashPassword(newPassword);
-  // Invalidate all sessions for this user
+  delete data.users[usernameLower].resetToken;
+  delete data.users[usernameLower].resetTokenExpiry;
   Object.keys(data.sessions).forEach(token => {
     if (data.sessions[token].username.toLowerCase() === usernameLower) {
       delete data.sessions[token];
@@ -145,6 +146,41 @@ function resetPassword(username, newPassword) {
   });
   saveData();
   return { success: true };
+}
+
+function changePassword(username, currentPassword, newPassword) {
+  const usernameLower = username.toLowerCase();
+  const user = data.users[usernameLower];
+  if (!user) {
+    return { error: 'User not found' };
+  }
+  if (user.passwordHash !== hashPassword(currentPassword)) {
+    return { error: 'Current password is incorrect' };
+  }
+  if (newPassword.length < 4) {
+    return { error: 'New password must be at least 4 characters' };
+  }
+  user.passwordHash = hashPassword(newPassword);
+  saveData();
+  return { success: true };
+}
+
+function createResetToken(email) {
+  const user = Object.values(data.users).find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
+  if (!user) {
+    return { error: 'No account found with that email' };
+  }
+  const token = generateToken();
+  const usernameLower = user.username.toLowerCase();
+  data.users[usernameLower].resetToken = token;
+  data.users[usernameLower].resetTokenExpiry = Date.now() + 3600000; // 1 hour
+  saveData();
+  return { success: true, token, username: user.username };
+}
+
+function getUserByResetToken(token) {
+  const user = Object.values(data.users).find(u => u.resetToken === token && u.resetTokenExpiry > Date.now());
+  return user || null;
 }
 
 function getPendingUsers() {
@@ -267,6 +303,9 @@ module.exports = {
   getAllUsers,
   deleteUser,
   resetPassword,
+  changePassword,
+  createResetToken,
+  getUserByResetToken,
   getPendingUsers,
   approveUser,
   denyUser,

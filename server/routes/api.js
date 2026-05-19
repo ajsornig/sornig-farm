@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const config = require('../../config.json');
 const db = require('../db');
-const { sendApprovalRequest, sendApprovalNotification } = require('../mailer');
+const { sendApprovalRequest, sendApprovalNotification, sendPasswordResetEmail } = require('../mailer');
 
 const router = express.Router();
 
@@ -55,6 +55,80 @@ router.post('/logout', (req, res) => {
   const token = req.headers['x-auth-token'];
   if (token) {
     db.logoutUser(token);
+  }
+  res.json({ success: true });
+});
+
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+  const result = db.createResetToken(email);
+  if (result.error) {
+    return res.json({ success: true, message: 'If an account with that email exists, a reset link has been sent.' });
+  }
+  await sendPasswordResetEmail(result.username, email, result.token);
+  res.json({ success: true, message: 'If an account with that email exists, a reset link has been sent.' });
+});
+
+router.get('/reset-password/:token', (req, res) => {
+  const user = db.getUserByResetToken(req.params.token);
+  if (!user) {
+    return res.send('<h1>Invalid or expired reset link</h1><p>This link has expired or is invalid. Please request a new one.</p><p><a href="/">Go to site</a></p>');
+  }
+  res.send(`
+    <html><head><title>Reset Password - Sornig Farm</title>
+    <style>body{font-family:Georgia,serif;background:#FDF6E3;display:flex;justify-content:center;align-items:center;min-height:100vh;}
+    .box{background:#F5EDDA;padding:2rem;border-radius:12px;border:2px solid #5D4037;max-width:400px;width:100%;}
+    h1{color:#8B2500;margin-bottom:1rem;font-size:1.5rem;}
+    input{width:100%;padding:0.7rem;margin:0.5rem 0;border:2px solid #5D4037;border-radius:6px;font-size:1rem;box-sizing:border-box;}
+    button{width:100%;padding:0.7rem;background:#2D5A27;color:#FDF6E3;border:none;border-radius:6px;font-size:1rem;cursor:pointer;margin-top:0.5rem;}
+    button:hover{background:#3d7a37;} .err{color:#8B2500;margin-top:0.5rem;}</style></head>
+    <body><div class="box"><h1>Reset Password</h1><p>Enter a new password for <strong>${user.username}</strong></p>
+    <form id="f"><input type="password" id="p1" placeholder="New password" required minlength="4">
+    <input type="password" id="p2" placeholder="Confirm password" required minlength="4">
+    <button type="submit">Reset Password</button><p class="err" id="err"></p></form>
+    <script>document.getElementById('f').onsubmit=async(e)=>{e.preventDefault();const p1=document.getElementById('p1').value;const p2=document.getElementById('p2').value;
+    if(p1!==p2){document.getElementById('err').textContent='Passwords do not match';return;}
+    const r=await fetch('/api/reset-password/${req.params.token}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({newPassword:p1})});
+    const d=await r.json();if(d.success){document.querySelector('.box').innerHTML='<h1>Password Reset!</h1><p>Your password has been changed. You can now <a href="/">log in</a>.</p>';}
+    else{document.getElementById('err').textContent=d.error||'Reset failed';}}</script></div></body></html>
+  `);
+});
+
+router.post('/reset-password/:token', (req, res) => {
+  const user = db.getUserByResetToken(req.params.token);
+  if (!user) {
+    return res.status(400).json({ error: 'Invalid or expired reset link' });
+  }
+  const { newPassword } = req.body;
+  if (!newPassword || newPassword.length < 4) {
+    return res.status(400).json({ error: 'Password must be at least 4 characters' });
+  }
+  const result = db.resetPassword(user.username, newPassword);
+  if (result.error) {
+    return res.status(400).json(result);
+  }
+  res.json({ success: true });
+});
+
+router.post('/change-password', (req, res) => {
+  const token = req.headers['x-auth-token'];
+  if (!token) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  const session = db.getSession(token);
+  if (!session) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Current and new password required' });
+  }
+  const result = db.changePassword(session.username, currentPassword, newPassword);
+  if (result.error) {
+    return res.status(400).json(result);
   }
   res.json({ success: true });
 });

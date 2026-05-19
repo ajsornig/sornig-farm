@@ -23,7 +23,22 @@
     <div id="user-area">
       <span id="viewer-count"></span>
       <span id="user-status"></span>
+      <button id="change-password-btn" class="hidden">Change Password</button>
       <button id="logout-btn" class="hidden">Logout</button>
+    </div>
+
+    <div id="change-password-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Change Password</h3>
+        <input type="password" id="current-password" placeholder="Current password">
+        <input type="password" id="new-password" placeholder="New password">
+        <input type="password" id="confirm-password" placeholder="Confirm new password">
+        <div class="modal-buttons">
+          <button id="change-password-submit">Change</button>
+          <button id="change-password-cancel">Cancel</button>
+        </div>
+        <p id="change-password-error" class="hidden"></p>
+      </div>
     </div>
   </header>
 
@@ -54,6 +69,13 @@
             <button id="login-btn">Login</button>
             <button id="register-btn">Register</button>
           </div>
+          <a href="#" id="forgot-password-link" class="forgot-link">Forgot Password?</a>
+        </div>
+
+        <div id="forgot-form" class="hidden">
+          <input type="email" id="forgot-email" placeholder="Your registered email">
+          <button id="forgot-submit-btn">Send Reset Link</button>
+          <a href="#" id="forgot-back-link" class="forgot-link">Back to login</a>
         </div>
 
         <div id="auth-error" class="hidden"></div>
