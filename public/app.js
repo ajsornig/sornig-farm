@@ -101,7 +101,7 @@ async function checkAuth() {
 function showLoggedInState() {
   const statusEl = document.getElementById('user-status');
   if (isAdmin) {
-    statusEl.innerHTML = `Welcome, ${currentUser} (<a href="/admin.html" class="admin-link">Admin</a>)`;
+    statusEl.innerHTML = `Welcome, ${escapeHtml(currentUser)} (<a href="/admin.html" class="admin-link">Admin</a>)`;
   } else {
     statusEl.textContent = `Welcome, ${currentUser}`;
   }
@@ -386,7 +386,9 @@ function playStream(url) {
   if (Hls.isSupported()) {
     hls = new Hls({
       enableWorker: true,
-      lowLatencyMode: true
+      lowLatencyMode: false,
+      liveSyncDurationCount: 3,
+      liveMaxLatencyDurationCount: 5
     });
 
     hls.loadSource(url);
@@ -551,6 +553,12 @@ function updateViewerCount(count) {
   }
 }
 
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 function appendMessage(msg) {
   const messages = document.getElementById('chat-messages');
   const el = document.createElement('div');
@@ -558,19 +566,21 @@ function appendMessage(msg) {
   el.id = `msg-${msg.id}`;
 
   const time = new Date(msg.timestamp).toLocaleTimeString();
+  const safeNickname = escapeHtml(msg.nickname);
+  const safeContent = escapeHtml(msg.content);
 
   let deleteBtn = '';
   if (isAdmin && msg.id) {
-    deleteBtn = `<button class="delete-msg-btn" onclick="deleteMessage('${msg.id}')" title="Delete">x</button>`;
+    deleteBtn = `<button class="delete-msg-btn" onclick="deleteMessage('${escapeHtml(msg.id)}')" title="Delete">x</button>`;
   }
 
   el.innerHTML = `
     <div class="msg-header">
-      <span class="nickname">${msg.nickname}${msg.isRegistered ? ' <span class="verified-badge" title="Registered user">✓</span>' : ''}</span>
+      <span class="nickname">${safeNickname}${msg.isRegistered ? ' <span class="verified-badge" title="Registered user">&#10003;</span>' : ''}</span>
       <span class="time">${time}</span>
       ${deleteBtn}
     </div>
-    <div class="content">${msg.content}</div>
+    <div class="content">${safeContent}</div>
   `;
 
   messages.appendChild(el);
@@ -599,8 +609,8 @@ async function loadRecordings() {
     }
 
     list.innerHTML = recordings.map(rec => `
-      <div class="recording-card" onclick="playRecording('${rec.filename}')">
-        <div class="filename">${rec.filename}</div>
+      <div class="recording-card" onclick="playRecording('${escapeHtml(rec.filename)}')">
+        <div class="filename">${escapeHtml(rec.filename)}</div>
         <div class="meta">
           ${formatSize(rec.size)} - ${new Date(rec.created).toLocaleString()}
         </div>

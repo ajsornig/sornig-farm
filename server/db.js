@@ -3,6 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const DATA_FILE = path.join(__dirname, '../data.json');
+const SESSION_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 let data = {
   messages: [],
@@ -30,7 +31,20 @@ function initDb() {
       data = { messages: [], users: {}, sessions: {}, stats: { totalViews: 0, visitors: [] } };
     }
   }
+  pruneExpiredSessions();
   return data;
+}
+
+function pruneExpiredSessions() {
+  const now = Date.now();
+  let pruned = false;
+  for (const token of Object.keys(data.sessions)) {
+    if (now - data.sessions[token].createdAt > SESSION_MAX_AGE) {
+      delete data.sessions[token];
+      pruned = true;
+    }
+  }
+  if (pruned) saveData();
 }
 
 function saveData() {
@@ -38,7 +52,23 @@ function saveData() {
 }
 
 function hashPassword(password) {
-  return crypto.createHash('sha256').update(password).digest('hex');
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `scrypt:${salt}:${hash}`;
+}
+
+function verifyPassword(password, stored) {
+  if (stored.startsWith('scrypt:')) {
+    const [, salt, hash] = stored.split(':');
+    const derived = crypto.scryptSync(password, salt, 64).toString('hex');
+    return derived === hash;
+  }
+  // Legacy SHA-256 (no salt, 64-char hex)
+  return crypto.createHash('sha256').update(password).digest('hex') === stored;
+}
+
+function isLegacyHash(stored) {
+  return !stored.startsWith('scrypt:');
 }
 
 function generateToken() {
@@ -74,8 +104,13 @@ function createUser(username, password, isAdmin = false, email = null) {
 function loginUser(username, password) {
   const usernameLower = username.toLowerCase();
   const user = data.users[usernameLower];
-  if (!user || user.passwordHash !== hashPassword(password)) {
+  if (!user || !verifyPassword(password, user.passwordHash)) {
     return { error: 'Invalid username or password' };
+  }
+
+  // Auto-migrate legacy SHA-256 hashes to scrypt
+  if (isLegacyHash(user.passwordHash)) {
+    user.passwordHash = hashPassword(password);
   }
 
   const token = generateToken();
@@ -89,7 +124,14 @@ function loginUser(username, password) {
 }
 
 function getSession(token) {
-  return data.sessions[token] || null;
+  const session = data.sessions[token];
+  if (!session) return null;
+  if (Date.now() - session.createdAt > SESSION_MAX_AGE) {
+    delete data.sessions[token];
+    saveData();
+    return null;
+  }
+  return session;
 }
 
 function logoutUser(token) {
@@ -166,7 +208,7 @@ function changePassword(username, currentPassword, newPassword) {
   if (!user) {
     return { error: 'User not found' };
   }
-  if (user.passwordHash !== hashPassword(currentPassword)) {
+  if (!verifyPassword(currentPassword, user.passwordHash)) {
     return { error: 'Current password is incorrect' };
   }
   if (newPassword.length < 4) {

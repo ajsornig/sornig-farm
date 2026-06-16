@@ -8,7 +8,6 @@ const config = require('../config.json');
 const { initDb } = require('./db');
 const { setupChat } = require('./chat');
 const apiRoutes = require('./routes/api');
-const { authMiddleware } = require('./routes/auth');
 const { initMailer } = require('./mailer');
 
 const app = express();
@@ -19,10 +18,6 @@ initMailer();
 
 app.use(express.json());
 app.use(cookieParser());
-
-if (config.authEnabled) {
-  app.use(authMiddleware);
-}
 
 app.use('/api', apiRoutes);
 

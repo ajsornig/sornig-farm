@@ -7,6 +7,15 @@ const { sendApprovalRequest, sendApprovalNotification, sendPasswordResetEmail } 
 
 const router = express.Router();
 
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 router.post('/register', async (req, res) => {
   const { username, password, email } = req.body;
   if (!username || !password) {
@@ -85,7 +94,7 @@ router.get('/reset-password/:token', (req, res) => {
     input{width:100%;padding:0.7rem;margin:0.5rem 0;border:2px solid #5D4037;border-radius:6px;font-size:1rem;box-sizing:border-box;}
     button{width:100%;padding:0.7rem;background:#2D5A27;color:#FDF6E3;border:none;border-radius:6px;font-size:1rem;cursor:pointer;margin-top:0.5rem;}
     button:hover{background:#3d7a37;} .err{color:#8B2500;margin-top:0.5rem;}</style></head>
-    <body><div class="box"><h1>Reset Password</h1><p>Enter a new password for <strong>${user.username}</strong></p>
+    <body><div class="box"><h1>Reset Password</h1><p>Enter a new password for <strong>${escapeHtml(user.username)}</strong></p>
     <form id="f"><input type="password" id="p1" placeholder="New password" required minlength="4">
     <input type="password" id="p2" placeholder="Confirm password" required minlength="4">
     <button type="submit">Reset Password</button><p class="err" id="err"></p></form>
@@ -246,10 +255,10 @@ router.get('/approve/:token', async (req, res) => {
   }
   const result = db.approveUser(user.username);
   if (result.error) {
-    return res.send(`<h1>Error</h1><p>${result.error}</p>`);
+    return res.send(`<h1>Error</h1><p>${escapeHtml(result.error)}</p>`);
   }
   await sendApprovalNotification(user.username, user.email, true);
-  res.send(`<h1>Approved!</h1><p>User "${user.username}" has been approved.</p><p><a href="/">Go to site</a></p>`);
+  res.send(`<h1>Approved!</h1><p>User &quot;${escapeHtml(user.username)}&quot; has been approved.</p><p><a href="/">Go to site</a></p>`);
 });
 
 // Deny via email link (no auth required, uses token)
@@ -260,13 +269,13 @@ router.get('/deny/:token', async (req, res) => {
   }
   const result = db.denyUser(user.username);
   if (result.error) {
-    return res.send(`<h1>Error</h1><p>${result.error}</p>`);
+    return res.send(`<h1>Error</h1><p>${escapeHtml(result.error)}</p>`);
   }
   await sendApprovalNotification(user.username, user.email, false);
-  res.send(`<h1>Denied</h1><p>User "${user.username}" has been denied and removed.</p><p><a href="/">Go to site</a></p>`);
+  res.send(`<h1>Denied</h1><p>User &quot;${escapeHtml(user.username)}&quot; has been denied and removed.</p><p><a href="/">Go to site</a></p>`);
 });
 
-router.get('/recordings', (req, res) => {
+router.get('/recordings', requireAdmin, (req, res) => {
   const recordingsDir = path.join(__dirname, '../../recordings');
 
   if (!fs.existsSync(recordingsDir)) {
@@ -289,7 +298,7 @@ router.get('/recordings', (req, res) => {
   res.json(files);
 });
 
-router.get('/recordings/:filename', (req, res) => {
+router.get('/recordings/:filename', requireAdmin, (req, res) => {
   const filename = path.basename(req.params.filename);
   const filepath = path.join(__dirname, '../../recordings', filename);
 

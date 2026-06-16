@@ -3,6 +3,12 @@ let currentUser = null;
 let isAdmin = false;
 let ws = null;
 
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 async function init() {
   await checkAuth();
 }
@@ -73,13 +79,13 @@ async function loadPendingUsers() {
     list.innerHTML = pending.map(user => `
       <div class="pending-user">
         <div class="pending-info">
-          <strong>${user.username}</strong>
-          ${user.email ? `<span class="pending-email">${user.email}</span>` : ''}
+          <strong>${escapeHtml(user.username)}</strong>
+          ${user.email ? `<span class="pending-email">${escapeHtml(user.email)}</span>` : ''}
           <span class="pending-date">Registered: ${new Date(user.createdAt).toLocaleString()}</span>
         </div>
         <div class="pending-actions">
-          <button class="approve-btn" onclick="approveUser('${user.username}')">Approve</button>
-          <button class="deny-btn" onclick="denyUser('${user.username}')">Deny</button>
+          <button class="approve-btn" onclick="approveUser('${escapeHtml(user.username)}')">Approve</button>
+          <button class="deny-btn" onclick="denyUser('${escapeHtml(user.username)}')">Deny</button>
         </div>
       </div>
     `).join('');
@@ -182,19 +188,19 @@ async function loadAdminData() {
     const tbody = document.querySelector('#users-table tbody');
     tbody.innerHTML = users.map(user => `
       <tr>
-        <td>${user.username}</td>
+        <td>${escapeHtml(user.username)}</td>
         <td>
-          <span class="email-display">${user.email || '<em>none</em>'}</span>
-          <button class="edit-email-btn" onclick="editEmail('${user.username}', '${user.email || ''}')" title="Edit email">&#9998;</button>
+          <span class="email-display">${user.email ? escapeHtml(user.email) : '<em>none</em>'}</span>
+          <button class="edit-email-btn" onclick="editEmail('${escapeHtml(user.username)}', '${escapeHtml(user.email || '')}')" title="Edit email">&#9998;</button>
         </td>
         <td>${user.isAdmin ? 'Admin' : 'User'}</td>
         <td>${new Date(user.createdAt).toLocaleDateString()}</td>
         <td>
           <div class="action-buttons">
-            <button class="reset-pwd-btn" onclick="resetPassword('${user.username}')">
+            <button class="reset-pwd-btn" onclick="resetPassword('${escapeHtml(user.username)}')">
               Reset Password
             </button>
-            <button class="delete-user-btn" onclick="deleteUser('${user.username}')"
+            <button class="delete-user-btn" onclick="deleteUser('${escapeHtml(user.username)}')"
               ${user.username === currentUser ? 'disabled title="Cannot delete yourself"' : ''}>
               Delete
             </button>

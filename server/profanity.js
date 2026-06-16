@@ -22,6 +22,7 @@ const patterns = badWords.map(word => {
 function containsProfanity(text) {
   const lower = text.toLowerCase();
   for (const pattern of patterns) {
+    pattern.lastIndex = 0;
     if (pattern.test(lower)) {
       return true;
     }
@@ -32,6 +33,7 @@ function containsProfanity(text) {
 function filterProfanity(text) {
   let filtered = text;
   for (const pattern of patterns) {
+    pattern.lastIndex = 0;
     filtered = filtered.replace(pattern, match => '*'.repeat(match.length));
   }
   return filtered;
