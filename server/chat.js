@@ -134,21 +134,11 @@ function setupChat(wss) {
           return;
         }
 
-        // Human verification - triggered by user interaction
+        // Human verification - triggered by user interaction (for viewer count only)
         if (msg.type === 'verify_human') {
           if (!client.humanVerified) {
             client.humanVerified = true;
             broadcastViewerCount();
-
-            // Record visit for map if not already done
-            const pending = pendingVisits.get(clientId);
-            if (pending && !pending.verified) {
-              pending.verified = true;
-              geolocateIP(pending.ip).then(location => {
-                recordVisit(location);
-                console.log(`Verified human visitor from ${location?.city || 'unknown'}`);
-              });
-            }
           }
           return;
         }
