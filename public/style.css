@@ -163,7 +163,7 @@ main {
 #video-player {
   width: 100%;
   display: block;
-  aspect-ratio: 16/9;
+  aspect-ratio: 4/3;
   background: #000;
 }
 
@@ -782,23 +782,6 @@ main {
   overflow: hidden;
 }
 
-/* Ad Banners */
-.ad-banner {
-  max-width: 1400px;
-  margin: 1rem auto;
-  padding: 0 1.5rem;
-  text-align: center;
-}
-
-.ad-placeholder {
-  background: var(--cream-dark);
-  border: 2px dashed var(--wood-brown);
-  border-radius: 8px;
-  padding: 1.5rem;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-}
-
 /* Admin Panel */
 #admin-panel {
   max-width: 1400px;
@@ -1142,26 +1125,47 @@ footer {
     flex-direction: column;
     text-align: center;
     gap: 0.5rem;
-    padding: 1rem;
+    padding: 0.75rem;
+  }
+
+  .logo-section {
+    gap: 0.5rem;
   }
 
   .logo-text h1 {
-    font-size: 1.4rem;
+    font-size: 1.3rem;
   }
 
   .logo-icon {
-    font-size: 2rem;
+    font-size: 1.8rem;
+  }
+
+  .logo-text .tagline {
+    font-size: 0.8rem;
   }
 
   #user-area {
     flex-wrap: wrap;
     justify-content: center;
+    gap: 0.5rem;
+  }
+
+  #user-status {
+    font-size: 0.8rem;
+    width: 100%;
+    text-align: center;
+  }
+
+  #change-password-btn,
+  #logout-btn {
+    font-size: 0.75rem;
+    padding: 0.3rem 0.6rem;
   }
 
   main {
     flex-direction: column;
-    padding: 0.75rem;
-    gap: 1rem;
+    padding: 0;
+    gap: 0;
   }
 
   #video-container {
@@ -1170,37 +1174,56 @@ footer {
 
   #camera-tabs {
     flex-wrap: wrap;
+    padding: 0.5rem 0.5rem 0;
   }
 
   .camera-tab {
-    padding: 0.5rem 0.8rem;
+    padding: 0.4rem 0.8rem;
     font-size: 0.85rem;
+  }
+
+  #video-wrapper {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+
+  #video-player {
+    aspect-ratio: 4/3;
   }
 
   #chat-container {
     width: 100%;
-    height: 350px;
+    height: 40vh;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
   }
 
   #chat-header {
     padding: 0.6rem 0.8rem;
     font-size: 1rem;
+    border-radius: 0;
   }
 
-  #guest-mode {
-    flex-direction: column;
+  #chat-messages {
+    font-size: 0.9rem;
   }
 
-  #guest-mode button {
-    width: 100%;
+  #chat-input-area {
+    border-radius: 0;
+  }
+
+  #chat-input {
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+
+  #auth-section input {
+    font-size: 16px; /* Prevents iOS zoom on focus */
   }
 
   .auth-buttons {
-    flex-direction: column;
-  }
-
-  .auth-buttons button {
-    width: 100%;
+    flex-direction: row;
   }
 
   #admin-panel,
@@ -1250,16 +1273,7 @@ footer {
   }
 
   #visitor-map {
-    height: 300px;
-  }
-
-  .ad-banner {
-    padding: 0 0.75rem;
-  }
-
-  .ad-placeholder {
-    padding: 1rem;
-    font-size: 0.8rem;
+    height: 250px;
   }
 
   footer {
@@ -1271,7 +1285,15 @@ footer {
 @media (max-width: 480px) {
   .logo-section {
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.25rem;
+  }
+
+  .logo-icon {
+    font-size: 1.5rem;
+  }
+
+  .logo-text h1 {
+    font-size: 1.1rem;
   }
 
   #viewer-count {
@@ -1279,23 +1301,18 @@ footer {
     padding: 0.2rem 0.4rem;
   }
 
-  #user-status {
-    font-size: 0.8rem;
-  }
-
-  #video-wrapper {
-    border-radius: 8px;
-    border-width: 2px;
-  }
-
   #chat-container {
-    height: 300px;
-    border-radius: 8px;
+    height: 35vh;
+    min-height: 250px;
   }
 
   .chat-message {
     padding: 0.4rem 0.6rem;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+  }
+
+  .chat-message .nickname {
+    font-size: 0.85rem;
   }
 
   #recordings-list {
@@ -1304,5 +1321,11 @@ footer {
 
   .recording-card {
     padding: 0.75rem;
+  }
+
+  .pending-user {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
   }
 }
