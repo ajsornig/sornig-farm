@@ -388,7 +388,10 @@ function playStream(url) {
       enableWorker: true,
       lowLatencyMode: false,
       liveSyncDurationCount: 3,
-      liveMaxLatencyDurationCount: 5
+      liveMaxLatencyDurationCount: 10,
+      manifestLoadingTimeOut: 15000,
+      levelLoadingTimeOut: 15000,
+      fragLoadingTimeOut: 15000
     });
 
     hls.loadSource(url);
@@ -400,8 +403,20 @@ function playStream(url) {
 
     hls.on(Hls.Events.ERROR, (event, data) => {
       if (data.fatal) {
-        console.error('HLS error:', data);
-        showVideoOverlay('Stream unavailable');
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+          hls.recoverMediaError();
+        } else if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          setTimeout(() => hls.startLoad(), 3000);
+        } else {
+          showVideoOverlay('Stream unavailable');
+        }
+      }
+    });
+
+    // If video stalls, jump to live edge
+    video.addEventListener('waiting', () => {
+      if (hls && hls.liveSyncPosition && video.currentTime < hls.liveSyncPosition - 10) {
+        video.currentTime = hls.liveSyncPosition;
       }
     });
   } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
