@@ -1,0 +1,5 @@
+# Timelapse - grab frame every 5 min during daylight (6am-9pm)
+*/5 6-21 * * * /home/ajsornig/chicken-stream/scripts/timelapse.sh
+
+# Timelapse - stitch previous day at midnight
+0 0 * * * /home/ajsornig/chicken-stream/scripts/timelapse.sh --stitch

@@ -1,0 +1,13 @@
+[Unit]
+Description=Chicken cam motion detection (nighttime)
+After=camera-hls.service
+
+[Service]
+Type=simple
+User=ajsornig
+ExecStart=/home/ajsornig/chicken-stream/scripts/motion-detect.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

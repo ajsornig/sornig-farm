@@ -20,8 +20,13 @@ async function init() {
   }
   loadRecordings();
   loadVisitorStats();
+  loadWeather();
   setupChat();
   setupAuthUI();
+  setupNotifications();
+  updateNightMode();
+  setInterval(updateNightMode, 60000);
+  setInterval(loadWeather, 15 * 60000);
 }
 
 async function checkStatus() {
@@ -401,16 +406,27 @@ function playStream(url) {
       video.play().catch(() => {});
     });
 
+    let networkRetries = 0;
+
     hls.on(Hls.Events.ERROR, (event, data) => {
       if (data.fatal) {
         if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
           hls.recoverMediaError();
         } else if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-          setTimeout(() => hls.startLoad(), 3000);
+          networkRetries++;
+          if (networkRetries < 10) {
+            setTimeout(() => hls.startLoad(), 3000);
+          } else {
+            showVideoOverlay('Camera offline — check back soon');
+          }
         } else {
           showVideoOverlay('Stream unavailable');
         }
       }
+    });
+
+    hls.on(Hls.Events.FRAG_LOADED, () => {
+      networkRetries = 0;
     });
 
     // If video stalls, jump to live edge
@@ -524,6 +540,7 @@ function handleChatMessage(data) {
     case 'chat':
       chatHistory.push(data);
       appendMessage(data);
+      notifyChat(data.nickname, data.content);
       break;
 
     case 'auth_success':
@@ -768,6 +785,96 @@ async function doChangePassword() {
     errorEl.textContent = 'Failed to change password';
     errorEl.classList.remove('hidden');
   }
+}
+
+// Weather overlay
+async function loadWeather() {
+  try {
+    const res = await fetch('/api/weather');
+    if (!res.ok) return;
+    const weather = await res.json();
+
+    const el = document.getElementById('weather-widget');
+    if (!el) return;
+
+    const icon = getWeatherIcon(weather.code);
+    el.innerHTML = `
+      <span class="weather-icon">${icon}</span>
+      <span class="weather-temp">${weather.temp}°F</span>
+      <span class="weather-desc">${weather.description}</span>
+      <span class="weather-detail">💨 ${weather.windSpeed}mph · 💧 ${weather.humidity}%</span>
+    `;
+    el.classList.remove('hidden');
+  } catch (err) {
+    console.error('Weather load failed:', err);
+  }
+}
+
+function getWeatherIcon(code) {
+  if (code === 0) return '☀️';
+  if (code <= 2) return '⛅';
+  if (code === 3) return '☁️';
+  if (code >= 45 && code <= 48) return '🌫️';
+  if (code >= 51 && code <= 55) return '🌦️';
+  if (code >= 61 && code <= 65) return '🌧️';
+  if (code >= 71 && code <= 77) return '🌨️';
+  if (code >= 80 && code <= 82) return '🌧️';
+  if (code >= 85 && code <= 86) return '🌨️';
+  if (code >= 95) return '⛈️';
+  return '🌡️';
+}
+
+// Night mode badge
+function updateNightMode() {
+  const hour = new Date().getHours();
+  const isNight = hour >= 21 || hour < 6;
+  const badge = document.getElementById('night-mode-badge');
+  if (!badge) return;
+
+  if (isNight) {
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
+// Chat notifications
+let notificationsEnabled = false;
+
+function setupNotifications() {
+  if (!('Notification' in window)) return;
+
+  const btn = document.getElementById('notify-btn');
+  if (!btn) return;
+
+  if (Notification.permission === 'granted') {
+    notificationsEnabled = true;
+    btn.classList.add('active');
+  }
+
+  btn.onclick = async () => {
+    if (Notification.permission === 'granted') {
+      notificationsEnabled = !notificationsEnabled;
+      btn.classList.toggle('active', notificationsEnabled);
+    } else if (Notification.permission !== 'denied') {
+      const result = await Notification.requestPermission();
+      if (result === 'granted') {
+        notificationsEnabled = true;
+        btn.classList.add('active');
+      }
+    }
+  };
+}
+
+function notifyChat(nickname, content) {
+  if (!notificationsEnabled || document.hasFocus()) return;
+  if (nickname === currentUser) return;
+
+  new Notification(`${nickname} in Coop Chat`, {
+    body: content.substring(0, 100),
+    icon: '/favicon.ico',
+    tag: 'chicken-chat'
+  });
 }
 
 init();
