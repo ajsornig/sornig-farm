@@ -58,7 +58,9 @@ router.post('/login', (req, res) => {
     });
   }
   const ip = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.ip;
-  db.logActivity(result.username, 'login', { ip });
+  if (!result.isAdmin) {
+    db.logActivity(result.username, 'login', { ip });
+  }
   res.json(result);
 });
 
@@ -155,7 +157,9 @@ router.get('/me', (req, res) => {
   }
   const approved = db.isUserApproved(session.username);
   const ip = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.ip;
-  db.logActivity(session.username, 'page_visit', { ip });
+  if (!session.isAdmin) {
+    db.logActivity(session.username, 'page_visit', { ip });
+  }
   res.json({
     loggedIn: true,
     username: session.username,
