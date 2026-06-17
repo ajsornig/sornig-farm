@@ -19,6 +19,7 @@ async function init() {
     await loadCameras();
   }
   loadRecordings();
+  loadTimelapse();
   loadMotionCaptures();
   loadVisitorStats();
   loadWeather();
@@ -625,6 +626,35 @@ function appendSystemMessage(text) {
   el.textContent = text;
   messages.appendChild(el);
   messages.scrollTop = messages.scrollHeight;
+}
+
+async function loadTimelapse() {
+  try {
+    const res = await fetch('/api/timelapse');
+    const videos = await res.json();
+    const list = document.getElementById('timelapse-list');
+
+    if (videos.length === 0) {
+      list.innerHTML = '<p class="no-recordings">No timelapses yet — first one generates after midnight tonight</p>';
+      return;
+    }
+
+    list.innerHTML = videos.map(vid => {
+      const date = vid.filename.replace('timelapse-', '').replace('.mp4', '');
+      const size = formatSize(vid.size);
+      return `
+        <div class="timelapse-card">
+          <video src="${vid.url}" controls preload="none" poster=""></video>
+          <div class="timelapse-info">
+            <span class="timelapse-date">${date}</span>
+            <span class="timelapse-size">${size}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Failed to load timelapse:', err);
+  }
 }
 
 async function loadMotionCaptures() {

@@ -689,6 +689,63 @@ main {
   transform: translateY(-1px);
 }
 
+/* Timelapse */
+#timelapse-section {
+  max-width: 1400px;
+  margin: 2rem auto;
+  padding: 0 1.5rem;
+}
+
+#timelapse-section h2 {
+  margin-bottom: 0.25rem;
+  color: var(--wood-dark);
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+#timelapse-section h2::before {
+  content: "⏱";
+}
+
+#timelapse-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+}
+
+.timelapse-card {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid var(--wood-brown);
+  background: var(--cream-dark);
+}
+
+.timelapse-card video {
+  width: 100%;
+  display: block;
+  aspect-ratio: 4/3;
+  background: #000;
+}
+
+.timelapse-info {
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.timelapse-date {
+  font-weight: bold;
+  color: var(--wood-dark);
+}
+
+.timelapse-size {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
 /* Motion Captures */
 #motion-section {
   max-width: 1400px;
@@ -1373,6 +1430,7 @@ footer {
     flex-direction: row;
   }
 
+  #timelapse-section,
   #motion-section,
   #admin-panel,
   #recordings-section,
@@ -1381,11 +1439,16 @@ footer {
     margin: 1rem auto;
   }
 
+  #timelapse-section h2,
   #motion-section h2,
   #admin-panel h2,
   #recordings-section h2,
   #visitors-section h2 {
     font-size: 1.2rem;
+  }
+
+  #timelapse-list {
+    grid-template-columns: 1fr;
   }
 
   #motion-gallery {

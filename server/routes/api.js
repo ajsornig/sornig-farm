@@ -321,6 +321,29 @@ router.get('/recordings/:filename', requireAdmin, (req, res) => {
   res.sendFile(filepath);
 });
 
+router.get('/timelapse', (req, res) => {
+  const timelapseDir = path.join(__dirname, '../../public/timelapse');
+
+  if (!fs.existsSync(timelapseDir)) {
+    return res.json([]);
+  }
+
+  const files = fs.readdirSync(timelapseDir)
+    .filter(f => f.endsWith('.mp4'))
+    .map(filename => {
+      const stats = fs.statSync(path.join(timelapseDir, filename));
+      return {
+        filename,
+        url: `/timelapse/${filename}`,
+        size: stats.size,
+        created: stats.birthtime.toISOString()
+      };
+    })
+    .sort((a, b) => new Date(b.created) - new Date(a.created));
+
+  res.json(files);
+});
+
 router.get('/motion-captures', (req, res) => {
   const capturesDir = path.join(__dirname, '../../public/motion-captures');
 
