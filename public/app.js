@@ -19,6 +19,7 @@ async function init() {
     await loadCameras();
   }
   loadRecordings();
+  loadMotionCaptures();
   loadVisitorStats();
   loadWeather();
   setupChat();
@@ -624,6 +625,32 @@ function appendSystemMessage(text) {
   el.textContent = text;
   messages.appendChild(el);
   messages.scrollTop = messages.scrollHeight;
+}
+
+async function loadMotionCaptures() {
+  try {
+    const res = await fetch('/api/motion-captures');
+    const captures = await res.json();
+    const gallery = document.getElementById('motion-gallery');
+
+    if (captures.length === 0) {
+      gallery.innerHTML = '<p class="no-recordings">No motion captures yet — check back after nightfall</p>';
+      return;
+    }
+
+    gallery.innerHTML = captures.map(cap => {
+      const date = new Date(cap.created);
+      const label = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+      return `
+        <a href="${cap.url}" target="_blank" class="motion-thumb">
+          <img src="${cap.url}" alt="Motion ${label}" loading="lazy">
+          <span class="motion-time">${label}</span>
+        </a>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Failed to load motion captures:', err);
+  }
 }
 
 async function loadRecordings() {

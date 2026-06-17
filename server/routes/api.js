@@ -309,6 +309,29 @@ router.get('/recordings/:filename', requireAdmin, (req, res) => {
   res.sendFile(filepath);
 });
 
+router.get('/motion-captures', (req, res) => {
+  const capturesDir = path.join(__dirname, '../../public/motion-captures');
+
+  if (!fs.existsSync(capturesDir)) {
+    return res.json([]);
+  }
+
+  const files = fs.readdirSync(capturesDir)
+    .filter(f => f.endsWith('.jpg'))
+    .map(filename => {
+      const stats = fs.statSync(path.join(capturesDir, filename));
+      return {
+        filename,
+        url: `/motion-captures/${filename}`,
+        created: stats.birthtime.toISOString()
+      };
+    })
+    .sort((a, b) => new Date(b.created) - new Date(a.created))
+    .slice(0, 50);
+
+  res.json(files);
+});
+
 router.get('/status', (req, res) => {
   res.json({
     authEnabled: config.authEnabled,
