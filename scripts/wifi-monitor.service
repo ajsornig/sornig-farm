@@ -1,0 +1,13 @@
+[Unit]
+Description=WiFi signal and stream health monitor
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/home/ajsornig/chicken-stream/scripts/wifi-monitor.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
