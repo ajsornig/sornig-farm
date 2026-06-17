@@ -23,7 +23,6 @@ async function init() {
   loadWeather();
   setupChat();
   setupAuthUI();
-  setupNotifications();
   updateNightMode();
   setInterval(updateNightMode, 60000);
   setInterval(loadWeather, 15 * 60000);
@@ -540,7 +539,6 @@ function handleChatMessage(data) {
     case 'chat':
       chatHistory.push(data);
       appendMessage(data);
-      notifyChat(data.nickname, data.content);
       break;
 
     case 'auth_success':
@@ -836,45 +834,6 @@ function updateNightMode() {
   } else {
     badge.classList.add('hidden');
   }
-}
-
-// Chat notifications
-let notificationsEnabled = false;
-
-function setupNotifications() {
-  if (!('Notification' in window)) return;
-
-  const btn = document.getElementById('notify-btn');
-  if (!btn) return;
-
-  if (Notification.permission === 'granted') {
-    notificationsEnabled = true;
-    btn.classList.add('active');
-  }
-
-  btn.onclick = async () => {
-    if (Notification.permission === 'granted') {
-      notificationsEnabled = !notificationsEnabled;
-      btn.classList.toggle('active', notificationsEnabled);
-    } else if (Notification.permission !== 'denied') {
-      const result = await Notification.requestPermission();
-      if (result === 'granted') {
-        notificationsEnabled = true;
-        btn.classList.add('active');
-      }
-    }
-  };
-}
-
-function notifyChat(nickname, content) {
-  if (!notificationsEnabled || document.hasFocus()) return;
-  if (nickname === currentUser) return;
-
-  new Notification(`${nickname} in Coop Chat`, {
-    body: content.substring(0, 100),
-    icon: '/favicon.ico',
-    tag: 'chicken-chat'
-  });
 }
 
 init();
