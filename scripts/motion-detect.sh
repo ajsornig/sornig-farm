@@ -8,14 +8,16 @@ LOG="/home/ajsornig/chicken-stream/logs/motion.log"
 WORK_DIR="/tmp/motion-detect"
 
 # Configuration
-THRESHOLD=5          # Percentage of pixels that must change to trigger
+THRESHOLD=15         # Percentage of pixels that must change to trigger
 COOLDOWN=300         # Seconds between alerts
 CHECK_INTERVAL=10    # Seconds between frame checks
 NIGHT_ONLY=true      # Only run detection during night hours (9pm-6am)
+CONFIRM_COUNT=3      # Must detect motion N consecutive times before alerting
 
 mkdir -p "$CAPTURES_DIR" "$WORK_DIR"
 
 last_alert=0
+consecutive_triggers=0
 
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG"
@@ -31,7 +33,8 @@ is_nighttime() {
 
 grab_frame() {
   local output="$1"
-  ffmpeg -y -i "$STREAM" -frames:v 1 -vf "scale=320:240" -q:v 5 "$output" 2>/dev/null
+  # Blur slightly to reduce WiFi compression noise triggering false positives
+  ffmpeg -y -i "$STREAM" -frames:v 1 -vf "scale=320:240,gblur=sigma=2" -q:v 5 "$output" 2>/dev/null
   return $?
 }
 
@@ -121,7 +124,13 @@ while true; do
   if [ -f "$WORK_DIR/previous.jpg" ]; then
     percent=$(compare_frames "$WORK_DIR/previous.jpg" "$WORK_DIR/current.jpg")
     if [ -n "$percent" ] && [ "$percent" -gt "$THRESHOLD" ]; then
-      trigger_alert "$percent"
+      consecutive_triggers=$((consecutive_triggers + 1))
+      if [ "$consecutive_triggers" -ge "$CONFIRM_COUNT" ]; then
+        trigger_alert "$percent"
+        consecutive_triggers=0
+      fi
+    else
+      consecutive_triggers=0
     fi
   fi
 
