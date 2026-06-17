@@ -1350,6 +1350,7 @@ footer {
     flex-direction: row;
   }
 
+  #motion-section,
   #admin-panel,
   #recordings-section,
   #visitors-section {
@@ -1357,10 +1358,16 @@ footer {
     margin: 1rem auto;
   }
 
+  #motion-section h2,
   #admin-panel h2,
   #recordings-section h2,
   #visitors-section h2 {
     font-size: 1.2rem;
+  }
+
+  #motion-gallery {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.75rem;
   }
 
   #admin-tabs {
