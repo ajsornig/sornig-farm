@@ -3,7 +3,9 @@ const path = require('path');
 const crypto = require('crypto');
 
 const DATA_FILE = path.join(__dirname, '../data.json');
+const ACTIVITY_LOG_FILE = path.join(__dirname, '../logs/activity.json');
 const SESSION_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
+const ACTIVITY_MAX_ENTRIES = 200;
 
 let data = {
   messages: [],
@@ -347,6 +349,42 @@ function getStats() {
   };
 }
 
+function loadActivityLog() {
+  if (fs.existsSync(ACTIVITY_LOG_FILE)) {
+    try {
+      return JSON.parse(fs.readFileSync(ACTIVITY_LOG_FILE, 'utf-8'));
+    } catch (err) {
+      return [];
+    }
+  }
+  return [];
+}
+
+function saveActivityLog(log) {
+  const dir = path.dirname(ACTIVITY_LOG_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(ACTIVITY_LOG_FILE, JSON.stringify(log, null, 2));
+}
+
+function logActivity(username, action, details = null) {
+  const log = loadActivityLog();
+  log.push({
+    timestamp: Date.now(),
+    username,
+    action,
+    details
+  });
+  // Keep only the most recent entries
+  const trimmed = log.slice(-ACTIVITY_MAX_ENTRIES);
+  saveActivityLog(trimmed);
+}
+
+function getActivityLog() {
+  return loadActivityLog().reverse();
+}
+
 module.exports = {
   initDb,
   createUser,
@@ -372,5 +410,7 @@ module.exports = {
   clearAllMessages,
   pruneOldMessages,
   recordVisit,
-  getStats
+  getStats,
+  logActivity,
+  getActivityLog
 };

@@ -148,8 +148,11 @@ function setupAdminTabs() {
       const panel = tab.dataset.panel;
       document.getElementById('admin-pending').classList.toggle('hidden', panel !== 'pending');
       document.getElementById('admin-users').classList.toggle('hidden', panel !== 'users');
+      document.getElementById('admin-activity').classList.toggle('hidden', panel !== 'activity');
       document.getElementById('admin-stats').classList.toggle('hidden', panel !== 'stats');
       document.getElementById('admin-chat').classList.toggle('hidden', panel !== 'chat');
+
+      if (panel === 'activity') loadActivityLog();
     };
   });
 
@@ -302,6 +305,47 @@ async function deleteUser(username) {
   } catch (err) {
     console.error('Failed to delete user:', err);
     alert('Failed to delete user');
+  }
+}
+
+async function loadActivityLog() {
+  try {
+    const res = await fetch('/api/admin/activity', {
+      headers: { 'x-auth-token': authToken }
+    });
+    const activity = await res.json();
+
+    const list = document.getElementById('activity-list');
+    if (activity.length === 0) {
+      list.innerHTML = '<p class="no-pending">No activity recorded yet</p>';
+      return;
+    }
+
+    list.innerHTML = `<table id="activity-table">
+      <thead>
+        <tr><th>Time</th><th>User</th><th>Action</th><th>IP</th></tr>
+      </thead>
+      <tbody>
+        ${activity.map(entry => `
+          <tr>
+            <td>${new Date(entry.timestamp).toLocaleString()}</td>
+            <td><strong>${escapeHtml(entry.username)}</strong></td>
+            <td>${formatAction(entry.action)}</td>
+            <td>${entry.details && entry.details.ip ? escapeHtml(entry.details.ip) : '-'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>`;
+  } catch (err) {
+    console.error('Failed to load activity log:', err);
+  }
+}
+
+function formatAction(action) {
+  switch (action) {
+    case 'login': return '<span style="color: var(--forest-green);">Login</span>';
+    case 'page_visit': return 'Page Visit';
+    default: return escapeHtml(action);
   }
 }
 

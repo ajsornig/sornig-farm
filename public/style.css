@@ -1170,6 +1170,29 @@ main {
   color: var(--wood-dark);
 }
 
+#activity-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#activity-table th,
+#activity-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--wood-brown);
+  font-size: 0.85rem;
+}
+
+#activity-table th {
+  background: var(--wood-brown);
+  color: var(--cream);
+  font-weight: bold;
+}
+
+#activity-table tr:hover {
+  background: var(--cream);
+}
+
 #admin-chat .admin-btn {
   padding: 0.8rem 1.5rem;
   font-size: 1rem;

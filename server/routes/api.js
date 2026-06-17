@@ -57,6 +57,8 @@ router.post('/login', (req, res) => {
       message: 'Your account is pending admin approval.'
     });
   }
+  const ip = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.ip;
+  db.logActivity(result.username, 'login', { ip });
   res.json(result);
 });
 
@@ -152,6 +154,8 @@ router.get('/me', (req, res) => {
     return res.json({ loggedIn: false });
   }
   const approved = db.isUserApproved(session.username);
+  const ip = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.ip;
+  db.logActivity(session.username, 'page_visit', { ip });
   res.json({
     loggedIn: true,
     username: session.username,
@@ -220,6 +224,10 @@ router.post('/admin/users/:username/email', requireAdmin, (req, res) => {
     return res.status(400).json(result);
   }
   res.json({ success: true });
+});
+
+router.get('/admin/activity', requireAdmin, (req, res) => {
+  res.json(db.getActivityLog());
 });
 
 // Get pending users awaiting approval
