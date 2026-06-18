@@ -17,11 +17,11 @@ async function init() {
   updateContentVisibility();
   if (isApproved || !requireApproval) {
     await loadCameras();
+    loadRecordings();
+    loadTimelapse();
+    loadMotionCaptures();
+    loadVisitorStats();
   }
-  loadRecordings();
-  loadTimelapse();
-  loadMotionCaptures();
-  loadVisitorStats();
   loadWeather();
   setupChat();
   setupAuthUI();
@@ -41,12 +41,17 @@ async function checkStatus() {
 }
 
 function updateContentVisibility() {
-  // If approval is required and user is not approved, hide content
-  if (requireApproval && !isApproved) {
-    document.getElementById('video-container').classList.add('hidden');
-    document.getElementById('chat-messages').classList.add('hidden');
+  const protectedSections = [
+    'video-container', 'chat-messages', 'timelapse-section',
+    'motion-section', 'recordings-section', 'visitors-section'
+  ];
 
-    // Show appropriate message based on login state
+  if (requireApproval && !isApproved) {
+    protectedSections.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('hidden');
+    });
+
     if (!currentUser) {
       showLoginRequired();
     } else {
@@ -55,8 +60,10 @@ function updateContentVisibility() {
   } else {
     hideLoginRequired();
     hidePendingApproval();
-    document.getElementById('video-container').classList.remove('hidden');
-    document.getElementById('chat-messages').classList.remove('hidden');
+    protectedSections.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('hidden');
+    });
   }
 }
 
@@ -122,15 +129,17 @@ function showLoggedInState() {
   }
 
   updateContentVisibility();
+
+  if (isApproved || !requireApproval) {
+    loadCameras();
+    loadRecordings();
+    loadTimelapse();
+    loadMotionCaptures();
+    loadVisitorStats();
+  }
 }
 
 function showPendingApproval() {
-  // Hide video and show pending message
-  document.getElementById('video-container').classList.add('hidden');
-  document.getElementById('chat-container').classList.add('hidden');
-  document.getElementById('recordings-section').classList.add('hidden');
-  document.getElementById('visitors-section').classList.add('hidden');
-
   let pendingEl = document.getElementById('pending-approval');
   if (!pendingEl) {
     pendingEl = document.createElement('div');
@@ -148,10 +157,6 @@ function showPendingApproval() {
 function hidePendingApproval() {
   const pendingEl = document.getElementById('pending-approval');
   if (pendingEl) pendingEl.remove();
-  document.getElementById('video-container').classList.remove('hidden');
-  document.getElementById('chat-container').classList.remove('hidden');
-  document.getElementById('recordings-section').classList.remove('hidden');
-  document.getElementById('visitors-section').classList.remove('hidden');
 }
 
 function rerenderChat() {
