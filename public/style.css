@@ -1362,6 +1362,48 @@ main {
   display: block;
   aspect-ratio: 4/3;
   object-fit: cover;
+  cursor: pointer;
+}
+
+#timelapse-lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+}
+
+#timelapse-lightbox.active {
+  display: flex;
+}
+
+.lightbox-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.lightbox-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.lightbox-content img {
+  max-width: 100%;
+  max-height: 80vh;
+  border-radius: 8px;
+  border: 3px solid var(--cream);
+}
+
+.lightbox-actions {
+  margin-top: 1rem;
+  display: flex;
+  gap: 1rem;
 }
 
 .timelapse-frame-info {
@@ -1479,7 +1521,7 @@ footer {
     text-align: center;
   }
 
-  #change-password-btn,
+  #account-link,
   #logout-btn {
     font-size: 0.75rem;
     padding: 0.3rem 0.6rem;
@@ -1681,4 +1723,96 @@ footer {
     align-items: flex-start;
     gap: 0.5rem;
   }
+}
+
+#account-link {
+  color: var(--cream);
+  text-decoration: none;
+  padding: 0.4rem 0.8rem;
+  border: 2px solid var(--cream);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  transition: background 0.2s, color 0.2s;
+}
+
+#account-link:hover {
+  background: var(--cream);
+  color: var(--barn-red);
+}
+
+.account-section {
+  background: var(--card-bg);
+  border: 2px solid var(--wood-brown);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.account-section h3 {
+  color: var(--forest-green);
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+}
+
+.account-field {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--wood-brown);
+}
+
+.account-field:last-child {
+  border-bottom: none;
+}
+
+.account-field label {
+  font-weight: bold;
+  color: var(--wood-brown);
+  min-width: 120px;
+}
+
+.account-value {
+  color: var(--text-color);
+  flex: 1;
+}
+
+.account-danger {
+  border-color: var(--barn-red);
+}
+
+.account-danger h3 {
+  color: var(--barn-red);
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--wood-brown);
+  font-weight: bold;
+}
+
+.form-group input {
+  width: 100%;
+  max-width: 300px;
+  padding: 0.6rem;
+  border: 2px solid var(--wood-brown);
+  border-radius: 6px;
+  font-size: 1rem;
+  background: var(--cream);
+  box-sizing: border-box;
+}
+
+.form-error {
+  color: var(--barn-red);
+  margin-top: 0.5rem;
+}
+
+.form-success {
+  color: var(--forest-green);
+  margin-top: 0.5rem;
 }

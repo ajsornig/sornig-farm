@@ -156,6 +156,7 @@ router.get('/me', (req, res) => {
     return res.json({ loggedIn: false });
   }
   const approved = db.isUserApproved(session.username);
+  const user = db.getUser(session.username);
   const ip = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.ip;
   if (!session.isAdmin) {
     db.logActivity(session.username, 'page_visit', { ip });
@@ -165,8 +166,46 @@ router.get('/me', (req, res) => {
     username: session.username,
     isAdmin: session.isAdmin,
     approved: approved,
-    requireApproval: config.requireApproval
+    requireApproval: config.requireApproval,
+    email: user ? user.email : null,
+    createdAt: user ? user.createdAt : null
   });
+});
+
+router.post('/account/email', (req, res) => {
+  const token = req.headers['x-auth-token'];
+  if (!token) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  const session = db.getSession(token);
+  if (!session) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  const { email } = req.body;
+  const result = db.updateUserEmail(session.username, email);
+  if (result.error) {
+    return res.status(400).json(result);
+  }
+  res.json({ success: true });
+});
+
+router.delete('/account', (req, res) => {
+  const token = req.headers['x-auth-token'];
+  if (!token) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  const session = db.getSession(token);
+  if (!session) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  if (session.isAdmin) {
+    return res.status(403).json({ error: 'Admin accounts cannot self-delete' });
+  }
+  const deleted = db.deleteUser(session.username);
+  if (!deleted) {
+    return res.status(404).json({ error: 'Account not found' });
+  }
+  res.json({ success: true });
 });
 
 function requireAdmin(req, res, next) {
@@ -237,6 +276,19 @@ router.get('/admin/activity', requireAdmin, (req, res) => {
 router.delete('/admin/activity', requireAdmin, (req, res) => {
   db.clearActivityLog();
   res.json({ success: true });
+});
+
+router.delete('/admin/activity/:index', requireAdmin, (req, res) => {
+  const index = parseInt(req.params.index);
+  if (isNaN(index)) {
+    return res.status(400).json({ error: 'Invalid index' });
+  }
+  const result = db.deleteActivityEntry(index);
+  if (result) {
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ error: 'Entry not found' });
+  }
 });
 
 // Get pending users awaiting approval

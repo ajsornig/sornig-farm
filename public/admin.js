@@ -425,15 +425,16 @@ async function loadActivityLog() {
     list.innerHTML = `<button class="admin-btn" onclick="clearActivityLog()" style="margin-bottom:1rem;">Clear All Logs</button>
     <table id="activity-table">
       <thead>
-        <tr><th>Time</th><th>User</th><th>Action</th><th>IP</th></tr>
+        <tr><th>Time</th><th>User</th><th>Action</th><th>IP</th><th></th></tr>
       </thead>
       <tbody>
-        ${activity.map(entry => `
-          <tr>
+        ${activity.map((entry, i) => `
+          <tr id="activity-row-${i}">
             <td>${new Date(entry.timestamp).toLocaleString()}</td>
             <td><strong>${escapeHtml(entry.username)}</strong></td>
             <td>${formatAction(entry.action)}</td>
             <td>${entry.details && entry.details.ip ? escapeHtml(entry.details.ip) : '-'}</td>
+            <td><button class="deny-btn" onclick="deleteActivityEntry(${i})" title="Delete">&#10005;</button></td>
           </tr>
         `).join('')}
       </tbody>
@@ -491,7 +492,7 @@ async function loadTimelapseFrames() {
       html += `<h4 style="margin:0.75rem 0 0.5rem;color:var(--forest-green);">Chicken Run</h4>`;
       html += '<div class="timelapse-grid">' + runFrames.map(frame => `
         <div class="timelapse-frame-card" id="frame-${escapeHtml(frame.cam)}-${escapeHtml(frame.filename)}">
-          <img src="${frame.url}" alt="${frame.time}" loading="lazy">
+          <img src="${frame.url}" alt="${frame.time}" loading="lazy" onclick="openLightbox('${frame.url}','${escapeHtml(frame.cam)}','${escapeHtml(frame.filename)}')">
           <div class="timelapse-frame-info">
             <span>${frame.time}</span>
             <button class="deny-btn" onclick="deleteTimelapseFrame('${escapeHtml(frame.cam)}','${escapeHtml(frame.filename)}')">Delete</button>
@@ -504,7 +505,7 @@ async function loadTimelapseFrames() {
       html += `<h4 style="margin:0.75rem 0 0.5rem;color:var(--forest-green);">Chicken Coop</h4>`;
       html += '<div class="timelapse-grid">' + coopFrames.map(frame => `
         <div class="timelapse-frame-card" id="frame-${escapeHtml(frame.cam)}-${escapeHtml(frame.filename)}">
-          <img src="${frame.url}" alt="${frame.time}" loading="lazy">
+          <img src="${frame.url}" alt="${frame.time}" loading="lazy" onclick="openLightbox('${frame.url}','${escapeHtml(frame.cam)}','${escapeHtml(frame.filename)}')">
           <div class="timelapse-frame-info">
             <span>${frame.time}</span>
             <button class="deny-btn" onclick="deleteTimelapseFrame('${escapeHtml(frame.cam)}','${escapeHtml(frame.filename)}')">Delete</button>
@@ -531,6 +532,50 @@ async function deleteTimelapseFrame(cam, filename) {
   } catch (err) {
     console.error('Failed to delete frame:', err);
   }
+}
+
+async function deleteActivityEntry(index) {
+  try {
+    const res = await fetch(`/api/admin/activity/${index}`, {
+      method: 'DELETE',
+      headers: { 'x-auth-token': authToken }
+    });
+    if ((await res.json()).success) {
+      document.getElementById(`activity-row-${index}`).remove();
+    }
+  } catch (err) {
+    console.error('Failed to delete activity entry:', err);
+  }
+}
+
+function openLightbox(url, cam, filename) {
+  let lb = document.getElementById('timelapse-lightbox');
+  if (!lb) {
+    lb = document.createElement('div');
+    lb.id = 'timelapse-lightbox';
+    lb.innerHTML = `
+      <div class="lightbox-backdrop" onclick="closeLightbox()"></div>
+      <div class="lightbox-content">
+        <img id="lightbox-img" src="" alt="Frame">
+        <div class="lightbox-actions">
+          <button class="approve-btn" onclick="closeLightbox()">Close</button>
+          <button class="deny-btn" id="lightbox-delete-btn">Delete Frame</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(lb);
+  }
+  document.getElementById('lightbox-img').src = url;
+  document.getElementById('lightbox-delete-btn').onclick = () => {
+    deleteTimelapseFrame(cam, filename);
+    closeLightbox();
+  };
+  lb.classList.add('active');
+}
+
+function closeLightbox() {
+  const lb = document.getElementById('timelapse-lightbox');
+  if (lb) lb.classList.remove('active');
 }
 
 init();

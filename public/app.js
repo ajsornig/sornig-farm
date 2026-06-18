@@ -119,7 +119,7 @@ function showLoggedInState() {
     statusEl.textContent = `Welcome, ${currentUser}`;
   }
   document.getElementById('logout-btn').classList.remove('hidden');
-  document.getElementById('change-password-btn').classList.remove('hidden');
+  document.getElementById('account-link').classList.remove('hidden');
   document.getElementById('auth-section').classList.add('hidden');
   document.getElementById('chat-input-area').classList.remove('hidden');
 
@@ -194,7 +194,6 @@ function setupAuthUI() {
     if (e.key === 'Enter') doForgotPassword();
   };
 
-  document.getElementById('change-password-btn').onclick = showChangePasswordModal;
   document.getElementById('change-password-cancel').onclick = hideChangePasswordModal;
   document.getElementById('change-password-submit').onclick = doChangePassword;
 
@@ -321,7 +320,7 @@ async function doLogout() {
 
   document.getElementById('user-status').textContent = '';
   document.getElementById('logout-btn').classList.add('hidden');
-  document.getElementById('change-password-btn').classList.add('hidden');
+  document.getElementById('account-link').classList.add('hidden');
   document.getElementById('admin-clear-btn').classList.add('hidden');
   document.getElementById('auth-section').classList.remove('hidden');
   document.getElementById('chat-input-area').classList.add('hidden');

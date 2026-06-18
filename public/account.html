@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account - Sornig Farm</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐔</text></svg>">
+</head>
+<body>
+  <header>
+    <div class="logo-section">
+      <span class="logo-icon">🐔</span>
+      <div class="logo-text">
+        <h1>Sornig Farm</h1>
+        <span class="tagline">My Account</span>
+      </div>
+    </div>
+    <div id="user-area">
+      <span id="user-status"></span>
+      <a href="/" class="back-link">Back to Site</a>
+      <button id="logout-btn" class="hidden">Logout</button>
+    </div>
+  </header>
+
+  <main class="admin-main">
+    <div id="account-loading">Checking authorization...</div>
+
+    <div id="account-unauthorized" class="hidden">
+      <h2>Not Logged In</h2>
+      <p>You must be logged in to view your account settings.</p>
+      <a href="/">Return to main site</a>
+    </div>
+
+    <section id="account-panel" class="hidden">
+      <h2>Account Settings</h2>
+
+      <div class="account-section">
+        <h3>Profile</h3>
+        <div class="account-field">
+          <label>Username</label>
+          <span id="account-username" class="account-value"></span>
+        </div>
+        <div class="account-field">
+          <label>Email</label>
+          <span id="account-email" class="account-value"></span>
+          <button class="admin-btn" onclick="editMyEmail()">Change</button>
+        </div>
+        <div class="account-field">
+          <label>Member since</label>
+          <span id="account-created" class="account-value"></span>
+        </div>
+      </div>
+
+      <div class="account-section">
+        <h3>Change Password</h3>
+        <form id="change-password-form" onsubmit="changePassword(event)">
+          <div class="form-group">
+            <label for="current-password">Current Password</label>
+            <input type="password" id="current-password" required>
+          </div>
+          <div class="form-group">
+            <label for="new-password">New Password</label>
+            <input type="password" id="new-password" required minlength="4">
+          </div>
+          <div class="form-group">
+            <label for="confirm-password">Confirm New Password</label>
+            <input type="password" id="confirm-password" required minlength="4">
+          </div>
+          <button type="submit" class="admin-btn">Update Password</button>
+          <p id="password-message" class="hidden"></p>
+        </form>
+      </div>
+
+      <div class="account-section account-danger">
+        <h3>Danger Zone</h3>
+        <p>Permanently delete your account and all associated data.</p>
+        <button class="deny-btn" onclick="deleteMyAccount()">Delete My Account</button>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Sornig Farm</p>
+  </footer>
+
+  <script src="account.js"></script>
+</body>
+</html>

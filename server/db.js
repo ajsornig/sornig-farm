@@ -385,6 +385,15 @@ function getActivityLog() {
   return loadActivityLog().reverse();
 }
 
+function deleteActivityEntry(index) {
+  const log = loadActivityLog();
+  const reversed = log.reverse();
+  if (index < 0 || index >= reversed.length) return false;
+  reversed.splice(index, 1);
+  saveActivityLog(reversed.reverse());
+  return true;
+}
+
 function clearActivityLog() {
   saveActivityLog([]);
 }
@@ -417,5 +426,6 @@ module.exports = {
   getStats,
   logActivity,
   getActivityLog,
+  deleteActivityEntry,
   clearActivityLog
 };
