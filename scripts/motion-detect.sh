@@ -8,7 +8,7 @@ LOG="/home/ajsornig/chicken-stream/logs/motion.log"
 WORK_DIR="/tmp/motion-detect"
 
 # Configuration
-THRESHOLD=15         # Percentage of pixels that must change to trigger
+THRESHOLD=40         # Percentage of pixels that must change to trigger
 COOLDOWN=300         # Seconds between alerts
 CHECK_INTERVAL=10    # Seconds between frame checks
 NIGHT_ONLY=true      # Only run detection during night hours (9pm-6am)
