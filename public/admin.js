@@ -148,15 +148,18 @@ function setupAdminTabs() {
       const panel = tab.dataset.panel;
       document.getElementById('admin-pending').classList.toggle('hidden', panel !== 'pending');
       document.getElementById('admin-users').classList.toggle('hidden', panel !== 'users');
+      document.getElementById('admin-motion').classList.toggle('hidden', panel !== 'motion');
       document.getElementById('admin-activity').classList.toggle('hidden', panel !== 'activity');
       document.getElementById('admin-stats').classList.toggle('hidden', panel !== 'stats');
       document.getElementById('admin-chat').classList.toggle('hidden', panel !== 'chat');
 
       if (panel === 'activity') loadActivityLog();
+      if (panel === 'motion') loadMotionPending();
     };
   });
 
   document.getElementById('admin-clear-btn').onclick = clearChat;
+  document.getElementById('reject-all-btn').onclick = rejectAllMotion;
 }
 
 function setupChatConnection() {
@@ -305,6 +308,89 @@ async function deleteUser(username) {
   } catch (err) {
     console.error('Failed to delete user:', err);
     alert('Failed to delete user');
+  }
+}
+
+async function loadMotionPending() {
+  try {
+    const res = await fetch('/api/admin/motion-pending', {
+      headers: { 'x-auth-token': authToken }
+    });
+    const captures = await res.json();
+    const list = document.getElementById('motion-pending-list');
+
+    if (captures.length === 0) {
+      list.innerHTML = '<p class="no-pending">No pending motion captures</p>';
+      return;
+    }
+
+    list.innerHTML = captures.map(cap => {
+      const date = new Date(cap.created);
+      const label = date.toLocaleString();
+      return `
+        <div class="motion-pending-item" id="motion-${escapeHtml(cap.filename)}">
+          <img src="${cap.url}" alt="Motion capture" loading="lazy">
+          <div class="motion-pending-info">
+            <span>${label}</span>
+            <div class="motion-pending-actions">
+              <button class="approve-btn" onclick="approveMotion('${escapeHtml(cap.filename)}')">Approve</button>
+              <button class="deny-btn" onclick="rejectMotion('${escapeHtml(cap.filename)}')">Reject</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Failed to load motion pending:', err);
+  }
+}
+
+async function approveMotion(filename) {
+  try {
+    const res = await fetch(`/api/admin/motion-pending/${filename}/approve`, {
+      method: 'POST',
+      headers: { 'x-auth-token': authToken }
+    });
+    if ((await res.json()).success) {
+      document.getElementById(`motion-${filename}`).remove();
+    }
+  } catch (err) {
+    console.error('Failed to approve:', err);
+  }
+}
+
+async function rejectMotion(filename) {
+  try {
+    const res = await fetch(`/api/admin/motion-pending/${filename}/reject`, {
+      method: 'POST',
+      headers: { 'x-auth-token': authToken }
+    });
+    if ((await res.json()).success) {
+      document.getElementById(`motion-${filename}`).remove();
+    }
+  } catch (err) {
+    console.error('Failed to reject:', err);
+  }
+}
+
+async function rejectAllMotion() {
+  if (!confirm('Reject all pending motion captures?')) return;
+
+  try {
+    const res = await fetch('/api/admin/motion-pending', {
+      headers: { 'x-auth-token': authToken }
+    });
+    const captures = await res.json();
+
+    for (const cap of captures) {
+      await fetch(`/api/admin/motion-pending/${cap.filename}/reject`, {
+        method: 'POST',
+        headers: { 'x-auth-token': authToken }
+      });
+    }
+    loadMotionPending();
+  } catch (err) {
+    console.error('Failed to reject all:', err);
   }
 }
 

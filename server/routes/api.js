@@ -367,6 +367,56 @@ router.get('/motion-captures', (req, res) => {
   res.json(files);
 });
 
+router.get('/admin/motion-pending', requireAdmin, (req, res) => {
+  const pendingDir = path.join(__dirname, '../../public/motion-captures/pending');
+
+  if (!fs.existsSync(pendingDir)) {
+    return res.json([]);
+  }
+
+  const files = fs.readdirSync(pendingDir)
+    .filter(f => f.endsWith('.jpg'))
+    .map(filename => {
+      const stats = fs.statSync(path.join(pendingDir, filename));
+      return {
+        filename,
+        url: `/motion-captures/pending/${filename}`,
+        created: stats.birthtime.toISOString()
+      };
+    })
+    .sort((a, b) => new Date(b.created) - new Date(a.created));
+
+  res.json(files);
+});
+
+router.post('/admin/motion-pending/:filename/approve', requireAdmin, (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const pendingDir = path.join(__dirname, '../../public/motion-captures/pending');
+  const approvedDir = path.join(__dirname, '../../public/motion-captures');
+  const src = path.join(pendingDir, filename);
+  const dest = path.join(approvedDir, filename);
+
+  if (!fs.existsSync(src)) {
+    return res.status(404).json({ error: 'File not found' });
+  }
+
+  fs.renameSync(src, dest);
+  res.json({ success: true });
+});
+
+router.post('/admin/motion-pending/:filename/reject', requireAdmin, (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const pendingDir = path.join(__dirname, '../../public/motion-captures/pending');
+  const filepath = path.join(pendingDir, filename);
+
+  if (!fs.existsSync(filepath)) {
+    return res.status(404).json({ error: 'File not found' });
+  }
+
+  fs.unlinkSync(filepath);
+  res.json({ success: true });
+});
+
 router.get('/status', (req, res) => {
   res.json({
     authEnabled: config.authEnabled,

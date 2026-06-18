@@ -11,7 +11,7 @@ WORK_DIR="/tmp/motion-detect"
 THRESHOLD=40         # Percentage of pixels that must change to trigger
 COOLDOWN=300         # Seconds between alerts
 CHECK_INTERVAL=10    # Seconds between frame checks
-NIGHT_ONLY=true      # Only run detection during night hours (9pm-6am)
+NIGHT_ONLY=false     # Run 24/7 for testing (normally true for night only)
 CONFIRM_COUNT=3      # Must detect motion N consecutive times before alerting
 
 mkdir -p "$CAPTURES_DIR" "$WORK_DIR"
@@ -69,16 +69,17 @@ trigger_alert() {
   last_alert=$now
   local timestamp=$(date '+%Y-%m-%d_%H%M%S')
 
-  # Save the motion frame
-  cp "$WORK_DIR/current.jpg" "$CAPTURES_DIR/motion-${timestamp}.jpg"
+  # Save to pending folder for admin approval
+  mkdir -p "$CAPTURES_DIR/pending"
+  cp "$WORK_DIR/current.jpg" "$CAPTURES_DIR/pending/motion-${timestamp}.jpg"
 
-  log "ALERT: Motion detected (${percent}% change) - saved motion-${timestamp}.jpg"
+  log "ALERT: Motion detected (${percent}% change) - pending motion-${timestamp}.jpg"
 
   # Write alert file for other processes to pick up
   echo "${timestamp}|${percent}" > /tmp/motion-alert
 
-  # Keep only last 50 captures
-  ls -t "$CAPTURES_DIR"/motion-*.jpg 2>/dev/null | tail -n +51 | xargs rm -f 2>/dev/null
+  # Keep only last 50 pending captures
+  ls -t "$CAPTURES_DIR/pending"/motion-*.jpg 2>/dev/null | tail -n +51 | xargs rm -f 2>/dev/null
 }
 
 cleanup() {
