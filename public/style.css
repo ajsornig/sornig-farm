@@ -179,13 +179,11 @@ main {
 #video-grid .grid-cam {
   border-radius: 8px;
   overflow: hidden;
-  cursor: pointer;
   transition: transform 0.15s;
   border: 3px solid var(--wood-brown);
 }
 
 #video-grid .grid-cam:hover {
-  transform: scale(1.02);
   border-color: var(--forest-green);
 }
 
@@ -203,6 +201,13 @@ main {
   text-align: center;
   font-size: 0.9rem;
   font-family: Georgia, serif;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#video-grid .grid-cam-label:hover {
+  background: var(--forest-green);
+  filter: brightness(1.2);
 }
 
 #video-overlay {

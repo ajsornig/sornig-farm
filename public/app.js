@@ -411,14 +411,17 @@ function showAllCams(tabBtn) {
   cameras.forEach((cam) => {
     const card = document.createElement('div');
     card.className = 'grid-cam';
-    card.innerHTML = `<video autoplay muted></video><div class="grid-cam-label">${cam.name}</div>`;
-    card.onclick = () => {
+    card.innerHTML = `<video autoplay muted playsinline></video><div class="grid-cam-label">${cam.name}</div>`;
+    grid.appendChild(card);
+
+    const label = card.querySelector('.grid-cam-label');
+    label.onclick = () => {
       const btn = [...document.querySelectorAll('.camera-tab')].find(t => t.textContent === cam.name);
       selectCamera(cam, btn);
     };
-    grid.appendChild(card);
 
     const video = card.querySelector('video');
+    video.onclick = (e) => e.stopPropagation();
     const hlsPlayer = new Hls({ enableWorker: true, lowLatencyMode: false });
     hlsPlayer.loadSource(cam.streamUrl);
     hlsPlayer.attachMedia(video);
@@ -821,7 +824,7 @@ async function loadVisitorStats() {
       maxBounds: [[-90, -180], [90, 180]],
       maxBoundsViscosity: 1.0,
       minZoom: 2
-    }).setView([39, -95], 4);
+    }).setView([39, -98], 3);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
