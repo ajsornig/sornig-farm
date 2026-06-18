@@ -149,12 +149,14 @@ function setupAdminTabs() {
       document.getElementById('admin-pending').classList.toggle('hidden', panel !== 'pending');
       document.getElementById('admin-users').classList.toggle('hidden', panel !== 'users');
       document.getElementById('admin-motion').classList.toggle('hidden', panel !== 'motion');
+      document.getElementById('admin-timelapse').classList.toggle('hidden', panel !== 'timelapse');
       document.getElementById('admin-activity').classList.toggle('hidden', panel !== 'activity');
       document.getElementById('admin-stats').classList.toggle('hidden', panel !== 'stats');
       document.getElementById('admin-chat').classList.toggle('hidden', panel !== 'chat');
 
       if (panel === 'activity') loadActivityLog();
       if (panel === 'motion') loadMotionPending();
+      if (panel === 'timelapse') loadTimelapseFrames();
     };
   });
 
@@ -465,6 +467,48 @@ async function doLogout() {
   isAdmin = false;
 
   window.location.href = '/';
+}
+
+async function loadTimelapseFrames() {
+  try {
+    const res = await fetch('/api/admin/timelapse-frames', {
+      headers: { 'x-auth-token': authToken }
+    });
+    const frames = await res.json();
+    const list = document.getElementById('timelapse-frames-list');
+
+    if (frames.length === 0) {
+      list.innerHTML = '<p class="no-pending">No frames captured today yet</p>';
+      return;
+    }
+
+    list.innerHTML = `<p style="margin-bottom:0.5rem;color:var(--wood-brown);">${frames.length} frames today</p>` +
+      '<div class="timelapse-grid">' + frames.map(frame => `
+        <div class="timelapse-frame-card" id="frame-${escapeHtml(frame.filename)}">
+          <img src="${frame.url}" alt="${frame.time}" loading="lazy">
+          <div class="timelapse-frame-info">
+            <span>${frame.time}</span>
+            <button class="deny-btn" onclick="deleteTimelapseFrame('${escapeHtml(frame.filename)}')">Delete</button>
+          </div>
+        </div>
+      `).join('') + '</div>';
+  } catch (err) {
+    console.error('Failed to load timelapse frames:', err);
+  }
+}
+
+async function deleteTimelapseFrame(filename) {
+  try {
+    const res = await fetch(`/api/admin/timelapse-frames/${filename}`, {
+      method: 'DELETE',
+      headers: { 'x-auth-token': authToken }
+    });
+    if ((await res.json()).success) {
+      document.getElementById(`frame-${filename}`).remove();
+    }
+  } catch (err) {
+    console.error('Failed to delete frame:', err);
+  }
 }
 
 init();

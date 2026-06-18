@@ -38,6 +38,7 @@
         <button class="admin-tab active" data-panel="pending">Pending</button>
         <button class="admin-tab" data-panel="users">Users</button>
         <button class="admin-tab" data-panel="motion">Motion</button>
+        <button class="admin-tab" data-panel="timelapse">Timelapse</button>
         <button class="admin-tab" data-panel="activity">Activity</button>
         <button class="admin-tab" data-panel="stats">Stats</button>
         <button class="admin-tab" data-panel="chat">Chat</button>
@@ -67,6 +68,11 @@
           <button id="reject-all-btn" class="admin-btn">Reject All</button>
         </div>
         <div id="motion-pending-list"></div>
+      </div>
+      <div id="admin-timelapse" class="admin-content hidden">
+        <h3>Today's Timelapse Frames</h3>
+        <p class="admin-note">Frames captured today. Delete any you don't want in tonight's video.</p>
+        <div id="timelapse-frames-list"></div>
       </div>
       <div id="admin-activity" class="admin-content hidden">
         <h3>Visitor Activity Log</h3>

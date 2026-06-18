@@ -349,6 +349,49 @@ router.get('/timelapse', (req, res) => {
   res.json(files);
 });
 
+router.get('/admin/timelapse-frames', requireAdmin, (req, res) => {
+  const framesDir = path.join(__dirname, '../../timelapse/frames');
+
+  if (!fs.existsSync(framesDir)) {
+    return res.json([]);
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const files = fs.readdirSync(framesDir)
+    .filter(f => f.endsWith('.jpg') && f.startsWith(today))
+    .sort()
+    .map(filename => ({
+      filename,
+      url: `/api/admin/timelapse-frames/${filename}`,
+      time: filename.replace(today + '_', '').replace('.jpg', '').replace(/(\d{2})(\d{2})/, '$1:$2')
+    }));
+
+  res.json(files);
+});
+
+router.get('/admin/timelapse-frames/:filename', requireAdmin, (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const filepath = path.join(__dirname, '../../timelapse/frames', filename);
+
+  if (!fs.existsSync(filepath)) {
+    return res.status(404).json({ error: 'Frame not found' });
+  }
+
+  res.sendFile(filepath);
+});
+
+router.delete('/admin/timelapse-frames/:filename', requireAdmin, (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const filepath = path.join(__dirname, '../../timelapse/frames', filename);
+
+  if (!fs.existsSync(filepath)) {
+    return res.status(404).json({ error: 'Frame not found' });
+  }
+
+  fs.unlinkSync(filepath);
+  res.json({ success: true });
+});
+
 router.get('/motion-captures', (req, res) => {
   const capturesDir = path.join(__dirname, '../../public/motion-captures');
 
