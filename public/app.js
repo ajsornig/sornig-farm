@@ -194,8 +194,6 @@ function setupAuthUI() {
     if (e.key === 'Enter') doForgotPassword();
   };
 
-  document.getElementById('change-password-cancel').onclick = hideChangePasswordModal;
-  document.getElementById('change-password-submit').onclick = doChangePassword;
 
   document.querySelectorAll('.toggle-password').forEach(btn => {
     btn.onclick = () => {
@@ -871,66 +869,6 @@ async function doForgotPassword() {
   }
 }
 
-function showChangePasswordModal() {
-  document.getElementById('change-password-modal').classList.remove('hidden');
-  document.getElementById('current-password').value = '';
-  document.getElementById('new-password').value = '';
-  document.getElementById('confirm-password').value = '';
-  document.getElementById('change-password-error').classList.add('hidden');
-}
-
-function hideChangePasswordModal() {
-  document.getElementById('change-password-modal').classList.add('hidden');
-}
-
-async function doChangePassword() {
-  const currentPassword = document.getElementById('current-password').value;
-  const newPassword = document.getElementById('new-password').value;
-  const confirmPassword = document.getElementById('confirm-password').value;
-  const errorEl = document.getElementById('change-password-error');
-
-  if (!currentPassword || !newPassword) {
-    errorEl.textContent = 'All fields required';
-    errorEl.classList.remove('hidden');
-    return;
-  }
-
-  if (newPassword !== confirmPassword) {
-    errorEl.textContent = 'New passwords do not match';
-    errorEl.classList.remove('hidden');
-    return;
-  }
-
-  if (newPassword.length < 4) {
-    errorEl.textContent = 'Password must be at least 4 characters';
-    errorEl.classList.remove('hidden');
-    return;
-  }
-
-  try {
-    const res = await fetch('/api/change-password', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-auth-token': authToken
-      },
-      body: JSON.stringify({ currentPassword, newPassword })
-    });
-    const data = await res.json();
-
-    if (data.error) {
-      errorEl.textContent = data.error;
-      errorEl.classList.remove('hidden');
-      return;
-    }
-
-    hideChangePasswordModal();
-    alert('Password changed successfully!');
-  } catch (err) {
-    errorEl.textContent = 'Failed to change password';
-    errorEl.classList.remove('hidden');
-  }
-}
 
 // Weather overlay
 async function loadWeather() {

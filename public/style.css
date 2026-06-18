@@ -1550,6 +1550,7 @@ footer {
   #camera-tabs {
     flex-wrap: wrap;
     padding: 0.5rem 0.5rem 0;
+    gap: 0.25rem;
   }
 
   .camera-tab {
@@ -1561,6 +1562,7 @@ footer {
     border-radius: 0;
     border-left: none;
     border-right: none;
+    border-width: 3px;
   }
 
   #video-grid {
@@ -1568,6 +1570,17 @@ footer {
     border-radius: 0;
     border-left: none;
     border-right: none;
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+
+  #video-grid .grid-cam {
+    border-width: 2px;
+  }
+
+  #video-grid .grid-cam-label {
+    padding: 0.3rem;
+    font-size: 0.8rem;
   }
 
   #video-player {
@@ -1576,10 +1589,14 @@ footer {
 
   #chat-container {
     width: 100%;
-    height: 40vh;
+    height: auto;
+    max-height: 50vh;
+    min-height: 280px;
     border-radius: 0;
     border-left: none;
     border-right: none;
+    border-top: none;
+    border-width: 2px;
   }
 
   #chat-header {
@@ -1590,22 +1607,44 @@ footer {
 
   #chat-messages {
     font-size: 0.9rem;
+    min-height: 120px;
   }
 
   #chat-input-area {
     border-radius: 0;
+    padding: 0.5rem;
   }
 
   #chat-input {
-    font-size: 16px; /* Prevents iOS zoom on focus */
+    font-size: 16px;
+    padding: 0.5rem 0.6rem;
+  }
+
+  #send-btn {
+    padding: 0.5rem 0.8rem;
+    font-size: 0.85rem;
+  }
+
+  #auth-section {
+    padding: 0.6rem;
   }
 
   #auth-section input {
-    font-size: 16px; /* Prevents iOS zoom on focus */
+    font-size: 16px;
+    padding: 0.5rem 0.6rem;
   }
 
   .auth-buttons {
     flex-direction: row;
+  }
+
+  .auth-buttons button {
+    padding: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .forgot-link {
+    font-size: 0.8rem;
   }
 
   #timelapse-section,
@@ -1623,6 +1662,10 @@ footer {
   #recordings-section h2,
   #visitors-section h2 {
     font-size: 1.2rem;
+  }
+
+  .section-subtitle {
+    font-size: 0.85rem;
   }
 
   #timelapse-list {
@@ -1672,12 +1715,39 @@ footer {
   }
 
   footer {
-    padding: 1.5rem 1rem;
+    padding: 1rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .account-section {
+    padding: 1rem;
+  }
+
+  .account-field {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .account-field label {
+    min-width: 100%;
     font-size: 0.85rem;
+  }
+
+  .form-group input {
+    max-width: 100%;
+  }
+
+  .admin-main {
+    padding: 0 0.75rem;
+    margin: 1rem auto;
   }
 }
 
 @media (max-width: 480px) {
+  header {
+    padding: 0.5rem;
+  }
+
   .logo-section {
     flex-direction: column;
     gap: 0.25rem;
@@ -1691,14 +1761,31 @@ footer {
     font-size: 1.1rem;
   }
 
+  .logo-text .tagline {
+    display: none;
+  }
+
   #viewer-count {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     padding: 0.2rem 0.4rem;
   }
 
+  #night-mode-badge {
+    font-size: 0.7rem;
+  }
+
+  #camera-tabs {
+    padding: 0.25rem 0.25rem 0;
+  }
+
+  .camera-tab {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+  }
+
   #chat-container {
-    height: 35vh;
-    min-height: 250px;
+    max-height: 45vh;
+    min-height: 240px;
   }
 
   .chat-message {
@@ -1708,6 +1795,10 @@ footer {
 
   .chat-message .nickname {
     font-size: 0.85rem;
+  }
+
+  .chat-message .time {
+    font-size: 0.65rem;
   }
 
   #recordings-list {
@@ -1722,6 +1813,19 @@ footer {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
+  }
+
+  .modal-content {
+    width: 95%;
+    padding: 1rem;
+  }
+
+  #video-overlay p {
+    font-size: 1.2rem;
+  }
+
+  #video-overlay::before {
+    font-size: 2rem;
   }
 }
 
