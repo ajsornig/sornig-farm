@@ -237,6 +237,8 @@ async function doLogin() {
     authToken = data.token;
     currentUser = data.username;
     isAdmin = data.isAdmin;
+    isApproved = data.approved || false;
+    requireApproval = data.requireApproval || false;
     localStorage.setItem('authToken', authToken);
 
     ws.send(JSON.stringify({ type: 'auth', token: authToken }));

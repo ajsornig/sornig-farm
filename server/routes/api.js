@@ -61,7 +61,7 @@ router.post('/login', (req, res) => {
   if (!result.isAdmin) {
     db.logActivity(result.username, 'login', { ip });
   }
-  res.json(result);
+  res.json({ ...result, approved: true, requireApproval: config.requireApproval || false });
 });
 
 router.post('/logout', (req, res) => {
