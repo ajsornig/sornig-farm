@@ -48,6 +48,10 @@ function showAccountPanel(data) {
   document.getElementById('logout-btn').classList.remove('hidden');
   document.getElementById('logout-btn').onclick = doLogout;
 
+  if (data.isAdmin) {
+    document.getElementById('admin-link').classList.remove('hidden');
+  }
+
   document.getElementById('account-username').textContent = data.username;
   document.getElementById('account-email').textContent = data.email || 'Not set';
   document.getElementById('account-created').textContent = data.createdAt
