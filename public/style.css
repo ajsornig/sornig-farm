@@ -148,7 +148,6 @@ main {
 .camera-tab.active {
   background: var(--forest-green);
   color: var(--cream);
-  border-bottom: 3px solid var(--golden);
 }
 
 #video-wrapper {
