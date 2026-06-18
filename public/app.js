@@ -359,6 +359,8 @@ function hideAuthError() {
   document.getElementById('auth-error').classList.add('hidden');
 }
 
+let gridPlayers = [];
+
 async function loadCameras() {
   try {
     const res = await fetch('/config/cameras');
@@ -367,15 +369,25 @@ async function loadCameras() {
     const tabs = document.getElementById('camera-tabs');
     tabs.innerHTML = '';
 
-    cameras.forEach((cam, index) => {
+    if (cameras.length > 1) {
+      const allBtn = document.createElement('button');
+      allBtn.className = 'camera-tab active';
+      allBtn.textContent = 'All Cams';
+      allBtn.onclick = () => showAllCams(allBtn);
+      tabs.appendChild(allBtn);
+    }
+
+    cameras.forEach((cam) => {
       const btn = document.createElement('button');
-      btn.className = 'camera-tab' + (index === 0 ? ' active' : '');
+      btn.className = 'camera-tab';
       btn.textContent = cam.name;
       btn.onclick = () => selectCamera(cam, btn);
       tabs.appendChild(btn);
     });
 
-    if (cameras.length > 0) {
+    if (cameras.length > 1) {
+      showAllCams(tabs.querySelector('.camera-tab'));
+    } else if (cameras.length === 1) {
       selectCamera(cameras[0], tabs.querySelector('.camera-tab'));
     } else {
       showVideoOverlay('No cameras configured');
@@ -386,11 +398,52 @@ async function loadCameras() {
   }
 }
 
+function showAllCams(tabBtn) {
+  document.querySelectorAll('.camera-tab').forEach(t => t.classList.remove('active'));
+  tabBtn.classList.add('active');
+
+  document.getElementById('video-wrapper').classList.add('hidden');
+  document.getElementById('video-grid').classList.remove('hidden');
+
+  if (hls) { hls.destroy(); hls = null; }
+  destroyGridPlayers();
+
+  const grid = document.getElementById('video-grid');
+  grid.innerHTML = '';
+
+  cameras.forEach((cam) => {
+    const card = document.createElement('div');
+    card.className = 'grid-cam';
+    card.innerHTML = `<video autoplay muted></video><div class="grid-cam-label">${cam.name}</div>`;
+    card.onclick = () => {
+      const btn = [...document.querySelectorAll('.camera-tab')].find(t => t.textContent === cam.name);
+      selectCamera(cam, btn);
+    };
+    grid.appendChild(card);
+
+    const video = card.querySelector('video');
+    const hlsPlayer = new Hls({ enableWorker: true, lowLatencyMode: false });
+    hlsPlayer.loadSource(cam.streamUrl);
+    hlsPlayer.attachMedia(video);
+    hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
+    gridPlayers.push(hlsPlayer);
+  });
+}
+
+function destroyGridPlayers() {
+  gridPlayers.forEach(p => p.destroy());
+  gridPlayers = [];
+}
+
 function selectCamera(cam, tabBtn) {
   currentCamera = cam;
 
   document.querySelectorAll('.camera-tab').forEach(t => t.classList.remove('active'));
   tabBtn.classList.add('active');
+
+  document.getElementById('video-wrapper').classList.remove('hidden');
+  document.getElementById('video-grid').classList.add('hidden');
+  destroyGridPlayers();
 
   playStream(cam.streamUrl);
 }
