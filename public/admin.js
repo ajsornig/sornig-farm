@@ -482,29 +482,51 @@ async function loadTimelapseFrames() {
       return;
     }
 
-    list.innerHTML = `<p style="margin-bottom:0.5rem;color:var(--wood-brown);">${frames.length} frames today</p>` +
-      '<div class="timelapse-grid">' + frames.map(frame => `
-        <div class="timelapse-frame-card" id="frame-${escapeHtml(frame.filename)}">
+    const runFrames = frames.filter(f => f.cam === 'run');
+    const coopFrames = frames.filter(f => f.cam === 'coop');
+
+    let html = `<p style="margin-bottom:0.5rem;color:var(--wood-brown);">${frames.length} frames today (${runFrames.length} run, ${coopFrames.length} coop)</p>`;
+
+    if (runFrames.length > 0) {
+      html += `<h4 style="margin:0.75rem 0 0.5rem;color:var(--forest-green);">Chicken Run</h4>`;
+      html += '<div class="timelapse-grid">' + runFrames.map(frame => `
+        <div class="timelapse-frame-card" id="frame-${escapeHtml(frame.cam)}-${escapeHtml(frame.filename)}">
           <img src="${frame.url}" alt="${frame.time}" loading="lazy">
           <div class="timelapse-frame-info">
             <span>${frame.time}</span>
-            <button class="deny-btn" onclick="deleteTimelapseFrame('${escapeHtml(frame.filename)}')">Delete</button>
+            <button class="deny-btn" onclick="deleteTimelapseFrame('${escapeHtml(frame.cam)}','${escapeHtml(frame.filename)}')">Delete</button>
           </div>
         </div>
       `).join('') + '</div>';
+    }
+
+    if (coopFrames.length > 0) {
+      html += `<h4 style="margin:0.75rem 0 0.5rem;color:var(--forest-green);">Chicken Coop</h4>`;
+      html += '<div class="timelapse-grid">' + coopFrames.map(frame => `
+        <div class="timelapse-frame-card" id="frame-${escapeHtml(frame.cam)}-${escapeHtml(frame.filename)}">
+          <img src="${frame.url}" alt="${frame.time}" loading="lazy">
+          <div class="timelapse-frame-info">
+            <span>${frame.time}</span>
+            <button class="deny-btn" onclick="deleteTimelapseFrame('${escapeHtml(frame.cam)}','${escapeHtml(frame.filename)}')">Delete</button>
+          </div>
+        </div>
+      `).join('') + '</div>';
+    }
+
+    list.innerHTML = html;
   } catch (err) {
     console.error('Failed to load timelapse frames:', err);
   }
 }
 
-async function deleteTimelapseFrame(filename) {
+async function deleteTimelapseFrame(cam, filename) {
   try {
-    const res = await fetch(`/api/admin/timelapse-frames/${filename}`, {
+    const res = await fetch(`/api/admin/timelapse-frames/${cam}/${filename}`, {
       method: 'DELETE',
       headers: { 'x-auth-token': authToken }
     });
     if ((await res.json()).success) {
-      document.getElementById(`frame-${filename}`).remove();
+      document.getElementById(`frame-${cam}-${filename}`).remove();
     }
   } catch (err) {
     console.error('Failed to delete frame:', err);

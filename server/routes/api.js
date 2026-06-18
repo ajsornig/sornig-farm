@@ -350,31 +350,39 @@ router.get('/timelapse', (req, res) => {
 });
 
 router.get('/admin/timelapse-frames', requireAdmin, (req, res) => {
-  const framesDir = path.join(__dirname, '../../timelapse/frames');
-
-  if (!fs.existsSync(framesDir)) {
-    return res.json([]);
-  }
-
   const today = new Date().toISOString().slice(0, 10);
-  const files = fs.readdirSync(framesDir)
-    .filter(f => f.endsWith('.jpg') && f.startsWith(today))
-    .sort()
-    .map(filename => ({
-      filename,
-      url: `/api/admin/timelapse-frames/${filename}`,
-      time: filename.replace(today + '_', '').replace('.jpg', '').replace(/(\d{2})(\d{2})/, '$1:$2')
-    }));
+  const cams = [
+    { dir: path.join(__dirname, '../../timelapse/frames'), label: 'run' },
+    { dir: path.join(__dirname, '../../timelapse/frames-coop'), label: 'coop' }
+  ];
+
+  const files = cams.flatMap(cam => {
+    if (!fs.existsSync(cam.dir)) return [];
+    return fs.readdirSync(cam.dir)
+      .filter(f => f.endsWith('.jpg') && f.startsWith(today))
+      .sort()
+      .map(filename => ({
+        filename,
+        cam: cam.label,
+        url: `/api/admin/timelapse-frames/${cam.label}/${filename}`,
+        time: filename.replace(today + '_', '').replace('.jpg', '').replace(/(\d{2})(\d{2})/, '$1:$2')
+      }));
+  });
 
   res.json(files);
 });
 
-router.get('/admin/timelapse-frames/:filename', (req, res) => {
+router.get('/admin/timelapse-frames/:cam/:filename', (req, res) => {
   const filename = path.basename(req.params.filename);
+  const cam = req.params.cam;
   if (!/^\d{4}-\d{2}-\d{2}_\d{4}\.jpg$/.test(filename)) {
     return res.status(400).json({ error: 'Invalid filename' });
   }
-  const filepath = path.join(__dirname, '../../timelapse/frames', filename);
+  if (cam !== 'run' && cam !== 'coop') {
+    return res.status(400).json({ error: 'Invalid camera' });
+  }
+  const dir = cam === 'coop' ? 'frames-coop' : 'frames';
+  const filepath = path.join(__dirname, '../../timelapse', dir, filename);
 
   if (!fs.existsSync(filepath)) {
     return res.status(404).json({ error: 'Frame not found' });
@@ -383,9 +391,14 @@ router.get('/admin/timelapse-frames/:filename', (req, res) => {
   res.sendFile(filepath);
 });
 
-router.delete('/admin/timelapse-frames/:filename', requireAdmin, (req, res) => {
+router.delete('/admin/timelapse-frames/:cam/:filename', requireAdmin, (req, res) => {
   const filename = path.basename(req.params.filename);
-  const filepath = path.join(__dirname, '../../timelapse/frames', filename);
+  const cam = req.params.cam;
+  if (cam !== 'run' && cam !== 'coop') {
+    return res.status(400).json({ error: 'Invalid camera' });
+  }
+  const dir = cam === 'coop' ? 'frames-coop' : 'frames';
+  const filepath = path.join(__dirname, '../../timelapse', dir, filename);
 
   if (!fs.existsSync(filepath)) {
     return res.status(404).json({ error: 'Frame not found' });
