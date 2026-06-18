@@ -418,17 +418,12 @@ function playStream(url) {
     hls.loadSource(url);
     hls.attachMedia(video);
 
-    let streamReady = false;
-
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
       video.play().catch(() => {});
     });
 
     hls.on(Hls.Events.FRAG_BUFFERED, () => {
-      if (!streamReady) {
-        streamReady = true;
-        hideVideoOverlay();
-      }
+      hideVideoOverlay();
     });
 
     let networkRetries = 0;
