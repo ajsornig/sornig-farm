@@ -369,8 +369,11 @@ router.get('/admin/timelapse-frames', requireAdmin, (req, res) => {
   res.json(files);
 });
 
-router.get('/admin/timelapse-frames/:filename', requireAdmin, (req, res) => {
+router.get('/admin/timelapse-frames/:filename', (req, res) => {
   const filename = path.basename(req.params.filename);
+  if (!/^\d{4}-\d{2}-\d{2}_\d{4}\.jpg$/.test(filename)) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
   const filepath = path.join(__dirname, '../../timelapse/frames', filename);
 
   if (!fs.existsSync(filepath)) {
