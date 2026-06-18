@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Layout Option 3: "All Cams" Tab</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #FDF6E3; font-family: Georgia, serif; padding: 1rem; }
+    h1 { color: #8B2500; margin-bottom: 0.5rem; font-size: 1.5rem; }
+    p { color: #5D4037; margin-bottom: 1rem; }
+
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 0; }
+    .tab {
+      padding: 0.6rem 1.2rem;
+      background: #5D4037;
+      color: #FDF6E3;
+      border: none;
+      border-radius: 8px 8px 0 0;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    .tab:hover { background: #7a5a4f; }
+    .tab.active { background: #2D5A27; }
+
+    .video-wrapper {
+      border: 4px solid #2D5A27;
+      border-radius: 0 12px 12px 12px;
+      overflow: hidden;
+      max-width: 900px;
+    }
+    .video-wrapper video { width: 100%; display: block; }
+
+    .grid-wrapper {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      max-width: 1200px;
+    }
+    .grid-wrapper .cam-card {
+      border: 4px solid #2D5A27;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .grid-wrapper video { width: 100%; display: block; }
+    .grid-wrapper .cam-label {
+      background: #2D5A27;
+      color: #FDF6E3;
+      padding: 0.5rem;
+      text-align: center;
+      font-size: 0.95rem;
+    }
+
+    .hidden { display: none; }
+
+    @media (max-width: 768px) {
+      .grid-wrapper { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Option 3: "All Cams" Tab</h1>
+  <p>A third tab shows both streams in a grid. Individual tabs still work for single-cam view.</p>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showSingle('run', this)">Chicken Run</button>
+    <button class="tab" onclick="showSingle('coop', this)">Chicken Coop</button>
+    <button class="tab" onclick="showAll(this)">All Cams</button>
+  </div>
+
+  <div id="single-view" class="video-wrapper">
+    <video id="single-video" controls autoplay muted></video>
+  </div>
+
+  <div id="grid-view" class="grid-wrapper hidden">
+    <div class="cam-card">
+      <video id="grid-video-1" controls autoplay muted></video>
+      <div class="cam-label">Chicken Run</div>
+    </div>
+    <div class="cam-card">
+      <video id="grid-video-2" controls autoplay muted></video>
+      <div class="cam-label">Chicken Coop</div>
+    </div>
+  </div>
+
+  <script>
+    const streams = { run: '/hls/stream.m3u8', coop: '/hls2/stream.m3u8' };
+    let players = {};
+
+    function createHls(videoEl, url) {
+      if (players[videoEl.id]) { players[videoEl.id].destroy(); }
+      const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+      hls.loadSource(url);
+      hls.attachMedia(videoEl);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => videoEl.play().catch(() => {}));
+      players[videoEl.id] = hls;
+    }
+
+    function destroyAll() {
+      Object.keys(players).forEach(k => { players[k].destroy(); delete players[k]; });
+    }
+
+    function setActiveTab(btn) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    function showSingle(cam, btn) {
+      setActiveTab(btn);
+      destroyAll();
+      document.getElementById('single-view').classList.remove('hidden');
+      document.getElementById('grid-view').classList.add('hidden');
+      createHls(document.getElementById('single-video'), streams[cam]);
+    }
+
+    function showAll(btn) {
+      setActiveTab(btn);
+      destroyAll();
+      document.getElementById('single-view').classList.add('hidden');
+      document.getElementById('grid-view').classList.remove('hidden');
+      createHls(document.getElementById('grid-video-1'), streams.run);
+      createHls(document.getElementById('grid-video-2'), streams.coop);
+    }
+
+    createHls(document.getElementById('single-video'), streams.run);
+  </script>
+</body>
+</html>
