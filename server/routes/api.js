@@ -422,6 +422,18 @@ router.post('/admin/motion-pending/:filename/reject', requireAdmin, (req, res) =
   res.json({ success: true });
 });
 
+router.delete('/admin/motion-captures/:filename', requireAdmin, (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const filepath = path.join(__dirname, '../../public/motion-captures', filename);
+
+  if (!fs.existsSync(filepath)) {
+    return res.status(404).json({ error: 'File not found' });
+  }
+
+  fs.unlinkSync(filepath);
+  res.json({ success: true });
+});
+
 router.get('/status', (req, res) => {
   res.json({
     authEnabled: config.authEnabled,

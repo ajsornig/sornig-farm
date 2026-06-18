@@ -671,15 +671,35 @@ async function loadMotionCaptures() {
     gallery.innerHTML = captures.map(cap => {
       const date = new Date(cap.created);
       const label = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+      const deleteBtn = isAdmin ? `<button class="motion-delete-btn" onclick="deleteMotionCapture('${escapeHtml(cap.filename)}', event)" title="Delete">x</button>` : '';
       return `
-        <a href="${cap.url}" target="_blank" class="motion-thumb">
-          <img src="${cap.url}" alt="Motion ${label}" loading="lazy">
-          <span class="motion-time">${label}</span>
-        </a>
+        <div class="motion-thumb" id="capture-${escapeHtml(cap.filename)}">
+          <a href="${cap.url}" target="_blank">
+            <img src="${cap.url}" alt="Motion ${label}" loading="lazy">
+          </a>
+          <span class="motion-time">${label}${deleteBtn}</span>
+        </div>
       `;
     }).join('');
   } catch (err) {
     console.error('Failed to load motion captures:', err);
+  }
+}
+
+async function deleteMotionCapture(filename, event) {
+  event.preventDefault();
+  event.stopPropagation();
+  try {
+    const res = await fetch(`/api/admin/motion-captures/${filename}`, {
+      method: 'DELETE',
+      headers: { 'x-auth-token': authToken }
+    });
+    if ((await res.json()).success) {
+      const el = document.getElementById(`capture-${filename}`);
+      if (el) el.remove();
+    }
+  } catch (err) {
+    console.error('Failed to delete capture:', err);
   }
 }
 
