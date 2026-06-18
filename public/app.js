@@ -317,6 +317,7 @@ async function doLogout() {
   authToken = null;
   currentUser = null;
   isAdmin = false;
+  isApproved = false;
 
   document.getElementById('user-status').textContent = '';
   document.getElementById('logout-btn').classList.add('hidden');
@@ -324,6 +325,13 @@ async function doLogout() {
   document.getElementById('admin-clear-btn').classList.add('hidden');
   document.getElementById('auth-section').classList.remove('hidden');
   document.getElementById('chat-input-area').classList.add('hidden');
+
+  if (hls) {
+    hls.destroy();
+    hls = null;
+  }
+
+  updateContentVisibility();
 
   // Reconnect WebSocket as unauthenticated
   wsIntentionalClose = true;
