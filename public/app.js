@@ -565,7 +565,6 @@ function handleChatMessage(data) {
     case 'auth_success':
       currentUser = data.nickname;
       isAdmin = data.isAdmin;
-      showLoggedInState();
       break;
 
     case 'auth_failed':
