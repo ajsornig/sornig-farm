@@ -608,6 +608,9 @@ function handleChatMessage(data) {
       chatHistory = data.messages;
       messages.innerHTML = '';
       data.messages.forEach(msg => appendMessage(msg));
+      requestAnimationFrame(() => {
+        messages.scrollTop = messages.scrollHeight;
+      });
       break;
 
     case 'chat':
