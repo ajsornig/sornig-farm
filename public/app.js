@@ -101,7 +101,7 @@ async function checkAuth() {
       isAdmin = data.isAdmin;
       isApproved = data.approved;
       requireApproval = data.requireApproval;
-      showLoggedInState();
+      showLoggedInState(true);
     } else {
       localStorage.removeItem('authToken');
       authToken = null;
@@ -111,7 +111,7 @@ async function checkAuth() {
   }
 }
 
-function showLoggedInState() {
+function showLoggedInState(skipContentLoad = false) {
   const statusEl = document.getElementById('user-status');
   if (isAdmin) {
     statusEl.innerHTML = `Welcome, ${escapeHtml(currentUser)} (<a href="/admin.html" class="admin-link">Admin</a>)`;
@@ -130,7 +130,7 @@ function showLoggedInState() {
 
   updateContentVisibility();
 
-  if (isApproved || !requireApproval) {
+  if (!skipContentLoad && (isApproved || !requireApproval)) {
     loadCameras();
     loadRecordings();
     loadTimelapse();
@@ -821,7 +821,7 @@ async function loadVisitorStats() {
       maxBounds: [[-90, -180], [90, 180]],
       maxBoundsViscosity: 1.0,
       minZoom: 2
-    }).setView([30, 0], 2);
+    }).setView([39, -95], 4);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
