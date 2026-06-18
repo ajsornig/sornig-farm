@@ -234,6 +234,11 @@ router.get('/admin/activity', requireAdmin, (req, res) => {
   res.json(db.getActivityLog());
 });
 
+router.delete('/admin/activity', requireAdmin, (req, res) => {
+  db.clearActivityLog();
+  res.json({ success: true });
+});
+
 // Get pending users awaiting approval
 router.get('/admin/pending', requireAdmin, (req, res) => {
   res.json(db.getPendingUsers());

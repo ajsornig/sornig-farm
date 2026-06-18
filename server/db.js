@@ -385,6 +385,10 @@ function getActivityLog() {
   return loadActivityLog().reverse();
 }
 
+function clearActivityLog() {
+  saveActivityLog([]);
+}
+
 module.exports = {
   initDb,
   createUser,
@@ -412,5 +416,6 @@ module.exports = {
   recordVisit,
   getStats,
   logActivity,
-  getActivityLog
+  getActivityLog,
+  clearActivityLog
 };

@@ -394,6 +394,19 @@ async function rejectAllMotion() {
   }
 }
 
+async function clearActivityLog() {
+  if (!confirm('Clear all activity logs?')) return;
+  try {
+    await fetch('/api/admin/activity', {
+      method: 'DELETE',
+      headers: { 'x-auth-token': authToken }
+    });
+    loadActivityLog();
+  } catch (err) {
+    console.error('Failed to clear activity log:', err);
+  }
+}
+
 async function loadActivityLog() {
   try {
     const res = await fetch('/api/admin/activity', {
@@ -407,7 +420,8 @@ async function loadActivityLog() {
       return;
     }
 
-    list.innerHTML = `<table id="activity-table">
+    list.innerHTML = `<button class="admin-btn" onclick="clearActivityLog()" style="margin-bottom:1rem;">Clear All Logs</button>
+    <table id="activity-table">
       <thead>
         <tr><th>Time</th><th>User</th><th>Action</th><th>IP</th></tr>
       </thead>
