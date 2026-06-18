@@ -34,7 +34,12 @@ is_nighttime() {
 
 grab_frame() {
   local output="$1"
-  # Blur slightly to reduce WiFi compression noise triggering false positives
+  ffmpeg -y -i "$STREAM" -frames:v 1 -vf "scale=320:240" -q:v 5 "$output" 2>/dev/null
+  return $?
+}
+
+grab_frame_blurred() {
+  local output="$1"
   ffmpeg -y -i "$STREAM" -frames:v 1 -vf "scale=320:240,gblur=sigma=2" -q:v 5 "$output" 2>/dev/null
   return $?
 }
@@ -112,19 +117,20 @@ while true; do
   fi
 
   # Move current to previous
-  if [ -f "$WORK_DIR/current.jpg" ]; then
-    mv "$WORK_DIR/current.jpg" "$WORK_DIR/previous.jpg"
+  if [ -f "$WORK_DIR/current_blur.jpg" ]; then
+    mv "$WORK_DIR/current_blur.jpg" "$WORK_DIR/previous.jpg"
   fi
 
-  # Grab new frame
-  if ! grab_frame "$WORK_DIR/current.jpg"; then
+  # Grab blurred frame for comparison, clean frame for saving
+  if ! grab_frame_blurred "$WORK_DIR/current_blur.jpg"; then
     sleep "$CHECK_INTERVAL"
     continue
   fi
+  grab_frame "$WORK_DIR/current.jpg"
 
-  # Compare if we have two frames
+  # Compare blurred frames for motion detection
   if [ -f "$WORK_DIR/previous.jpg" ]; then
-    percent=$(compare_frames "$WORK_DIR/previous.jpg" "$WORK_DIR/current.jpg")
+    percent=$(compare_frames "$WORK_DIR/previous.jpg" "$WORK_DIR/current_blur.jpg")
     if [ -n "$percent" ] && [ "$percent" -gt "$THRESHOLD" ]; then
       consecutive_triggers=$((consecutive_triggers + 1))
       if [ "$consecutive_triggers" -ge "$CONFIRM_COUNT" ]; then
