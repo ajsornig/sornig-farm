@@ -52,17 +52,17 @@ stitch_day() {
 
   local output="${OUTPUT_DIR}/timelapse-${yesterday}.mp4"
 
-  # Create file list for ffmpeg
+  # Create file list for ffmpeg (10fps = each frame shows for 0.1s)
   local filelist=$(mktemp)
   ls $pattern | sort | while read f; do
     echo "file '$f'"
-    echo "duration 0.0333"
+    echo "duration 0.1"
   done > "$filelist"
 
   ffmpeg -y -f concat -safe 0 -i "$filelist" \
     -vf "scale=1280:960" \
     -c:v libx264 -crf 23 -preset medium \
-    -r 30 -pix_fmt yuv420p \
+    -r 10 -pix_fmt yuv420p \
     "$output" 2>/dev/null
 
   if [ $? -eq 0 ] && [ -f "$output" ]; then

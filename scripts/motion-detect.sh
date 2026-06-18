@@ -25,7 +25,8 @@ log() {
 
 is_nighttime() {
   local hour=$(date +%H)
-  if [ "$hour" -ge 21 ] || [ "$hour" -lt 6 ]; then
+  # Stop before sunrise to avoid dawn light change triggering false positives
+  if [ "$hour" -ge 21 ] || [ "$hour" -lt 5 ]; then
     return 0
   fi
   return 1
