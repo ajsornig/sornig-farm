@@ -125,6 +125,8 @@ function showLoggedInState(skipContentLoad = false) {
 
   if (isAdmin) {
     document.getElementById('admin-clear-btn').classList.remove('hidden');
+    document.getElementById('privacy-toggle').classList.remove('hidden');
+    loadPrivacyState();
     rerenderChat();
   }
 
@@ -174,6 +176,7 @@ function setupAuthUI() {
 
   document.getElementById('logout-btn').onclick = doLogout;
   document.getElementById('admin-clear-btn').onclick = clearChat;
+  document.getElementById('privacy-toggle').onclick = togglePrivacyMode;
 
   document.getElementById('forgot-password-link').onclick = (e) => {
     e.preventDefault();
@@ -924,6 +927,53 @@ function updateNightMode() {
     badge.classList.remove('hidden');
   } else {
     badge.classList.add('hidden');
+  }
+}
+
+// Privacy mode (admin kill switch)
+async function loadPrivacyState() {
+  try {
+    const res = await fetch('/api/admin/privacy-mode', {
+      headers: { 'x-auth-token': authToken }
+    });
+    const data = await res.json();
+    const btn = document.getElementById('privacy-toggle');
+    if (data.enabled) {
+      btn.classList.add('active');
+      btn.textContent = 'DARK';
+    } else {
+      btn.classList.remove('active');
+      btn.textContent = 'Go Dark';
+    }
+  } catch (err) {
+    console.error('Failed to load privacy state:', err);
+  }
+}
+
+async function togglePrivacyMode() {
+  try {
+    const res = await fetch('/api/admin/privacy-mode', {
+      method: 'POST',
+      headers: { 'x-auth-token': authToken }
+    });
+    const data = await res.json();
+    const btn = document.getElementById('privacy-toggle');
+    if (data.enabled) {
+      btn.classList.add('active');
+      btn.textContent = 'DARK';
+      if (hls) { hls.destroy(); hls = null; }
+      destroyGridPlayers();
+      document.getElementById('video-grid').classList.add('hidden');
+      document.getElementById('video-wrapper').classList.add('hidden');
+      document.getElementById('camera-tabs').innerHTML = '';
+      showVideoOverlay('Cameras paused');
+    } else {
+      btn.classList.remove('active');
+      btn.textContent = 'Go Dark';
+      loadCameras();
+    }
+  } catch (err) {
+    console.error('Failed to toggle privacy mode:', err);
   }
 }
 

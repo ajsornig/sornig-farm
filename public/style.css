@@ -1829,6 +1829,30 @@ footer {
   }
 }
 
+#privacy-toggle {
+  padding: 0.3rem 0.7rem;
+  background: transparent;
+  border: 2px solid var(--cream);
+  border-radius: 4px;
+  color: var(--cream);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+}
+
+#privacy-toggle:hover {
+  background: var(--cream);
+  color: var(--barn-red);
+}
+
+#privacy-toggle.active {
+  background: var(--barn-red-light);
+  border-color: var(--golden);
+  color: var(--golden);
+  font-weight: bold;
+}
+
 #account-link {
   color: var(--cream);
   text-decoration: none;
