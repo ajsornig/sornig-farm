@@ -51,12 +51,19 @@ app.post('/api/admin/privacy-mode', (req, res) => {
   }
 });
 
+// Block HLS streams when privacy mode is active (looks like signal loss)
+app.use('/hls', (req, res, next) => {
+  if (isPrivacyMode()) return res.status(404).end();
+  next();
+});
+app.use('/hls2', (req, res, next) => {
+  if (isPrivacyMode()) return res.status(404).end();
+  next();
+});
+
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.get('/config/cameras', (req, res) => {
-  if (isPrivacyMode()) {
-    return res.json([]);
-  }
   const cameras = config.cameras
     .filter(cam => cam.enabled)
     .map(({ id, name, streamUrl }) => ({ id, name, streamUrl }));

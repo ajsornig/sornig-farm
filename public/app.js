@@ -490,10 +490,10 @@ function playStream(url) {
           hls.recoverMediaError();
         } else if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
           networkRetries++;
-          if (networkRetries < 10) {
-            setTimeout(() => hls.startLoad(), 3000);
+          if (networkRetries < 30) {
+            setTimeout(() => hls.startLoad(), 5000);
           } else {
-            showVideoOverlay('Camera offline — check back soon');
+            showVideoOverlay('Camera offline');
           }
         } else {
           showVideoOverlay('Stream unavailable');
@@ -961,12 +961,6 @@ async function togglePrivacyMode() {
     if (data.enabled) {
       btn.classList.add('active');
       btn.textContent = 'DARK';
-      if (hls) { hls.destroy(); hls = null; }
-      destroyGridPlayers();
-      document.getElementById('video-grid').classList.add('hidden');
-      document.getElementById('video-wrapper').classList.add('hidden');
-      document.getElementById('camera-tabs').innerHTML = '';
-      showVideoOverlay('Cameras paused');
     } else {
       btn.classList.remove('active');
       btn.textContent = 'Go Dark';
