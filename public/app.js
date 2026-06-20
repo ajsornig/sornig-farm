@@ -323,6 +323,7 @@ async function doLogout() {
   document.getElementById('logout-btn').classList.add('hidden');
   document.getElementById('account-link').classList.add('hidden');
   document.getElementById('admin-clear-btn').classList.add('hidden');
+  document.getElementById('privacy-toggle').classList.add('hidden');
   document.getElementById('auth-section').classList.remove('hidden');
   document.getElementById('chat-input-area').classList.add('hidden');
 
