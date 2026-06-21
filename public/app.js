@@ -717,19 +717,37 @@ async function loadTimelapse() {
       return;
     }
 
-    list.innerHTML = videos.map(vid => {
-      const date = vid.filename.replace('timelapse-', '').replace('.mp4', '');
-      const size = formatSize(vid.size);
-      return `
-        <div class="timelapse-card">
-          <video src="${vid.url}" controls preload="none" poster=""></video>
-          <div class="timelapse-info">
-            <span class="timelapse-date">${date}</span>
-            <span class="timelapse-size">${size}</span>
-          </div>
+    const weekly = videos.find(v => v.filename === 'timelapse-weekly.mp4');
+    const daily = videos.filter(v => v.filename !== 'timelapse-weekly.mp4');
+
+    let html = '';
+
+    if (weekly) {
+      html += `
+        <div class="timelapse-weekly">
+          <h3>Last 7 Days</h3>
+          <video src="${weekly.url}" controls preload="none"></video>
         </div>
       `;
-    }).join('');
+    }
+
+    if (daily.length > 0) {
+      html += daily.map(vid => {
+        const date = vid.filename.replace('timelapse-', '').replace('.mp4', '');
+        const size = formatSize(vid.size);
+        return `
+          <div class="timelapse-card">
+            <video src="${vid.url}" controls preload="none" poster=""></video>
+            <div class="timelapse-info">
+              <span class="timelapse-date">${date}</span>
+              <span class="timelapse-size">${size}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    list.innerHTML = html;
   } catch (err) {
     console.error('Failed to load timelapse:', err);
   }

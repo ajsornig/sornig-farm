@@ -3,6 +3,7 @@
 # Usage:
 #   ./timelapse.sh [cam]     - Grab a frame if within capture window
 #   ./timelapse.sh --stitch  - Combine both cams into one daily video
+#   ./timelapse.sh --weekly  - Compile last 7 days into a single montage
 
 BASE_DIR="/home/ajsornig/chicken-stream"
 SUN_SCRIPT="$BASE_DIR/scripts/sun-times.py"
@@ -122,10 +123,58 @@ stitch_combined() {
   find "$OUTPUT_DIR" -name "timelapse-*.mp4" -mtime +"$RETENTION_DAYS" -delete
 }
 
+stitch_weekly() {
+  local temp_dir=$(mktemp -d)
+  local filelist="$temp_dir/concat.txt"
+  local idx=0
+
+  # Find all daily timelapses, sorted chronologically
+  for video in $(ls "$OUTPUT_DIR"/timelapse-20*.mp4 2>/dev/null | sort); do
+    local date_str=$(basename "$video" .mp4 | sed 's/timelapse-//')
+    local label=$(date -d "$date_str" '+%a, %b %-d')
+
+    local temp_out="$temp_dir/segment_${idx}.mp4"
+
+    ffmpeg -y -i "$video" \
+      -vf "drawtext=text='${label}':fontsize=28:fontcolor=white:x=20:y=h-50:shadowcolor=black@0.3:shadowx=1:shadowy=1" \
+      -c:v libx264 -crf 23 -preset medium \
+      -pix_fmt yuv420p \
+      "$temp_out" 2>/dev/null
+
+    if [ $? -eq 0 ]; then
+      echo "file '$temp_out'" >> "$filelist"
+      idx=$((idx + 1))
+    fi
+  done
+
+  if [ "$idx" -lt 2 ]; then
+    log "[weekly] SKIP: Only $idx daily videos available, need at least 2"
+    rm -rf "$temp_dir"
+    return
+  fi
+
+  local output="$OUTPUT_DIR/timelapse-weekly.mp4"
+
+  ffmpeg -y -f concat -safe 0 -i "$filelist" \
+    -c copy \
+    "$output" 2>/dev/null
+
+  if [ $? -eq 0 ] && [ -f "$output" ]; then
+    log "[weekly] OK: Compiled $idx days into weekly montage"
+  else
+    log "[weekly] ERROR: Failed to create weekly montage"
+  fi
+
+  rm -rf "$temp_dir"
+}
+
 # Parse args
 case "$1" in
   --stitch)
     stitch_combined
+    ;;
+  --weekly)
+    stitch_weekly
     ;;
   *)
     grab_frame "${1:-run}"
