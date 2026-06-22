@@ -1,6 +1,7 @@
 node_modules/
 recordings/
 data.json
+data/
 *.log
 .DS_Store
 config.json

@@ -784,9 +784,17 @@ main {
   color: var(--wood-dark);
 }
 
-.timelapse-size {
+.timelapse-size,
+.timelapse-meta {
   font-size: 0.8rem;
   color: var(--text-muted);
+}
+
+.timelapse-views {
+  font-size: 0.75rem;
+  font-weight: normal;
+  color: var(--text-muted);
+  margin-left: 0.5rem;
 }
 
 .timelapse-weekly {

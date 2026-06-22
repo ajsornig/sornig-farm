@@ -110,6 +110,7 @@ stitch_combined() {
     -vf "scale=1280:960" \
     -c:v libx264 -crf 23 -preset medium \
     -r "$fps" -pix_fmt yuv420p \
+    -movflags +faststart \
     "$output" 2>/dev/null
 
   if [ $? -eq 0 ] && [ -f "$output" ]; then
@@ -157,6 +158,7 @@ stitch_weekly() {
 
   ffmpeg -y -f concat -safe 0 -i "$filelist" \
     -c copy \
+    -movflags +faststart \
     "$output" 2>/dev/null
 
   if [ $? -eq 0 ] && [ -f "$output" ]; then

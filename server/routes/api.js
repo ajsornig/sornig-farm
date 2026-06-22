@@ -607,4 +607,79 @@ function getWeatherDescription(code) {
   return descriptions[code] || 'Unknown';
 }
 
+// --- Timelapse Analytics ---
+
+const ANALYTICS_FILE = path.join(__dirname, '../../data/timelapse-analytics.json');
+
+function loadAnalytics() {
+  try {
+    if (fs.existsSync(ANALYTICS_FILE)) {
+      return JSON.parse(fs.readFileSync(ANALYTICS_FILE, 'utf8'));
+    }
+  } catch (err) {
+    console.error('Failed to load analytics:', err);
+  }
+  return { events: [], summary: {} };
+}
+
+function saveAnalytics(data) {
+  const dir = path.dirname(ANALYTICS_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(ANALYTICS_FILE, JSON.stringify(data, null, 2));
+}
+
+router.post('/timelapse/analytics', (req, res) => {
+  const { video, event, duration, watchedSeconds } = req.body;
+  if (!video || !event) return res.status(400).json({ error: 'Missing fields' });
+
+  const allowed = ['play', 'pause', 'ended', 'timeupdate'];
+  if (!allowed.includes(event)) return res.status(400).json({ error: 'Invalid event' });
+
+  const analytics = loadAnalytics();
+
+  const entry = {
+    video: String(video).slice(0, 100),
+    event,
+    duration: Number(duration) || 0,
+    watchedSeconds: Number(watchedSeconds) || 0,
+    timestamp: new Date().toISOString(),
+    ip: req.ip
+  };
+
+  analytics.events.push(entry);
+
+  // Update summary
+  if (!analytics.summary[entry.video]) {
+    analytics.summary[entry.video] = { plays: 0, completions: 0, totalWatchSeconds: 0 };
+  }
+  const s = analytics.summary[entry.video];
+  if (event === 'play') s.plays++;
+  if (event === 'ended') s.completions++;
+  if (event === 'pause' || event === 'ended') {
+    s.totalWatchSeconds += entry.watchedSeconds;
+  }
+
+  // Keep last 1000 events to avoid unbounded growth
+  if (analytics.events.length > 1000) {
+    analytics.events = analytics.events.slice(-500);
+  }
+
+  saveAnalytics(analytics);
+  res.json({ ok: true });
+});
+
+router.get('/timelapse/stats', (req, res) => {
+  const analytics = loadAnalytics();
+  const publicStats = {};
+  for (const [video, data] of Object.entries(analytics.summary)) {
+    publicStats[video] = { plays: data.plays, completions: data.completions };
+  }
+  res.json(publicStats);
+});
+
+router.get('/admin/timelapse-analytics', requireAdmin, (req, res) => {
+  const analytics = loadAnalytics();
+  res.json(analytics);
+});
+
 module.exports = router;

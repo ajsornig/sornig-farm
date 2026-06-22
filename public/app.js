@@ -708,8 +708,12 @@ function appendSystemMessage(text) {
 
 async function loadTimelapse() {
   try {
-    const res = await fetch('/api/timelapse');
-    const videos = await res.json();
+    const [videosRes, analyticsRes] = await Promise.all([
+      fetch('/api/timelapse'),
+      fetch('/api/timelapse/stats').catch(() => null)
+    ]);
+    const videos = await videosRes.json();
+    const stats = analyticsRes && analyticsRes.ok ? await analyticsRes.json() : {};
     const list = document.getElementById('timelapse-list');
 
     if (videos.length === 0) {
@@ -723,10 +727,12 @@ async function loadTimelapse() {
     let html = '';
 
     if (weekly) {
+      const wStats = stats[weekly.filename] || {};
+      const plays = wStats.plays || 0;
       html += `
         <div class="timelapse-weekly">
-          <h3>Last 7 Days</h3>
-          <video src="${weekly.url}" controls preload="none"></video>
+          <h3>Last 7 Days${plays ? ` <span class="timelapse-views">${plays} view${plays !== 1 ? 's' : ''}</span>` : ''}</h3>
+          <video src="${weekly.url}" controls preload="none" data-video="${weekly.filename}"></video>
         </div>
       `;
     }
@@ -735,12 +741,14 @@ async function loadTimelapse() {
       html += daily.map(vid => {
         const date = vid.filename.replace('timelapse-', '').replace('.mp4', '');
         const size = formatSize(vid.size);
+        const vStats = stats[vid.filename] || {};
+        const plays = vStats.plays || 0;
         return `
           <div class="timelapse-card">
-            <video src="${vid.url}" controls preload="none" poster=""></video>
+            <video src="${vid.url}" controls preload="none" poster="" data-video="${vid.filename}"></video>
             <div class="timelapse-info">
               <span class="timelapse-date">${date}</span>
-              <span class="timelapse-size">${size}</span>
+              <span class="timelapse-meta">${plays ? `${plays} view${plays !== 1 ? 's' : ''} · ` : ''}${size}</span>
             </div>
           </div>
         `;
@@ -748,9 +756,48 @@ async function loadTimelapse() {
     }
 
     list.innerHTML = html;
+    setupTimelapseTracking();
   } catch (err) {
     console.error('Failed to load timelapse:', err);
   }
+}
+
+function setupTimelapseTracking() {
+  const videos = document.querySelectorAll('#timelapse-list video[data-video]');
+  videos.forEach(video => {
+    let tracked = false;
+
+    video.addEventListener('play', () => {
+      trackTimelapse(video, 'play');
+    });
+
+    video.addEventListener('pause', () => {
+      if (!video.ended) {
+        trackTimelapse(video, 'pause');
+      }
+    });
+
+    video.addEventListener('ended', () => {
+      if (!tracked) {
+        trackTimelapse(video, 'ended');
+        tracked = true;
+      }
+    });
+  });
+}
+
+function trackTimelapse(video, event) {
+  const filename = video.dataset.video;
+  fetch('/api/timelapse/analytics', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      video: filename,
+      event,
+      duration: Math.round(video.duration || 0),
+      watchedSeconds: Math.round(video.currentTime || 0)
+    })
+  }).catch(() => {});
 }
 
 async function loadMotionCaptures() {
