@@ -402,7 +402,8 @@ router.get('/timelapse', (req, res) => {
 });
 
 router.get('/admin/timelapse-frames', requireAdmin, (req, res) => {
-  const today = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   const cams = [
     { dir: path.join(__dirname, '../../timelapse/frames'), label: 'run' },
     { dir: path.join(__dirname, '../../timelapse/frames-coop'), label: 'coop' }
