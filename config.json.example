@@ -4,8 +4,20 @@
   "cameras": [
     {
       "id": "cam1",
-      "name": "Coop Camera",
+      "name": "Chicken Run",
       "streamUrl": "/hls/stream.m3u8",
+      "enabled": true
+    },
+    {
+      "id": "cam2",
+      "name": "Chicken Coop",
+      "streamUrl": "/hls2/stream.m3u8",
+      "enabled": true
+    },
+    {
+      "id": "cam3",
+      "name": "Chick Cam",
+      "streamUrl": "/hls3/stream.m3u8",
       "enabled": true
     }
   ],
