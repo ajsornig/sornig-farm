@@ -213,7 +213,7 @@ router.delete('/account', (req, res) => {
 });
 
 function requireAdmin(req, res, next) {
-  const token = req.headers['x-auth-token'];
+  const token = req.headers['x-auth-token'] || req.query.token;
   if (!token) {
     return res.status(401).json({ error: 'Not authenticated' });
   }

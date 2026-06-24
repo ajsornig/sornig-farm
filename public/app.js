@@ -64,6 +64,10 @@ function updateContentVisibility() {
       const el = document.getElementById(id);
       if (el) el.classList.remove('hidden');
     });
+    const recSection = document.getElementById('recordings-section');
+    if (recSection) {
+      recSection.classList.toggle('hidden', !isAdmin);
+    }
   }
 }
 
@@ -862,13 +866,16 @@ async function deleteMotionCapture(filename, event) {
 }
 
 async function loadRecordings() {
+  if (!isAdmin) return;
   try {
-    const res = await fetch('/api/recordings');
+    const res = await fetch('/api/recordings', {
+      headers: { 'x-auth-token': authToken }
+    });
+    if (!res.ok) return;
     const recordings = await res.json();
 
     const list = document.getElementById('recordings-list');
-
-    if (recordings.length === 0) {
+    if (!Array.isArray(recordings) || recordings.length === 0) {
       list.innerHTML = '<p class="no-recordings">No recordings yet</p>';
       return;
     }
@@ -887,7 +894,7 @@ async function loadRecordings() {
 }
 
 function playRecording(filename) {
-  const url = `/api/recordings/${filename}`;
+  const url = `/api/recordings/${encodeURIComponent(filename)}?token=${encodeURIComponent(authToken)}`;
   playStream(url);
 }
 
