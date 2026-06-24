@@ -10,6 +10,7 @@ const { initDb, getSession } = require('./db');
 const { setupChat } = require('./chat');
 const apiRoutes = require('./routes/api');
 const { initMailer } = require('./mailer');
+const { securityHeaders, createRateLimiter } = require('./security');
 
 const PRIVACY_FLAG = path.join(__dirname, '../.privacy-mode');
 
@@ -20,11 +21,26 @@ function isPrivacyMode() {
 const app = express();
 const server = http.createServer(app);
 
+// Running behind the Cloudflare Tunnel — trust the proxy so req.ip resolves.
+app.set('trust proxy', true);
+
 initDb();
 initMailer();
 
-app.use(express.json());
+app.use(securityHeaders);
+app.use(express.json({ limit: '64kb' }));
 app.use(cookieParser());
+
+// Throttle auth + write-heavy endpoints to stop brute force / abuse.
+const authLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+  message: 'Too many attempts, please try again later.'
+});
+app.use(['/api/login', '/api/register', '/api/forgot-password', '/api/reset-password'], authLimiter);
+
+const analyticsLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 60 });
+app.use('/api/timelapse/analytics', analyticsLimiter);
 
 app.use('/api', apiRoutes);
 

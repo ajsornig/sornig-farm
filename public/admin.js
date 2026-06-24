@@ -3,10 +3,27 @@ let currentUser = null;
 let isAdmin = false;
 let ws = null;
 
+// Escape for safe interpolation into HTML TEXT or attribute VALUES (quotes
+// included). NOTE: this is NOT sufficient for a value placed inside an inline
+// event handler like onclick="fn('...')" — there the browser HTML-decodes the
+// attribute before the JS parses, so an escaped quote decodes back and breaks
+// out of the JS string. Use jsArg() for those.
 function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/`/g, '&#96;');
+}
+
+// Safely embed a value as a quoted JS-string argument inside an inline event
+// handler attribute, e.g. onclick="fn(${jsArg(x)})". JSON.stringify escapes the
+// JS-string layer (quotes, backslashes, control chars); escapeHtml then makes
+// the result safe in the HTML-attribute layer. Emits its own surrounding quotes.
+function jsArg(value) {
+  return escapeHtml(JSON.stringify(String(value)));
 }
 
 async function init() {
@@ -84,8 +101,8 @@ async function loadPendingUsers() {
           <span class="pending-date">Registered: ${new Date(user.createdAt).toLocaleString()}</span>
         </div>
         <div class="pending-actions">
-          <button class="approve-btn" onclick="approveUser('${escapeHtml(user.username)}')">Approve</button>
-          <button class="deny-btn" onclick="denyUser('${escapeHtml(user.username)}')">Deny</button>
+          <button class="approve-btn" onclick="approveUser(${jsArg(user.username)})">Approve</button>
+          <button class="deny-btn" onclick="denyUser(${jsArg(user.username)})">Deny</button>
         </div>
       </div>
     `).join('');
@@ -199,16 +216,16 @@ async function loadAdminData() {
         <td>${escapeHtml(user.username)}</td>
         <td>
           <span class="email-display">${user.email ? escapeHtml(user.email) : '<em>none</em>'}</span>
-          <button class="edit-email-btn" onclick="editEmail('${escapeHtml(user.username)}', '${escapeHtml(user.email || '')}')" title="Edit email">&#9998;</button>
+          <button class="edit-email-btn" onclick="editEmail(${jsArg(user.username)}, ${jsArg(user.email || '')})" title="Edit email">&#9998;</button>
         </td>
         <td>${user.isAdmin ? 'Admin' : 'User'}</td>
         <td>${new Date(user.createdAt).toLocaleDateString()}</td>
         <td>
           <div class="action-buttons">
-            <button class="reset-pwd-btn" onclick="resetPassword('${escapeHtml(user.username)}')">
+            <button class="reset-pwd-btn" onclick="resetPassword(${jsArg(user.username)})">
               Reset Password
             </button>
-            <button class="delete-user-btn" onclick="deleteUser('${escapeHtml(user.username)}')"
+            <button class="delete-user-btn" onclick="deleteUser(${jsArg(user.username)})"
               ${user.username === currentUser ? 'disabled title="Cannot delete yourself"' : ''}>
               Delete
             </button>
@@ -263,8 +280,8 @@ async function resetPassword(username) {
   if (!newPassword) {
     return;
   }
-  if (newPassword.length < 4) {
-    alert('Password must be at least 4 characters');
+  if (newPassword.length < 8) {
+    alert('Password must be at least 8 characters');
     return;
   }
 
@@ -335,8 +352,8 @@ async function loadMotionPending() {
           <div class="motion-pending-info">
             <span>${label}</span>
             <div class="motion-pending-actions">
-              <button class="approve-btn" onclick="approveMotion('${escapeHtml(cap.filename)}')">Approve</button>
-              <button class="deny-btn" onclick="rejectMotion('${escapeHtml(cap.filename)}')">Reject</button>
+              <button class="approve-btn" onclick="approveMotion(${jsArg(cap.filename)})">Approve</button>
+              <button class="deny-btn" onclick="rejectMotion(${jsArg(cap.filename)})">Reject</button>
             </div>
           </div>
         </div>
@@ -495,7 +512,7 @@ async function loadTimelapseFrames() {
           <img src="${frame.url}" alt="${frame.time}" loading="lazy" onclick="openLightbox('${frame.url}','${escapeHtml(frame.cam)}','${escapeHtml(frame.filename)}')">
           <div class="timelapse-frame-info">
             <span>${frame.time}</span>
-            <button class="deny-btn" onclick="deleteTimelapseFrame('${escapeHtml(frame.cam)}','${escapeHtml(frame.filename)}')">Delete</button>
+            <button class="deny-btn" onclick="deleteTimelapseFrame(${jsArg(frame.cam)},${jsArg(frame.filename)})">Delete</button>
           </div>
         </div>
       `).join('') + '</div>';
@@ -508,7 +525,7 @@ async function loadTimelapseFrames() {
           <img src="${frame.url}" alt="${frame.time}" loading="lazy" onclick="openLightbox('${frame.url}','${escapeHtml(frame.cam)}','${escapeHtml(frame.filename)}')">
           <div class="timelapse-frame-info">
             <span>${frame.time}</span>
-            <button class="deny-btn" onclick="deleteTimelapseFrame('${escapeHtml(frame.cam)}','${escapeHtml(frame.filename)}')">Delete</button>
+            <button class="deny-btn" onclick="deleteTimelapseFrame(${jsArg(frame.cam)},${jsArg(frame.filename)})">Delete</button>
           </div>
         </div>
       `).join('') + '</div>';

@@ -9,3 +9,5 @@ config.json
 *.pem
 SornigReadMe.txt
 .privacy-mode
+# atomic-write temp files (e.g. .data.json.<pid>.tmp) — may contain secrets
+.*.tmp

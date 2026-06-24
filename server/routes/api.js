@@ -4,8 +4,12 @@ const path = require('path');
 const config = require('../../config.json');
 const db = require('../db');
 const { sendApprovalRequest, sendApprovalNotification, sendPasswordResetEmail } = require('../mailer');
+const { atomicWriteJSON } = require('../atomic-write');
+const { getClientIp } = require('../security');
 
 const router = express.Router();
+
+const MIN_PASSWORD_LENGTH = 8;
 
 function escapeHtml(str) {
   return String(str)
@@ -99,8 +103,8 @@ router.get('/reset-password/:token', (req, res) => {
     button{width:100%;padding:0.7rem;background:#2D5A27;color:#FDF6E3;border:none;border-radius:6px;font-size:1rem;cursor:pointer;margin-top:0.5rem;}
     button:hover{background:#3d7a37;} .err{color:#8B2500;margin-top:0.5rem;}</style></head>
     <body><div class="box"><h1>Reset Password</h1><p>Enter a new password for <strong>${escapeHtml(user.username)}</strong></p>
-    <form id="f"><input type="password" id="p1" placeholder="New password" required minlength="4">
-    <input type="password" id="p2" placeholder="Confirm password" required minlength="4">
+    <form id="f"><input type="password" id="p1" placeholder="New password" required minlength="8">
+    <input type="password" id="p2" placeholder="Confirm password" required minlength="8">
     <button type="submit">Reset Password</button><p class="err" id="err"></p></form>
     <script>document.getElementById('f').onsubmit=async(e)=>{e.preventDefault();const p1=document.getElementById('p1').value;const p2=document.getElementById('p2').value;
     if(p1!==p2){document.getElementById('err').textContent='Passwords do not match';return;}
@@ -116,8 +120,8 @@ router.post('/reset-password/:token', (req, res) => {
     return res.status(400).json({ error: 'Invalid or expired reset link' });
   }
   const { newPassword } = req.body;
-  if (!newPassword || newPassword.length < 4) {
-    return res.status(400).json({ error: 'Password must be at least 4 characters' });
+  if (!newPassword || newPassword.length < MIN_PASSWORD_LENGTH) {
+    return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
   }
   const result = db.resetPassword(user.username, newPassword);
   if (result.error) {
@@ -556,7 +560,16 @@ router.get('/status', (req, res) => {
 });
 
 router.get('/stats', (req, res) => {
-  res.json(db.getStats());
+  const stats = db.getStats();
+  // Round visitor coordinates (~11km) so the public map can't be used to
+  // pinpoint individual visitors.
+  const visitors = stats.visitors.map(v => ({
+    lat: Math.round(v.lat * 10) / 10,
+    lng: Math.round(v.lng * 10) / 10,
+    city: v.city,
+    country: v.country
+  }));
+  res.json({ totalViews: stats.totalViews, visitors });
 });
 
 let weatherCache = { data: null, fetchedAt: 0 };
@@ -624,14 +637,21 @@ function loadAnalytics() {
 }
 
 function saveAnalytics(data) {
-  const dir = path.dirname(ANALYTICS_FILE);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(ANALYTICS_FILE, JSON.stringify(data, null, 2));
+  atomicWriteJSON(ANALYTICS_FILE, data);
 }
+
+const VIDEO_RE = /^[A-Za-z0-9._-]{1,100}$/;
+const MAX_SUMMARY_VIDEOS = 500;
 
 router.post('/timelapse/analytics', (req, res) => {
   const { video, event, duration, watchedSeconds } = req.body;
   if (!video || !event) return res.status(400).json({ error: 'Missing fields' });
+
+  // Validate the video key: it becomes an object key in the summary map, so an
+  // attacker-controlled value could otherwise grow the file/map without bound.
+  if (typeof video !== 'string' || !VIDEO_RE.test(video)) {
+    return res.status(400).json({ error: 'Invalid video' });
+  }
 
   const allowed = ['play', 'pause', 'ended', 'timeupdate'];
   if (!allowed.includes(event)) return res.status(400).json({ error: 'Invalid event' });
@@ -639,25 +659,29 @@ router.post('/timelapse/analytics', (req, res) => {
   const analytics = loadAnalytics();
 
   const entry = {
-    video: String(video).slice(0, 100),
+    video,
     event,
     duration: Number(duration) || 0,
     watchedSeconds: Number(watchedSeconds) || 0,
     timestamp: new Date().toISOString(),
-    ip: req.ip
+    ip: getClientIp(req)
   };
 
   analytics.events.push(entry);
 
-  // Update summary
-  if (!analytics.summary[entry.video]) {
-    analytics.summary[entry.video] = { plays: 0, completions: 0, totalWatchSeconds: 0 };
-  }
-  const s = analytics.summary[entry.video];
-  if (event === 'play') s.plays++;
-  if (event === 'ended') s.completions++;
-  if (event === 'pause' || event === 'ended') {
-    s.totalWatchSeconds += entry.watchedSeconds;
+  // Update summary, but cap the number of distinct video keys so a flood of
+  // bogus video names can't grow the summary map indefinitely.
+  const known = Object.prototype.hasOwnProperty.call(analytics.summary, video);
+  if (known || Object.keys(analytics.summary).length < MAX_SUMMARY_VIDEOS) {
+    if (!known) {
+      analytics.summary[video] = { plays: 0, completions: 0, totalWatchSeconds: 0 };
+    }
+    const s = analytics.summary[video];
+    if (event === 'play') s.plays++;
+    if (event === 'ended') s.completions++;
+    if (event === 'pause' || event === 'ended') {
+      s.totalWatchSeconds += entry.watchedSeconds;
+    }
   }
 
   // Keep last 1000 events to avoid unbounded growth

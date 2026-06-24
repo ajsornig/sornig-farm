@@ -1,11 +1,20 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { atomicWriteJSON } = require('./atomic-write');
 
 const DATA_FILE = path.join(__dirname, '../data.json');
 const ACTIVITY_LOG_FILE = path.join(__dirname, '../logs/activity.json');
 const SESSION_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 const ACTIVITY_MAX_ENTRIES = 200;
+const MIN_PASSWORD_LENGTH = 8;
+// Usernames are interpolated into HTML/JS on the admin panel, so restrict them
+// to a safe character set at creation time (defense in depth on top of output
+// escaping). Email is validated wherever it can be set.
+const USERNAME_RE = /^[A-Za-z0-9_.-]{2,20}$/;
+// Restrictive on purpose: forbids quotes/backticks/angle brackets so an email can
+// never carry an HTML/JS payload even before output escaping.
+const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
 let data = {
   messages: [],
@@ -50,7 +59,7 @@ function pruneExpiredSessions() {
 }
 
 function saveData() {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+  atomicWriteJSON(DATA_FILE, data);
 }
 
 function hashPassword(password) {
@@ -78,15 +87,21 @@ function generateToken() {
 }
 
 function createUser(username, password, isAdmin = false, email = null) {
+  if (typeof username !== 'string' || typeof password !== 'string') {
+    return { error: 'Invalid username or password' };
+  }
   const usernameLower = username.toLowerCase();
   if (data.users[usernameLower]) {
     return { error: 'Username already exists' };
   }
-  if (username.length < 2 || username.length > 20) {
-    return { error: 'Username must be 2-20 characters' };
+  if (!USERNAME_RE.test(username)) {
+    return { error: 'Username must be 2-20 characters: letters, numbers, and . _ - only' };
   }
-  if (password.length < 4) {
-    return { error: 'Password must be at least 4 characters' };
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` };
+  }
+  if (email && !EMAIL_RE.test(email)) {
+    return { error: 'Please enter a valid email address' };
   }
 
   const approvalToken = generateToken();
@@ -164,6 +179,9 @@ function updateUserEmail(username, email) {
   if (!data.users[usernameLower]) {
     return { error: 'User not found' };
   }
+  if (email && !EMAIL_RE.test(email)) {
+    return { error: 'Please enter a valid email address' };
+  }
   data.users[usernameLower].email = email || null;
   saveData();
   return { success: true };
@@ -189,8 +207,8 @@ function resetPassword(username, newPassword) {
   if (!data.users[usernameLower]) {
     return { error: 'User not found' };
   }
-  if (newPassword.length < 4) {
-    return { error: 'Password must be at least 4 characters' };
+  if (newPassword.length < MIN_PASSWORD_LENGTH) {
+    return { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` };
   }
   data.users[usernameLower].passwordHash = hashPassword(newPassword);
   delete data.users[usernameLower].resetToken;
@@ -213,8 +231,8 @@ function changePassword(username, currentPassword, newPassword) {
   if (!verifyPassword(currentPassword, user.passwordHash)) {
     return { error: 'Current password is incorrect' };
   }
-  if (newPassword.length < 4) {
-    return { error: 'New password must be at least 4 characters' };
+  if (newPassword.length < MIN_PASSWORD_LENGTH) {
+    return { error: `New password must be at least ${MIN_PASSWORD_LENGTH} characters` };
   }
   user.passwordHash = hashPassword(newPassword);
   saveData();
@@ -361,11 +379,7 @@ function loadActivityLog() {
 }
 
 function saveActivityLog(log) {
-  const dir = path.dirname(ACTIVITY_LOG_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  fs.writeFileSync(ACTIVITY_LOG_FILE, JSON.stringify(log, null, 2));
+  atomicWriteJSON(ACTIVITY_LOG_FILE, log);
 }
 
 function logActivity(username, action, details = null) {

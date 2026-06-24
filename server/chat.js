@@ -2,6 +2,16 @@ const config = require('../config.json');
 const { getRecentMessages, saveMessage, pruneOldMessages, getSession, clearAllMessages, deleteMessage, recordVisit } = require('./db');
 const { filterProfanity } = require('./profanity');
 const { isBot, isSuspicious } = require('./botDetect');
+const { getClientIp } = require('./security');
+
+const MAX_CONNECTIONS_PER_IP = 15;
+
+// When the real client IP can't be resolved (e.g. cf-connecting-ip missing) the
+// socket address is the loopback for every visitor, which would collapse the
+// per-IP cap and rate limit onto a single global bucket. Detect that case.
+function isLoopback(ip) {
+  return !ip || ip === 'unknown' || ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+}
 
 async function geolocateIP(ip) {
   // Skip localhost/private IPs
@@ -27,20 +37,20 @@ async function geolocateIP(ip) {
 }
 
 const clients = new Map();
-const rateLimits = new Map();
-const pendingVisits = new Map(); // Track unverified visitors
+const rateLimits = new Map();        // ip -> timestamp[]
+const connectionsByIp = new Map();   // ip -> open connection count
+const pendingVisits = new Map();     // Track unverified visitors
 
-function isRateLimited(clientId) {
+// Rate-limit by IP, not by per-connection id. Keying on the connection id let a
+// client reset its quota just by reconnecting; keying on IP (and never clearing
+// it on disconnect) makes reconnect-flooding ineffective.
+function isRateLimited(ip) {
   const { messages, windowSeconds } = config.chat.rateLimit;
   const now = Date.now();
   const windowMs = windowSeconds * 1000;
 
-  if (!rateLimits.has(clientId)) {
-    rateLimits.set(clientId, []);
-  }
-
-  const timestamps = rateLimits.get(clientId).filter(t => now - t < windowMs);
-  rateLimits.set(clientId, timestamps);
+  const timestamps = (rateLimits.get(ip) || []).filter(t => now - t < windowMs);
+  rateLimits.set(ip, timestamps);
 
   if (timestamps.length >= messages) {
     return true;
@@ -49,6 +59,16 @@ function isRateLimited(clientId) {
   timestamps.push(now);
   return false;
 }
+
+// Drop stale IPs from the rate-limit map so it can't grow without bound.
+const rateLimitCleanup = setInterval(() => {
+  const now = Date.now();
+  const windowMs = config.chat.rateLimit.windowSeconds * 1000;
+  for (const [ip, times] of rateLimits) {
+    if (times.every(t => now - t >= windowMs)) rateLimits.delete(ip);
+  }
+}, 5 * 60 * 1000);
+if (rateLimitCleanup.unref) rateLimitCleanup.unref();
 
 function broadcast(data) {
   const message = JSON.stringify(data);
@@ -69,13 +89,23 @@ function broadcastViewerCount() {
 
 function setupChat(wss) {
   wss.on('connection', async (ws, req) => {
-    const clientId = Math.random().toString(36).substring(2);
-    clients.set(clientId, { ws, nickname: null, isRegistered: false, isAdmin: false, humanVerified: false });
-
     // Get client IP (check Cloudflare header first, then x-forwarded-for, then direct)
-    const ip = req.headers['cf-connecting-ip'] ||
-               req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-               req.socket.remoteAddress;
+    const ip = getClientIp(req);
+    const clientId = Math.random().toString(36).substring(2);
+    // Key the cap + rate limit on the real IP, but fall back to the unique
+    // connection id when no real IP is available so all clients don't share one
+    // global bucket. The real `ip` is still used for geolocation below.
+    const rlKey = isLoopback(ip) ? clientId : ip;
+
+    // Cap concurrent connections per IP to blunt connection-flood abuse.
+    const openCount = connectionsByIp.get(rlKey) || 0;
+    if (openCount >= MAX_CONNECTIONS_PER_IP) {
+      ws.close(1008, 'Too many connections');
+      return;
+    }
+    connectionsByIp.set(rlKey, openCount + 1);
+
+    clients.set(clientId, { ws, ip, rlKey, nickname: null, isRegistered: false, isAdmin: false, humanVerified: false });
 
     const userAgent = req.headers['user-agent'] || '';
 
@@ -162,7 +192,7 @@ function setupChat(wss) {
             return;
           }
 
-          if (isRateLimited(clientId)) {
+          if (isRateLimited(client.rlKey)) {
             ws.send(JSON.stringify({ type: 'error', message: 'Slow down! Too many messages.' }));
             return;
           }
@@ -205,8 +235,12 @@ function setupChat(wss) {
 
     ws.on('close', () => {
       clients.delete(clientId);
-      rateLimits.delete(clientId);
       pendingVisits.delete(clientId);
+      const remaining = (connectionsByIp.get(rlKey) || 1) - 1;
+      if (remaining <= 0) connectionsByIp.delete(rlKey);
+      else connectionsByIp.set(rlKey, remaining);
+      // Note: rateLimits is intentionally NOT cleared here so reconnecting
+      // cannot reset a client's message quota.
       broadcastViewerCount();
     });
   });

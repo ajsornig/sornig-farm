@@ -663,10 +663,25 @@ function updateViewerCount(count) {
   }
 }
 
+// Escape for safe interpolation into HTML TEXT or attribute VALUES (quotes
+// included). NOTE: NOT sufficient inside an inline event handler like
+// onclick="fn('...')" — the browser HTML-decodes the attribute before the JS
+// parses, so an escaped quote decodes back and breaks out. Use jsArg() there.
 function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/`/g, '&#96;');
+}
+
+// Safely embed a value as a quoted JS-string argument inside an inline event
+// handler attribute, e.g. onclick="fn(${jsArg(x)})". JSON.stringify escapes the
+// JS-string layer; escapeHtml then makes it safe in the HTML-attribute layer.
+function jsArg(value) {
+  return escapeHtml(JSON.stringify(String(value)));
 }
 
 function appendMessage(msg) {
@@ -681,7 +696,7 @@ function appendMessage(msg) {
 
   let deleteBtn = '';
   if (isAdmin && msg.id) {
-    deleteBtn = `<button class="delete-msg-btn" onclick="deleteMessage('${escapeHtml(msg.id)}')" title="Delete">x</button>`;
+    deleteBtn = `<button class="delete-msg-btn" onclick="deleteMessage(${jsArg(msg.id)})" title="Delete">x</button>`;
   }
 
   el.innerHTML = `
@@ -814,7 +829,7 @@ async function loadMotionCaptures() {
     gallery.innerHTML = captures.map(cap => {
       const date = new Date(cap.created);
       const label = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-      const deleteBtn = isAdmin ? `<button class="motion-delete-btn" onclick="deleteMotionCapture('${escapeHtml(cap.filename)}', event)" title="Delete">x</button>` : '';
+      const deleteBtn = isAdmin ? `<button class="motion-delete-btn" onclick="deleteMotionCapture(${jsArg(cap.filename)}, event)" title="Delete">x</button>` : '';
       return `
         <div class="motion-thumb" id="capture-${escapeHtml(cap.filename)}">
           <a href="${cap.url}" target="_blank">
@@ -859,7 +874,7 @@ async function loadRecordings() {
     }
 
     list.innerHTML = recordings.map(rec => `
-      <div class="recording-card" onclick="playRecording('${escapeHtml(rec.filename)}')">
+      <div class="recording-card" onclick="playRecording(${jsArg(rec.filename)})">
         <div class="filename">${escapeHtml(rec.filename)}</div>
         <div class="meta">
           ${formatSize(rec.size)} - ${new Date(rec.created).toLocaleString()}
