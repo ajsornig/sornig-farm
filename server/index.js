@@ -84,8 +84,12 @@ app.use('/hls3', (req, res, next) => {
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.get('/config/cameras', (req, res) => {
+  const token = req.headers['x-auth-token'];
+  const session = token ? getSession(token) : null;
+  const isAdmin = session && session.isAdmin;
+
   const cameras = config.cameras
-    .filter(cam => cam.enabled)
+    .filter(cam => cam.enabled && (!cam.adminOnly || isAdmin))
     .map(({ id, name, streamUrl, ptz }) => ({
       id, name, streamUrl,
       hasPtz: !!(ptz && ptz.ip),

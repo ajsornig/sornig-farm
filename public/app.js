@@ -368,7 +368,8 @@ let gridPlayers = [];
 
 async function loadCameras() {
   try {
-    const res = await fetch('/config/cameras');
+    const headers = authToken ? { 'x-auth-token': authToken } : {};
+    const res = await fetch('/config/cameras', { headers });
     cameras = await res.json();
 
     const tabs = document.getElementById('camera-tabs');
