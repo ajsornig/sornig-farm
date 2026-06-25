@@ -457,11 +457,11 @@ function selectCamera(cam, tabBtn) {
   document.getElementById('video-grid').classList.add('hidden');
   destroyGridPlayers();
 
-  playStream(cam.streamUrl);
+  playStream(cam.streamUrl, !!cam.ptz);
   updatePtzControls(cam);
 }
 
-function playStream(url) {
+function playStream(url, lowLatency) {
   const video = document.getElementById('video-player');
   showVideoOverlay('Loading stream...');
 
@@ -471,7 +471,18 @@ function playStream(url) {
   }
 
   if (Hls.isSupported()) {
-    hls = new Hls({
+    const hlsConfig = lowLatency ? {
+      enableWorker: true,
+      lowLatencyMode: true,
+      liveSyncDurationCount: 1,
+      liveMaxLatencyDurationCount: 3,
+      maxBufferLength: 2,
+      maxMaxBufferLength: 3,
+      backBufferLength: 0,
+      manifestLoadingTimeOut: 15000,
+      levelLoadingTimeOut: 15000,
+      fragLoadingTimeOut: 15000
+    } : {
       enableWorker: true,
       lowLatencyMode: false,
       liveSyncDurationCount: 3,
@@ -479,7 +490,8 @@ function playStream(url) {
       manifestLoadingTimeOut: 15000,
       levelLoadingTimeOut: 15000,
       fragLoadingTimeOut: 15000
-    });
+    };
+    hls = new Hls(hlsConfig);
 
     hls.loadSource(url);
     hls.attachMedia(video);
