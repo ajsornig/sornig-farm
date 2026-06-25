@@ -42,6 +42,7 @@
         <button class="admin-tab" data-panel="activity">Activity</button>
         <button class="admin-tab" data-panel="stats">Stats</button>
         <button class="admin-tab" data-panel="chat">Chat</button>
+        <button class="admin-tab" data-panel="infra">Infra</button>
       </div>
       <div id="admin-pending" class="admin-content">
         <h3>Pending Approval Requests</h3>
@@ -95,6 +96,13 @@
       <div id="admin-chat" class="admin-content hidden">
         <button id="admin-clear-btn" class="admin-btn">Clear All Chat Messages</button>
         <p class="admin-note">This will permanently delete all chat messages.</p>
+      </div>
+      <div id="admin-infra" class="admin-content hidden">
+        <div id="infra-alerts"></div>
+        <div id="infra-cards" class="infra-cards"></div>
+        <h3 style="margin-top:1.5rem;color:var(--wood-brown);">Trends (Last Hour)</h3>
+        <div id="infra-sparklines" class="infra-sparklines"></div>
+        <div id="infra-updated" class="infra-updated"></div>
       </div>
     </section>
   </main>

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Network + stream health monitor
-# Logs eth0 link, camera pings, Wavlink AP, stream freshness every minute
+# Logs eth0 link, wlan0/wlan1 signal, camera pings, Wavlink AP, stream freshness every minute
 # Output: ~/chicken-stream/logs/wifi-monitor.log
 
 LOG="/home/ajsornig/chicken-stream/logs/wifi-monitor.log"
@@ -13,8 +13,11 @@ while true; do
   eth0_state=$(cat /sys/class/net/eth0/operstate 2>/dev/null || echo "UNKNOWN")
   eth0_speed=$(cat /sys/class/net/eth0/speed 2>/dev/null || echo "?")
 
-  # wlan0 signal (home WiFi — Pi's internet uplink)
+  # wlan0 signal (home WiFi — fallback uplink)
   wlan0_signal=$(sudo iw dev wlan0 link 2>/dev/null | grep 'signal:' | awk '{print $2}')
+
+  # wlan1 signal (BrosTrend 5GHz — primary uplink)
+  wlan1_signal=$(sudo iw dev wlan1 link 2>/dev/null | grep 'signal:' | awk '{print $2}')
 
   # Ping cameras
   ping1_ms=$(ping -c 1 -W 2 10.0.0.10 2>/dev/null | grep 'time=' | sed 's/.*time=\([^ ]*\).*/\1/' || echo "FAIL")
@@ -44,7 +47,7 @@ while true; do
   # ffmpeg process count
   ffmpeg_count=$(pgrep -c -f 'ffmpeg.*hls' 2>/dev/null || echo "0")
 
-  echo "${timestamp} | eth0=${eth0_state}@${eth0_speed}Mbps | wlan0=${wlan0_signal:-?}dBm | cam1=${ping1_ms}ms cam2=${ping2_ms}ms wavlink=${wavlink_ms}ms | stream1=${stream1_age}s stream2=${stream2_age}s | restarts=${restarts1}/${restarts2} | ffmpeg=${ffmpeg_count}" >> "$LOG"
+  echo "${timestamp} | eth0=${eth0_state}@${eth0_speed}Mbps | wlan0=${wlan0_signal:-?}dBm | wlan1=${wlan1_signal:-?}dBm | cam1=${ping1_ms}ms cam2=${ping2_ms}ms wavlink=${wavlink_ms}ms | stream1=${stream1_age}s stream2=${stream2_age}s | restarts=${restarts1}/${restarts2} | ffmpeg=${ffmpeg_count}" >> "$LOG"
 
   sleep 60
 done

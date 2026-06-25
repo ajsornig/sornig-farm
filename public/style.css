@@ -1974,3 +1974,131 @@ footer {
   color: var(--forest-green);
   margin-top: 0.5rem;
 }
+
+/* --- Infrastructure Dashboard --- */
+
+.infra-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.infra-card {
+  background: var(--cream);
+  border-radius: 8px;
+  padding: 1rem;
+  border: 2px solid var(--wood-brown);
+  border-left: 4px solid var(--forest-green);
+}
+
+.infra-card.healthy {
+  border-left-color: var(--forest-green);
+}
+
+.infra-card.warning {
+  border-left-color: var(--golden);
+}
+
+.infra-card.critical {
+  border-left-color: var(--barn-red);
+}
+
+.infra-card-title {
+  font-weight: bold;
+  color: var(--wood-brown);
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.infra-card-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.2rem 0;
+  font-size: 0.85rem;
+  color: var(--text-dark);
+}
+
+.infra-alert-banner {
+  background: var(--barn-red);
+  color: var(--cream);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.infra-alert-banner.warning {
+  background: var(--golden);
+  color: var(--text-dark);
+}
+
+.infra-alert-banner.healthy {
+  background: var(--forest-green);
+  color: var(--cream);
+}
+
+.infra-pulse {
+  width: 10px;
+  height: 10px;
+  min-width: 10px;
+  border-radius: 50%;
+  background: var(--cream);
+  animation: infraPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes infraPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+
+.infra-sparklines {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+.infra-spark-item {
+  background: var(--cream);
+  border: 2px solid var(--wood-brown);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.infra-spark-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--wood-brown);
+  margin-bottom: 0.25rem;
+  font-weight: bold;
+}
+
+.sparkline {
+  display: block;
+  width: 100%;
+}
+
+.infra-updated {
+  text-align: right;
+  color: var(--wood-brown);
+  font-size: 0.8rem;
+  margin-top: 1rem;
+}
+
+@media (max-width: 900px) {
+  .infra-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .infra-cards {
+    grid-template-columns: 1fr;
+  }
+  .infra-sparklines {
+    grid-template-columns: 1fr;
+  }
+}

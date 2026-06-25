@@ -707,4 +707,100 @@ router.get('/admin/timelapse-analytics', requireAdmin, (req, res) => {
   res.json(analytics);
 });
 
+// --- Infrastructure Dashboard ---
+
+const WIFI_LOG = path.join(__dirname, '../../logs/wifi-monitor.log');
+const INFRA_HISTORY_COUNT = 60;
+
+function parseInfraLine(line) {
+  const parts = line.split(' | ');
+  if (parts.length < 7) return null;
+
+  const timestamp = parts[0].trim();
+
+  const eth0Match = parts[1].match(/eth0=(\w+)@(\d+|\?)Mbps/);
+  const eth0 = eth0Match
+    ? { state: eth0Match[1], speed: eth0Match[2] === '?' ? null : Number(eth0Match[2]) }
+    : { state: 'UNKNOWN', speed: null };
+
+  const wlan0Match = parts[2].match(/wlan0=(-?\d+|\?)dBm/);
+  const wlan0 = { signal: wlan0Match && wlan0Match[1] !== '?' ? Number(wlan0Match[1]) : null };
+
+  let wlan1 = { signal: null };
+  let pingIdx = 3;
+
+  if (parts.length >= 8) {
+    const wlan1Match = parts[3].match(/wlan1=(-?\d+|\?)dBm/);
+    wlan1 = { signal: wlan1Match && wlan1Match[1] !== '?' ? Number(wlan1Match[1]) : null };
+    pingIdx = 4;
+  }
+
+  const pingSection = parts[pingIdx].trim();
+  const parsePing = (name) => {
+    const m = pingSection.match(new RegExp(name + '=([\\d.]+|FAIL)ms'));
+    if (!m) return { ms: null, ok: false };
+    return m[1] === 'FAIL' ? { ms: null, ok: false } : { ms: parseFloat(m[1]), ok: true };
+  };
+
+  const streamSection = parts[pingIdx + 1].trim();
+  const parseStream = (name) => {
+    const m = streamSection.match(new RegExp(name + '=(\\d+|NO_FILE)s'));
+    if (!m) return { age: null, ok: false };
+    return m[1] === 'NO_FILE' ? { age: null, ok: false } : { age: Number(m[1]), ok: Number(m[1]) <= 30 };
+  };
+
+  const restartsMatch = parts[pingIdx + 2].match(/restarts=(\d+)\/(\d+)/);
+  const ffmpegMatch = parts[pingIdx + 3] && parts[pingIdx + 3].match(/ffmpeg=(\d+)/);
+
+  return {
+    timestamp,
+    eth0,
+    wlan0,
+    wlan1,
+    pings: { cam1: parsePing('cam1'), cam2: parsePing('cam2'), wavlink: parsePing('wavlink') },
+    streams: { stream1: parseStream('stream1'), stream2: parseStream('stream2') },
+    restarts: restartsMatch ? { cam1: Number(restartsMatch[1]), cam2: Number(restartsMatch[2]) } : { cam1: 0, cam2: 0 },
+    ffmpegCount: ffmpegMatch ? Number(ffmpegMatch[1]) : 0
+  };
+}
+
+function generateInfraAlerts(entry) {
+  const alerts = [];
+  if (!entry) return [{ level: 'warning', message: 'No monitoring data available' }];
+
+  if (!entry.pings.cam1.ok) alerts.push({ level: 'critical', message: 'Chicken Run camera ping FAILED' });
+  if (!entry.pings.cam2.ok) alerts.push({ level: 'critical', message: 'Chicken Coop camera ping FAILED' });
+  if (!entry.streams.stream1.ok) {
+    alerts.push({ level: 'critical', message: entry.streams.stream1.age === null ? 'Stream 1 NO_FILE' : `Stream 1 stale (${entry.streams.stream1.age}s)` });
+  }
+  if (!entry.streams.stream2.ok) {
+    alerts.push({ level: 'critical', message: entry.streams.stream2.age === null ? 'Stream 2 NO_FILE' : `Stream 2 stale (${entry.streams.stream2.age}s)` });
+  }
+  if (entry.eth0.state !== 'up') alerts.push({ level: 'critical', message: 'eth0 link DOWN' });
+  if (entry.ffmpegCount < 2) alerts.push({ level: 'warning', message: `Only ${entry.ffmpegCount} ffmpeg process(es) running` });
+  if (entry.wlan1.signal === null) alerts.push({ level: 'warning', message: 'Primary uplink (wlan1) signal lost — failover may be active' });
+  if (entry.wlan0.signal !== null && entry.wlan0.signal < -70) alerts.push({ level: 'warning', message: `Failover WiFi signal weak (${entry.wlan0.signal} dBm)` });
+
+  return alerts;
+}
+
+router.get('/admin/infra', requireAdmin, (req, res) => {
+  try {
+    if (!fs.existsSync(WIFI_LOG)) {
+      return res.json({ success: true, latest: null, history: [], alerts: [{ level: 'warning', message: 'No monitoring data available' }] });
+    }
+
+    const raw = fs.readFileSync(WIFI_LOG, 'utf8');
+    const lines = raw.split('\n').filter(Boolean).slice(-INFRA_HISTORY_COUNT);
+    const history = lines.map(parseInfraLine).filter(Boolean);
+    const latest = history.length > 0 ? history[history.length - 1] : null;
+    const alerts = generateInfraAlerts(latest);
+
+    res.json({ success: true, latest, history, alerts });
+  } catch (err) {
+    console.error('Infra endpoint error:', err);
+    res.status(500).json({ error: 'Failed to read infrastructure data' });
+  }
+});
+
 module.exports = router;

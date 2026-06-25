@@ -2,6 +2,7 @@ let authToken = localStorage.getItem('authToken');
 let currentUser = null;
 let isAdmin = false;
 let ws = null;
+let infraRefreshInterval = null;
 
 // Escape for safe interpolation into HTML TEXT or attribute VALUES (quotes
 // included). NOTE: this is NOT sufficient for a value placed inside an inline
@@ -170,10 +171,19 @@ function setupAdminTabs() {
       document.getElementById('admin-activity').classList.toggle('hidden', panel !== 'activity');
       document.getElementById('admin-stats').classList.toggle('hidden', panel !== 'stats');
       document.getElementById('admin-chat').classList.toggle('hidden', panel !== 'chat');
+      document.getElementById('admin-infra').classList.toggle('hidden', panel !== 'infra');
 
       if (panel === 'activity') loadActivityLog();
       if (panel === 'motion') loadMotionPending();
       if (panel === 'timelapse') loadTimelapseFrames();
+
+      if (panel === 'infra') {
+        loadInfraData();
+        infraRefreshInterval = setInterval(loadInfraData, 60000);
+      } else if (infraRefreshInterval) {
+        clearInterval(infraRefreshInterval);
+        infraRefreshInterval = null;
+      }
     };
   });
 
@@ -593,6 +603,153 @@ function openLightbox(url, cam, filename) {
 function closeLightbox() {
   const lb = document.getElementById('timelapse-lightbox');
   if (lb) lb.classList.remove('active');
+}
+
+function renderSparkline(values, width, height, color) {
+  const nums = values.filter(v => v !== null);
+  if (nums.length < 2) return '<span style="color:var(--wood-brown);font-size:0.85rem;">Not enough data</span>';
+  const max = Math.max(...nums);
+  const min = Math.min(...nums);
+  const range = max - min || 1;
+  const points = nums.map((v, i) => {
+    const x = (i / (nums.length - 1)) * width;
+    const y = height - 2 - ((v - min) / range) * (height - 4);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return `<svg width="${width}" height="${height}" class="sparkline"><polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+}
+
+function infraCardStatus(metric, value) {
+  switch (metric) {
+    case 'ping': return value === null ? 'critical' : (value > 10 ? 'warning' : 'healthy');
+    case 'streamAge': return value === null ? 'critical' : (value > 30 ? 'critical' : (value > 15 ? 'warning' : 'healthy'));
+    case 'eth0': return value === 'up' ? 'healthy' : 'critical';
+    case 'ffmpeg': return value >= 2 ? 'healthy' : (value >= 1 ? 'warning' : 'critical');
+    case 'network': return 'healthy';
+    default: return 'healthy';
+  }
+}
+
+function worstStatus(...statuses) {
+  if (statuses.includes('critical')) return 'critical';
+  if (statuses.includes('warning')) return 'warning';
+  return 'healthy';
+}
+
+function fmtMs(ping) {
+  return ping.ok ? `${ping.ms.toFixed(1)} ms` : 'FAIL';
+}
+
+function fmtAge(stream) {
+  return stream.ok ? `${stream.age}s` : (stream.age === null ? 'NO FILE' : `${stream.age}s (stale)`);
+}
+
+function fmtSignal(signal) {
+  if (signal === null) return '?';
+  return `${signal} dBm`;
+}
+
+async function loadInfraData() {
+  try {
+    const res = await fetch('/api/admin/infra', {
+      headers: { 'x-auth-token': authToken }
+    });
+    const data = await res.json();
+
+    if (!data.success) {
+      document.getElementById('infra-alerts').innerHTML = '<div class="infra-alert-banner warning">Failed to load infrastructure data</div>';
+      return;
+    }
+
+    const alertsEl = document.getElementById('infra-alerts');
+    if (data.alerts.length > 0) {
+      const hasCritical = data.alerts.some(a => a.level === 'critical');
+      const cls = hasCritical ? '' : ' warning';
+      alertsEl.innerHTML = `<div class="infra-alert-banner${cls}">
+        ${hasCritical ? '<span class="infra-pulse"></span>' : ''}
+        <div>${data.alerts.map(a => escapeHtml(a.message)).join('<br>')}</div>
+      </div>`;
+    } else {
+      alertsEl.innerHTML = '<div class="infra-alert-banner healthy">All systems healthy</div>';
+    }
+
+    const cardsEl = document.getElementById('infra-cards');
+    if (!data.latest) {
+      cardsEl.innerHTML = '<p style="color:var(--wood-brown);">No data yet. Waiting for wifi-monitor...</p>';
+      document.getElementById('infra-sparklines').innerHTML = '';
+      document.getElementById('infra-updated').innerHTML = '';
+      return;
+    }
+
+    const d = data.latest;
+
+    const networkSignals = [d.wlan1, d.wlan0].filter(w => w.signal !== null);
+    const networkStatus = worstStatus(
+      d.eth0.state !== 'up' ? 'critical' : 'healthy',
+      d.wlan1.signal === null ? 'warning' : 'healthy',
+      d.wlan0.signal !== null && d.wlan0.signal < -70 ? 'warning' : 'healthy'
+    );
+
+    const cam1Status = worstStatus(
+      infraCardStatus('ping', d.pings.cam1.ok ? d.pings.cam1.ms : null),
+      infraCardStatus('streamAge', d.streams.stream1.ok ? d.streams.stream1.age : null)
+    );
+
+    const cam2Status = worstStatus(
+      infraCardStatus('ping', d.pings.cam2.ok ? d.pings.cam2.ms : null),
+      infraCardStatus('streamAge', d.streams.stream2.ok ? d.streams.stream2.age : null)
+    );
+
+    const streamStatus = infraCardStatus('ffmpeg', d.ffmpegCount);
+
+    cardsEl.innerHTML = `
+      <div class="infra-card ${networkStatus}">
+        <div class="infra-card-title">Network</div>
+        <div class="infra-card-row"><span>eth0</span><span>${escapeHtml(d.eth0.state)}${d.eth0.speed ? ' @ ' + d.eth0.speed + ' Mbps' : ''}</span></div>
+        <div class="infra-card-row"><span>wlan1 (primary)</span><span>${fmtSignal(d.wlan1.signal)}</span></div>
+        <div class="infra-card-row"><span>wlan0 (fallback)</span><span>${fmtSignal(d.wlan0.signal)}</span></div>
+        <div class="infra-card-row"><span>Wavlink AP</span><span>${fmtMs(d.pings.wavlink)}</span></div>
+      </div>
+      <div class="infra-card ${cam1Status}">
+        <div class="infra-card-title">Chicken Run</div>
+        <div class="infra-card-row"><span>Ping</span><span>${fmtMs(d.pings.cam1)}</span></div>
+        <div class="infra-card-row"><span>Stream Age</span><span>${fmtAge(d.streams.stream1)}</span></div>
+      </div>
+      <div class="infra-card ${cam2Status}">
+        <div class="infra-card-title">Chicken Coop</div>
+        <div class="infra-card-row"><span>Ping</span><span>${fmtMs(d.pings.cam2)}</span></div>
+        <div class="infra-card-row"><span>Stream Age</span><span>${fmtAge(d.streams.stream2)}</span></div>
+      </div>
+      <div class="infra-card ${streamStatus}">
+        <div class="infra-card-title">Streaming</div>
+        <div class="infra-card-row"><span>FFmpeg Processes</span><span>${d.ffmpegCount}</span></div>
+        <div class="infra-card-row"><span>Restarts (Run)</span><span>${d.restarts.cam1}</span></div>
+        <div class="infra-card-row"><span>Restarts (Coop)</span><span>${d.restarts.cam2}</span></div>
+      </div>
+    `;
+
+    const h = data.history;
+    const sparkW = 200;
+    const sparkH = 40;
+    const sparklines = [
+      { label: 'Cam1 Latency', values: h.map(e => e.pings.cam1.ms), color: 'var(--forest-green)' },
+      { label: 'Cam2 Latency', values: h.map(e => e.pings.cam2.ms), color: 'var(--forest-green)' },
+      { label: 'Stream 1 Age', values: h.map(e => e.streams.stream1.age), color: 'var(--barn-red)' },
+      { label: 'Stream 2 Age', values: h.map(e => e.streams.stream2.age), color: 'var(--barn-red)' },
+      { label: 'wlan0 Signal', values: h.map(e => e.wlan0.signal), color: 'var(--wood-brown)' }
+    ];
+
+    document.getElementById('infra-sparklines').innerHTML = sparklines.map(s =>
+      `<div class="infra-spark-item">
+        <span class="infra-spark-label">${escapeHtml(s.label)}</span>
+        ${renderSparkline(s.values, sparkW, sparkH, s.color)}
+      </div>`
+    ).join('');
+
+    document.getElementById('infra-updated').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+  } catch (err) {
+    console.error('Failed to load infra data:', err);
+  }
 }
 
 init();
