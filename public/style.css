@@ -364,6 +364,52 @@ main {
   display: none;
 }
 
+/* Camera toggle rows */
+.camera-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: var(--cream);
+  border: 2px solid var(--wood-brown);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.camera-toggle-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.camera-toggle-status {
+  font-size: 0.8rem;
+}
+
+.camera-toggle-status.status-live {
+  color: var(--forest-green);
+}
+
+.camera-toggle-status.status-hidden {
+  color: var(--text-muted);
+}
+
+.cam-show-btn {
+  background: var(--forest-green) !important;
+}
+
+.cam-show-btn:hover {
+  filter: brightness(1.2);
+}
+
+.cam-hide-btn {
+  background: var(--text-muted) !important;
+}
+
+.cam-hide-btn:hover {
+  background: var(--barn-red) !important;
+}
+
 #chat-messages {
   flex: 1;
   overflow-y: auto;

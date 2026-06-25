@@ -171,11 +171,13 @@ function setupAdminTabs() {
       document.getElementById('admin-activity').classList.toggle('hidden', panel !== 'activity');
       document.getElementById('admin-stats').classList.toggle('hidden', panel !== 'stats');
       document.getElementById('admin-chat').classList.toggle('hidden', panel !== 'chat');
+      document.getElementById('admin-cameras').classList.toggle('hidden', panel !== 'cameras');
       document.getElementById('admin-infra').classList.toggle('hidden', panel !== 'infra');
 
       if (panel === 'activity') loadActivityLog();
       if (panel === 'motion') loadMotionPending();
       if (panel === 'timelapse') loadTimelapseFrames();
+      if (panel === 'cameras') loadCameraToggles();
 
       if (panel === 'infra') {
         loadInfraData();
@@ -781,6 +783,52 @@ async function loadInfraData() {
     document.getElementById('infra-updated').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
   } catch (err) {
     console.error('Failed to load infra data:', err);
+  }
+}
+
+// --- Camera Visibility Toggles ---
+
+async function loadCameraToggles() {
+  try {
+    const res = await fetch('/api/admin/cameras', {
+      headers: { 'x-auth-token': authToken }
+    });
+    const cameras = await res.json();
+    const list = document.getElementById('camera-toggle-list');
+
+    if (cameras.length === 0) {
+      list.innerHTML = '<p class="no-pending">No cameras configured</p>';
+      return;
+    }
+
+    list.innerHTML = cameras.map(cam => `
+      <div class="camera-toggle-row" id="cam-row-${escapeHtml(cam.id)}">
+        <div class="camera-toggle-info">
+          <strong>${escapeHtml(cam.name)}</strong>
+          <span class="camera-toggle-status ${cam.hidden ? 'status-hidden' : 'status-live'}">${cam.hidden ? 'Hidden from public' : 'Live for everyone'}</span>
+        </div>
+        <button class="admin-btn ${cam.hidden ? 'cam-show-btn' : 'cam-hide-btn'}" onclick="toggleCamera(${jsArg(cam.id)})">
+          ${cam.hidden ? 'Make Public' : 'Hide'}
+        </button>
+      </div>
+    `).join('');
+  } catch (err) {
+    console.error('Failed to load camera toggles:', err);
+  }
+}
+
+async function toggleCamera(camId) {
+  try {
+    const res = await fetch(`/api/admin/cameras/${encodeURIComponent(camId)}/toggle`, {
+      method: 'POST',
+      headers: { 'x-auth-token': authToken }
+    });
+    const data = await res.json();
+    if (data.id) {
+      loadCameraToggles();
+    }
+  } catch (err) {
+    console.error('Failed to toggle camera:', err);
   }
 }
 

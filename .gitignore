@@ -9,6 +9,7 @@ config.json
 *.pem
 SornigReadMe.txt
 .privacy-mode
+.hidden-cams/
 # atomic-write temp files (e.g. .data.json.<pid>.tmp) — may contain secrets
 .*.tmp
 # data.json backups — contain password hashes + session tokens, never commit

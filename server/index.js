@@ -13,9 +13,26 @@ const { initMailer } = require('./mailer');
 const { securityHeaders, createRateLimiter } = require('./security');
 
 const PRIVACY_FLAG = path.join(__dirname, '../.privacy-mode');
+const HIDDEN_CAMS_DIR = path.join(__dirname, '../.hidden-cams');
 
 function isPrivacyMode() {
   return fs.existsSync(PRIVACY_FLAG);
+}
+
+function isCameraHidden(camId) {
+  return fs.existsSync(path.join(HIDDEN_CAMS_DIR, camId));
+}
+
+function setCameraHidden(camId, hidden) {
+  if (!fs.existsSync(HIDDEN_CAMS_DIR)) {
+    fs.mkdirSync(HIDDEN_CAMS_DIR, { recursive: true });
+  }
+  const flagPath = path.join(HIDDEN_CAMS_DIR, camId);
+  if (hidden) {
+    fs.writeFileSync(flagPath, Date.now().toString());
+  } else if (fs.existsSync(flagPath)) {
+    fs.unlinkSync(flagPath);
+  }
 }
 
 const app = express();
@@ -86,16 +103,48 @@ app.use(express.static(path.join(__dirname, '../public')));
 app.get('/config/cameras', (req, res) => {
   const token = req.headers['x-auth-token'];
   const session = token ? getSession(token) : null;
-  const isAdmin = session && session.isAdmin;
+  const isAdminUser = session && session.isAdmin;
 
   const cameras = config.cameras
-    .filter(cam => cam.enabled && (!cam.adminOnly || isAdmin))
+    .filter(cam => cam.enabled)
+    .filter(cam => {
+      const hidden = isCameraHidden(cam.id);
+      if (hidden && !isAdminUser) return false;
+      return true;
+    })
     .map(({ id, name, streamUrl, ptz }) => ({
       id, name, streamUrl,
       hasPtz: !!(ptz && ptz.ip),
-      ptzCapabilities: ptz && ptz.ip ? (ptz.capabilities || ['pan', 'tilt']) : []
+      ptzCapabilities: ptz && ptz.ip ? (ptz.capabilities || ['pan', 'tilt']) : [],
+      hidden: isCameraHidden(id)
     }));
   res.json(cameras);
+});
+
+app.get('/api/admin/cameras', (req, res) => {
+  const token = req.headers['x-auth-token'];
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+  const session = getSession(token);
+  if (!session || !session.isAdmin) return res.status(403).json({ error: 'Admin required' });
+
+  const cameras = config.cameras
+    .filter(cam => cam.enabled)
+    .map(({ id, name }) => ({ id, name, hidden: isCameraHidden(id) }));
+  res.json(cameras);
+});
+
+app.post('/api/admin/cameras/:id/toggle', (req, res) => {
+  const token = req.headers['x-auth-token'];
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+  const session = getSession(token);
+  if (!session || !session.isAdmin) return res.status(403).json({ error: 'Admin required' });
+
+  const cam = config.cameras.find(c => c.id === req.params.id && c.enabled);
+  if (!cam) return res.status(404).json({ error: 'Camera not found' });
+
+  const currentlyHidden = isCameraHidden(cam.id);
+  setCameraHidden(cam.id, !currentlyHidden);
+  res.json({ id: cam.id, hidden: !currentlyHidden });
 });
 
 const wss = new WebSocketServer({ server, path: '/chat' });
