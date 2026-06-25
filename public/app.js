@@ -410,6 +410,9 @@ function showAllCams(tabBtn) {
   document.getElementById('video-wrapper').classList.add('hidden');
   document.getElementById('video-grid').classList.remove('hidden');
 
+  const ptzEl = document.getElementById('ptz-controls');
+  if (ptzEl) ptzEl.classList.add('hidden');
+
   if (hls) { hls.destroy(); hls = null; }
   destroyGridPlayers();
 
@@ -454,6 +457,7 @@ function selectCamera(cam, tabBtn) {
   destroyGridPlayers();
 
   playStream(cam.streamUrl);
+  updatePtzControls(cam);
 }
 
 function playStream(url) {
@@ -1056,6 +1060,116 @@ async function togglePrivacyMode() {
     }
   } catch (err) {
     console.error('Failed to toggle privacy mode:', err);
+  }
+}
+
+// --- PTZ Controls ---
+
+let ptzActive = false;
+
+function updatePtzControls(cam) {
+  let container = document.getElementById('ptz-controls');
+  if (!container) {
+    container = createPtzControls();
+  }
+
+  if (cam && cam.hasPtz && authToken) {
+    container.classList.remove('hidden');
+    container.dataset.camId = cam.id;
+    const zoomBtns = container.querySelector('.ptz-zoom');
+    if (zoomBtns) {
+      zoomBtns.classList.toggle('hidden', !cam.ptzCapabilities.includes('zoom'));
+    }
+  } else {
+    container.classList.add('hidden');
+  }
+}
+
+function createPtzControls() {
+  const wrapper = document.getElementById('video-wrapper');
+  const container = document.createElement('div');
+  container.id = 'ptz-controls';
+  container.className = 'hidden';
+  container.innerHTML = `
+    <div class="ptz-dpad">
+      <button class="ptz-btn ptz-up" data-op="Up" title="Tilt Up">&#9650;</button>
+      <button class="ptz-btn ptz-left" data-op="Left" title="Pan Left">&#9664;</button>
+      <button class="ptz-btn ptz-center" data-op="Stop" title="Stop">&#9632;</button>
+      <button class="ptz-btn ptz-right" data-op="Right" title="Pan Right">&#9654;</button>
+      <button class="ptz-btn ptz-down" data-op="Down" title="Tilt Down">&#9660;</button>
+      <button class="ptz-btn ptz-up-left" data-op="LeftUp" title="Up-Left">&#8598;</button>
+      <button class="ptz-btn ptz-up-right" data-op="RightUp" title="Up-Right">&#8599;</button>
+      <button class="ptz-btn ptz-down-left" data-op="LeftDown" title="Down-Left">&#8601;</button>
+      <button class="ptz-btn ptz-down-right" data-op="RightDown" title="Down-Right">&#8600;</button>
+    </div>
+    <div class="ptz-zoom">
+      <button class="ptz-btn ptz-zoom-in" data-op="ZoomInc" title="Zoom In">+</button>
+      <button class="ptz-btn ptz-zoom-out" data-op="ZoomDec" title="Zoom Out">&minus;</button>
+    </div>
+  `;
+
+  wrapper.appendChild(container);
+
+  container.querySelectorAll('.ptz-btn').forEach(btn => {
+    const op = btn.dataset.op;
+
+    if (op === 'Stop') {
+      btn.addEventListener('click', () => sendPtz('Stop'));
+      return;
+    }
+
+    btn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      ptzActive = true;
+      sendPtz(op);
+    });
+    btn.addEventListener('mouseup', () => {
+      ptzActive = false;
+      sendPtz('Stop');
+    });
+    btn.addEventListener('mouseleave', () => {
+      if (ptzActive) {
+        ptzActive = false;
+        sendPtz('Stop');
+      }
+    });
+
+    btn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      ptzActive = true;
+      sendPtz(op);
+    });
+    btn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      ptzActive = false;
+      sendPtz('Stop');
+    });
+    btn.addEventListener('touchcancel', () => {
+      ptzActive = false;
+      sendPtz('Stop');
+    });
+  });
+
+  return container;
+}
+
+async function sendPtz(op) {
+  const container = document.getElementById('ptz-controls');
+  if (!container) return;
+  const camId = container.dataset.camId;
+  if (!camId || !authToken) return;
+
+  try {
+    await fetch(`/api/camera/${encodeURIComponent(camId)}/ptz`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-auth-token': authToken
+      },
+      body: JSON.stringify({ op })
+    });
+  } catch (err) {
+    console.error('PTZ command failed:', err);
   }
 }
 

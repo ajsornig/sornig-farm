@@ -6,6 +6,8 @@ const db = require('../db');
 const { sendApprovalRequest, sendApprovalNotification, sendPasswordResetEmail } = require('../mailer');
 const { atomicWriteJSON } = require('../atomic-write');
 const { getClientIp } = require('../security');
+const { sendPtzCommand, getPresets, gotoPreset, VALID_OPS } = require('../ptz');
+const { createRateLimiter } = require('../security');
 
 const router = express.Router();
 
@@ -804,6 +806,75 @@ router.get('/admin/infra', requireAdmin, (req, res) => {
   } catch (err) {
     console.error('Infra endpoint error:', err);
     res.status(500).json({ error: 'Failed to read infrastructure data' });
+  }
+});
+
+// --- PTZ Camera Control ---
+
+function requireAuth(req, res, next) {
+  const token = req.headers['x-auth-token'];
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+  const session = db.getSession(token);
+  if (!session) return res.status(401).json({ error: 'Not authenticated' });
+  req.session = session;
+  next();
+}
+
+function findPtzCamera(id) {
+  const cam = config.cameras.find(c => c.id === id && c.enabled);
+  if (!cam) return null;
+  if (!cam.ptz || !cam.ptz.ip) return null;
+  return cam;
+}
+
+const ptzLimiter = createRateLimiter({ windowMs: 1000, max: 20, message: 'PTZ rate limit exceeded' });
+
+router.post('/camera/:id/ptz', requireAuth, ptzLimiter, async (req, res) => {
+  const cam = findPtzCamera(req.params.id);
+  if (!cam) return res.status(404).json({ error: 'Camera not found or does not support PTZ' });
+
+  const { op, speed } = req.body;
+  if (!op || !VALID_OPS.includes(op)) {
+    return res.status(400).json({ error: `Invalid op. Valid: ${VALID_OPS.join(', ')}` });
+  }
+
+  try {
+    const result = await sendPtzCommand(cam, op, speed || 32);
+    res.json(result);
+  } catch (err) {
+    console.error('PTZ command failed:', err.message);
+    res.status(502).json({ error: 'Failed to send PTZ command to camera' });
+  }
+});
+
+router.get('/camera/:id/presets', requireAuth, async (req, res) => {
+  const cam = findPtzCamera(req.params.id);
+  if (!cam) return res.status(404).json({ error: 'Camera not found or does not support PTZ' });
+
+  try {
+    const presets = await getPresets(cam);
+    res.json(presets);
+  } catch (err) {
+    console.error('Get presets failed:', err.message);
+    res.status(502).json({ error: 'Failed to get presets from camera' });
+  }
+});
+
+router.post('/camera/:id/preset/:presetId', requireAuth, async (req, res) => {
+  const cam = findPtzCamera(req.params.id);
+  if (!cam) return res.status(404).json({ error: 'Camera not found or does not support PTZ' });
+
+  const presetId = parseInt(req.params.presetId);
+  if (isNaN(presetId) || presetId < 0 || presetId > 63) {
+    return res.status(400).json({ error: 'Invalid preset ID' });
+  }
+
+  try {
+    const result = await gotoPreset(cam, presetId, req.body.speed || 32);
+    res.json(result);
+  } catch (err) {
+    console.error('Goto preset failed:', err.message);
+    res.status(502).json({ error: 'Failed to move to preset' });
   }
 });
 

@@ -76,13 +76,21 @@ app.use('/hls2', (req, res, next) => {
   if (isPrivacyMode()) return res.status(404).end();
   next();
 });
+app.use('/hls3', (req, res, next) => {
+  if (isPrivacyMode()) return res.status(404).end();
+  next();
+});
 
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.get('/config/cameras', (req, res) => {
   const cameras = config.cameras
     .filter(cam => cam.enabled)
-    .map(({ id, name, streamUrl }) => ({ id, name, streamUrl }));
+    .map(({ id, name, streamUrl, ptz }) => ({
+      id, name, streamUrl,
+      hasPtz: !!(ptz && ptz.ip),
+      ptzCapabilities: ptz && ptz.ip ? (ptz.capabilities || ['pan', 'tilt']) : []
+    }));
   res.json(cameras);
 });
 
