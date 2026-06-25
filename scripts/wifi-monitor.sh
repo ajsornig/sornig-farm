@@ -1,6 +1,6 @@
 #!/bin/bash
-# WiFi signal + stream health monitor
-# Logs signal strength, camera connectivity, and ffmpeg restarts every minute
+# Network + stream health monitor
+# Logs eth0 link, camera pings, Wavlink AP, stream freshness every minute
 # Output: ~/chicken-stream/logs/wifi-monitor.log
 
 LOG="/home/ajsornig/chicken-stream/logs/wifi-monitor.log"
@@ -9,33 +9,42 @@ mkdir -p "$(dirname "$LOG")"
 while true; do
   timestamp=$(date '+%Y-%m-%d %H:%M:%S')
 
-  # Camera signal info from AP interface
-  signal=$(sudo iw dev wlan1 station dump 2>/dev/null | grep 'signal:' | awk '{print $2}')
-  tx_rate=$(sudo iw dev wlan1 station dump 2>/dev/null | grep 'tx bitrate:' | head -1 | sed 's/.*tx bitrate:\s*//')
-  rx_rate=$(sudo iw dev wlan1 station dump 2>/dev/null | grep 'rx bitrate:' | head -1 | sed 's/.*rx bitrate:\s*//')
+  # eth0 link state (camera network)
+  eth0_state=$(cat /sys/class/net/eth0/operstate 2>/dev/null || echo "UNKNOWN")
+  eth0_speed=$(cat /sys/class/net/eth0/speed 2>/dev/null || echo "?")
 
-  # Can we ping the cameras?
-  ping_cam1=$(ping -c 1 -W 2 10.0.0.10 2>/dev/null && echo "OK" || echo "FAIL")
-  ping1=$(echo "$ping_cam1" | tail -1)
-  ping_cam2=$(ping -c 1 -W 2 10.0.0.11 2>/dev/null && echo "OK" || echo "FAIL")
-  ping2=$(echo "$ping_cam2" | tail -1)
-  ping_cam3=$(ping -c 1 -W 2 10.0.0.12 2>/dev/null && echo "OK" || echo "FAIL")
-  ping3=$(echo "$ping_cam3" | tail -1)
+  # wlan0 signal (home WiFi — Pi's internet uplink)
+  wlan0_signal=$(sudo iw dev wlan0 link 2>/dev/null | grep 'signal:' | awk '{print $2}')
 
-  # Stream freshness
+  # Ping cameras
+  ping1_ms=$(ping -c 1 -W 2 10.0.0.10 2>/dev/null | grep 'time=' | sed 's/.*time=\([^ ]*\).*/\1/' || echo "FAIL")
+  ping2_ms=$(ping -c 1 -W 2 10.0.0.11 2>/dev/null | grep 'time=' | sed 's/.*time=\([^ ]*\).*/\1/' || echo "FAIL")
+
+  # Ping Wavlink AP
+  wavlink_ms=$(ping -c 1 -W 2 10.0.0.49 2>/dev/null | grep 'time=' | sed 's/.*time=\([^ ]*\).*/\1/' || echo "FAIL")
+
+  # Stream freshness (cam1)
   if [ -f /home/ajsornig/chicken-stream/public/hls/stream.m3u8 ]; then
-    stream_age=$(( $(date +%s) - $(stat -c %Y /home/ajsornig/chicken-stream/public/hls/stream.m3u8) ))
+    stream1_age=$(( $(date +%s) - $(stat -c %Y /home/ajsornig/chicken-stream/public/hls/stream.m3u8) ))
   else
-    stream_age="NO_FILE"
+    stream1_age="NO_FILE"
   fi
 
-  # ffmpeg restart count
-  restarts=$(sudo systemctl show camera-hls --property=NRestarts 2>/dev/null | cut -d= -f2)
+  # Stream freshness (cam2)
+  if [ -f /home/ajsornig/chicken-stream/public/hls2/stream.m3u8 ]; then
+    stream2_age=$(( $(date +%s) - $(stat -c %Y /home/ajsornig/chicken-stream/public/hls2/stream.m3u8) ))
+  else
+    stream2_age="NO_FILE"
+  fi
 
-  # ffmpeg running?
-  ffmpeg_pid=$(pgrep -f 'ffmpeg.*hls' || echo "DEAD")
+  # ffmpeg restart counts
+  restarts1=$(sudo systemctl show camera-hls --property=NRestarts 2>/dev/null | cut -d= -f2)
+  restarts2=$(sudo systemctl show camera-hls-2 --property=NRestarts 2>/dev/null | cut -d= -f2)
 
-  echo "${timestamp} | signal=${signal:-?}dBm | tx=${tx_rate:-?} | rx=${rx_rate:-?} | ping1=${ping1} ping2=${ping2} ping3=${ping3} | stream_age=${stream_age}s | restarts=${restarts} | ffmpeg=${ffmpeg_pid}" >> "$LOG"
+  # ffmpeg process count
+  ffmpeg_count=$(pgrep -c -f 'ffmpeg.*hls' 2>/dev/null || echo "0")
+
+  echo "${timestamp} | eth0=${eth0_state}@${eth0_speed}Mbps | wlan0=${wlan0_signal:-?}dBm | cam1=${ping1_ms}ms cam2=${ping2_ms}ms wavlink=${wavlink_ms}ms | stream1=${stream1_age}s stream2=${stream2_age}s | restarts=${restarts1}/${restarts2} | ffmpeg=${ffmpeg_count}" >> "$LOG"
 
   sleep 60
 done
