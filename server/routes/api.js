@@ -778,8 +778,12 @@ function generateInfraAlerts(entry) {
   }
   if (entry.eth0.state !== 'up') alerts.push({ level: 'critical', message: 'eth0 link DOWN' });
   if (entry.ffmpegCount < 2) alerts.push({ level: 'warning', message: `Only ${entry.ffmpegCount} ffmpeg process(es) running` });
-  if (entry.wlan1.signal === null) alerts.push({ level: 'warning', message: 'Primary uplink (wlan1) signal lost — failover may be active' });
-  if (entry.wlan0.signal !== null && entry.wlan0.signal < -70) alerts.push({ level: 'warning', message: `Failover WiFi signal weak (${entry.wlan0.signal} dBm)` });
+  if (entry.wlan1.signal === null) {
+    alerts.push({ level: 'warning', message: 'Primary uplink (wlan1) signal lost — failover active' });
+    if (entry.wlan0.signal !== null && entry.wlan0.signal < -70) {
+      alerts.push({ level: 'warning', message: `Failover WiFi signal weak (${entry.wlan0.signal} dBm)` });
+    }
+  }
 
   return alerts;
 }

@@ -605,18 +605,35 @@ function closeLightbox() {
   if (lb) lb.classList.remove('active');
 }
 
-function renderSparkline(values, width, height, color) {
+function renderSparkline(values, width, height, color, opts) {
   const nums = values.filter(v => v !== null);
   if (nums.length < 2) return '<span style="color:var(--wood-brown);font-size:0.85rem;">Not enough data</span>';
-  const max = Math.max(...nums);
-  const min = Math.min(...nums);
-  const range = max - min || 1;
+
+  const dataMin = Math.min(...nums);
+  const dataMax = Math.max(...nums);
+  const threshold = opts && opts.threshold;
+  const scaleMin = threshold != null ? Math.min(dataMin, 0) : dataMin;
+  const scaleMax = threshold != null ? Math.max(dataMax, threshold * 1.2) : dataMax;
+  const range = scaleMax - scaleMin || 1;
+  const pad = 2;
+
+  const toY = (v) => height - pad - ((v - scaleMin) / range) * (height - pad * 2);
+
   const points = nums.map((v, i) => {
     const x = (i / (nums.length - 1)) * width;
-    const y = height - 2 - ((v - min) / range) * (height - 4);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
+    return `${x.toFixed(1)},${toY(v).toFixed(1)}`;
   }).join(' ');
-  return `<svg width="${width}" height="${height}" class="sparkline"><polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+
+  let thresholdLine = '';
+  if (threshold != null) {
+    const ty = toY(threshold).toFixed(1);
+    thresholdLine = `<line x1="0" y1="${ty}" x2="${width}" y2="${ty}" stroke="var(--barn-red)" stroke-width="1" stroke-dasharray="4,3" opacity="0.6"/>`;
+  }
+
+  return `<svg width="${width}" height="${height}" class="sparkline" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+    ${thresholdLine}
+    <polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/>
+  </svg>`;
 }
 
 function infraCardStatus(metric, value) {
@@ -729,22 +746,37 @@ async function loadInfraData() {
     `;
 
     const h = data.history;
-    const sparkW = 200;
-    const sparkH = 40;
+    const sparkW = 240;
+    const sparkH = 50;
+
+    const fmtSparkVal = (v, unit) => v === null ? '?' : `${typeof v === 'number' && v % 1 !== 0 ? v.toFixed(1) : v}${unit}`;
+
     const sparklines = [
-      { label: 'Cam1 Latency', values: h.map(e => e.pings.cam1.ms), color: 'var(--forest-green)' },
-      { label: 'Cam2 Latency', values: h.map(e => e.pings.cam2.ms), color: 'var(--forest-green)' },
-      { label: 'Stream 1 Age', values: h.map(e => e.streams.stream1.age), color: 'var(--barn-red)' },
-      { label: 'Stream 2 Age', values: h.map(e => e.streams.stream2.age), color: 'var(--barn-red)' },
-      { label: 'wlan0 Signal', values: h.map(e => e.wlan0.signal), color: 'var(--wood-brown)' }
+      { label: 'Run Camera Latency', values: h.map(e => e.pings.cam1.ms), color: 'var(--forest-green)', unit: 'ms', threshold: 10, good: 'Under 10ms is healthy' },
+      { label: 'Coop Camera Latency', values: h.map(e => e.pings.cam2.ms), color: 'var(--forest-green)', unit: 'ms', threshold: 10, good: 'Under 10ms is healthy' },
+      { label: 'Run Stream Age', values: h.map(e => e.streams.stream1.age), color: 'var(--wood-brown)', unit: 's', threshold: 30, good: 'Under 30s is healthy' },
+      { label: 'Coop Stream Age', values: h.map(e => e.streams.stream2.age), color: 'var(--wood-brown)', unit: 's', threshold: 30, good: 'Under 30s is healthy' },
+      { label: 'Fallback WiFi Signal', values: h.map(e => e.wlan0.signal), color: 'var(--wood-brown)', unit: ' dBm', threshold: null, good: 'Closer to 0 is stronger' }
     ];
 
-    document.getElementById('infra-sparklines').innerHTML = sparklines.map(s =>
-      `<div class="infra-spark-item">
-        <span class="infra-spark-label">${escapeHtml(s.label)}</span>
-        ${renderSparkline(s.values, sparkW, sparkH, s.color)}
-      </div>`
-    ).join('');
+    document.getElementById('infra-sparklines').innerHTML = sparklines.map(s => {
+      const nums = s.values.filter(v => v !== null);
+      const current = nums.length > 0 ? nums[nums.length - 1] : null;
+      const min = nums.length > 0 ? Math.min(...nums) : null;
+      const max = nums.length > 0 ? Math.max(...nums) : null;
+
+      return `<div class="infra-spark-item">
+        <div class="infra-spark-header">
+          <span class="infra-spark-label">${escapeHtml(s.label)}</span>
+          <span class="infra-spark-current">${fmtSparkVal(current, s.unit)}</span>
+        </div>
+        ${renderSparkline(s.values, sparkW, sparkH, s.color, { threshold: s.threshold })}
+        <div class="infra-spark-footer">
+          <span class="infra-spark-range">${nums.length > 0 ? `${fmtSparkVal(min, s.unit)} — ${fmtSparkVal(max, s.unit)}` : ''}</span>
+          <span class="infra-spark-hint">${s.threshold ? 'Red line = ' + s.threshold + s.unit + ' limit' : escapeHtml(s.good)}</span>
+        </div>
+      </div>`;
+    }).join('');
 
     document.getElementById('infra-updated').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
   } catch (err) {

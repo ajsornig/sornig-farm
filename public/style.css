@@ -2068,17 +2068,46 @@ footer {
   padding: 0.75rem;
 }
 
+.infra-spark-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.35rem;
+}
+
 .infra-spark-label {
-  display: block;
   font-size: 0.8rem;
   color: var(--wood-brown);
-  margin-bottom: 0.25rem;
   font-weight: bold;
+}
+
+.infra-spark-current {
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--text-dark);
 }
 
 .sparkline {
   display: block;
   width: 100%;
+  height: 50px;
+}
+
+.infra-spark-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--wood-brown);
+}
+
+.infra-spark-range {
+  opacity: 0.8;
+}
+
+.infra-spark-hint {
+  font-style: italic;
+  opacity: 0.7;
 }
 
 .infra-updated {
