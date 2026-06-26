@@ -1,5 +1,5 @@
 #!/bin/bash
-# Motion detection for chick cam (Peep Show / cam3)
+# Motion detection for chick cam (Chick Cam / cam3)
 # Uses RMSE comparison with heavy blur to ignore compression/IR noise
 # Only triggers on actual visible movement (chicks walking, etc.)
 # Saves to chick-album/pending/ for admin approval into public album

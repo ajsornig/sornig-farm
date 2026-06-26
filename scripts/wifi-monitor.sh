@@ -41,7 +41,7 @@ while true; do
     stream2_age="NO_FILE"
   fi
 
-  # Stream freshness (cam3 - Peep Show)
+  # Stream freshness (cam3 - Chick Cam)
   if [ -f /home/ajsornig/chicken-stream/public/hls3/stream.m3u8 ]; then
     stream3_age=$(( $(date +%s) - $(stat -c %Y /home/ajsornig/chicken-stream/public/hls3/stream.m3u8) ))
   else
