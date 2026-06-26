@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Panel - Sornig Farm</title>
-  <link rel="stylesheet" href="style.css?v=8">
+  <link rel="stylesheet" href="style.css?v=9">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐔</text></svg>">
 </head>
 <body>
@@ -38,7 +38,7 @@
         <button class="admin-tab active" data-panel="dashboard">Dashboard</button>
         <button class="admin-tab" data-panel="users">Users</button>
         <button class="admin-tab" data-panel="media">Media</button>
-        <button class="admin-tab" data-panel="cameras">Cameras</button>
+        <button class="admin-tab" data-panel="cameras">System</button>
         <button class="admin-tab" data-panel="comms">Comms</button>
         <button class="admin-tab" data-panel="activity">Activity</button>
       </div>
@@ -129,6 +129,14 @@
 
       <div id="admin-activity" class="admin-content hidden">
         <h3>Visitor Activity Log</h3>
+        <div class="activity-filters">
+          <input type="text" id="activity-filter-user" placeholder="Filter by username..." class="activity-filter-input">
+          <select id="activity-filter-action" class="activity-filter-select">
+            <option value="">All Actions</option>
+            <option value="login">Login</option>
+            <option value="page_visit">Page Visit</option>
+          </select>
+        </div>
         <div id="activity-list"></div>
       </div>
     </section>
@@ -138,6 +146,6 @@
     <p>Sornig Farm Admin Panel</p>
   </footer>
 
-  <script src="admin.js?v=11"></script>
+  <script src="admin.js?v=12"></script>
 </body>
 </html>

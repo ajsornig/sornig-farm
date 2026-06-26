@@ -6,6 +6,7 @@ let infraRefreshInterval = null;
 let adminUsers = [];
 let userSortCol = 'created';
 let userSortAsc = false;
+let activityData = [];
 
 // Escape for safe interpolation into HTML TEXT or attribute VALUES (quotes
 // included). NOTE: this is NOT sufficient for a value placed inside an inline
@@ -577,34 +578,73 @@ async function loadActivityLog() {
     const res = await fetch('/api/admin/activity', {
       headers: { 'x-auth-token': authToken }
     });
-    const activity = await res.json();
+    activityData = await res.json();
 
-    const list = document.getElementById('activity-list');
-    if (activity.length === 0) {
-      list.innerHTML = '<p class="no-pending">No activity recorded yet</p>';
-      return;
-    }
+    setupActivityFilters();
+    renderActivityLog();
+  } catch (err) {
+    console.error('Failed to load activity log:', err);
+  }
+}
 
-    list.innerHTML = `<button class="admin-btn" onclick="clearActivityLog()" style="margin-bottom:1rem;">Clear All Logs</button>
+function setupActivityFilters() {
+  const userInput = document.getElementById('activity-filter-user');
+  const actionSelect = document.getElementById('activity-filter-action');
+
+  userInput.oninput = renderActivityLog;
+  actionSelect.onchange = renderActivityLog;
+
+  const actions = [...new Set(activityData.map(e => e.action))];
+  const currentVal = actionSelect.value;
+  actionSelect.innerHTML = '<option value="">All Actions</option>' +
+    actions.map(a => `<option value="${escapeHtml(a)}">${formatActionLabel(a)}</option>`).join('');
+  actionSelect.value = currentVal;
+}
+
+function formatActionLabel(action) {
+  switch (action) {
+    case 'login': return 'Login';
+    case 'page_visit': return 'Page Visit';
+    default: return action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+}
+
+function renderActivityLog() {
+  const list = document.getElementById('activity-list');
+  const userFilter = document.getElementById('activity-filter-user').value.toLowerCase().trim();
+  const actionFilter = document.getElementById('activity-filter-action').value;
+
+  if (activityData.length === 0) {
+    list.innerHTML = '<p class="no-pending">No activity recorded yet</p>';
+    return;
+  }
+
+  const filtered = activityData.filter(entry => {
+    if (userFilter && !entry.username.toLowerCase().includes(userFilter)) return false;
+    if (actionFilter && entry.action !== actionFilter) return false;
+    return true;
+  });
+
+  list.innerHTML = `<button class="admin-btn" onclick="clearActivityLog()" style="margin-bottom:1rem;">Clear All Logs</button>
+    <p class="admin-note" style="margin-bottom:0.5rem;">${filtered.length} of ${activityData.length} entries</p>
     <table id="activity-table">
       <thead>
         <tr><th>Time</th><th>User</th><th>Action</th><th>IP</th><th></th></tr>
       </thead>
       <tbody>
-        ${activity.map((entry, i) => `
-          <tr id="activity-row-${i}">
+        ${filtered.map((entry) => {
+          const origIndex = activityData.indexOf(entry);
+          return `
+          <tr id="activity-row-${origIndex}">
             <td>${new Date(entry.timestamp).toLocaleString()}</td>
             <td><strong>${escapeHtml(entry.username)}</strong></td>
             <td>${formatAction(entry.action)}</td>
             <td>${entry.details && entry.details.ip ? escapeHtml(entry.details.ip) : '-'}</td>
-            <td><button class="deny-btn" onclick="deleteActivityEntry(${i})" title="Delete">&#10005;</button></td>
-          </tr>
-        `).join('')}
+            <td><button class="deny-btn" onclick="deleteActivityEntry(${origIndex})" title="Delete">&#10005;</button></td>
+          </tr>`;
+        }).join('')}
       </tbody>
     </table>`;
-  } catch (err) {
-    console.error('Failed to load activity log:', err);
-  }
 }
 
 function formatAction(action) {

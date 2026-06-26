@@ -2478,3 +2478,40 @@ footer {
     grid-template-columns: 1fr;
   }
 }
+
+.activity-filters {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.activity-filter-input {
+  padding: 0.4rem 0.75rem;
+  border: 2px solid var(--wood-brown);
+  border-radius: 6px;
+  background: var(--cream);
+  color: var(--text-dark);
+  font-size: 0.85rem;
+  flex: 1;
+  max-width: 250px;
+}
+
+.activity-filter-input:focus {
+  outline: none;
+  border-color: var(--forest-green);
+}
+
+.activity-filter-select {
+  padding: 0.4rem 0.75rem;
+  border: 2px solid var(--wood-brown);
+  border-radius: 6px;
+  background: var(--cream);
+  color: var(--text-dark);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.activity-filter-select:focus {
+  outline: none;
+  border-color: var(--forest-green);
+}
