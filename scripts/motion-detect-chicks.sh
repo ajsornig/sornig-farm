@@ -1,6 +1,7 @@
 #!/bin/bash
 # Motion detection for chick cam (Peep Show / cam3)
-# Lower threshold than predator detection — captures chick activity
+# Uses RMSE comparison with heavy blur to ignore compression/IR noise
+# Only triggers on actual visible movement (chicks walking, etc.)
 # Saves to chick-album/pending/ for admin approval into public album
 
 STREAM="/home/ajsornig/chicken-stream/public/hls3/stream.m3u8"
@@ -8,11 +9,14 @@ CAPTURES_DIR="/home/ajsornig/chicken-stream/public/chick-album"
 LOG="/home/ajsornig/chicken-stream/logs/chick-motion.log"
 WORK_DIR="/tmp/motion-detect-chicks"
 
-# Lower threshold for small chick movements
-THRESHOLD=5          # Percentage of pixels that must change
-COOLDOWN=30          # Seconds between captures (more frequent than predator)
+# RMSE threshold — 0 means identical, 1 means completely different.
+# IR noise + JPEG artifacts sit around 0.01-0.02 on a static scene.
+# A chick walking across frame is ~0.04-0.08. Set to 0.03 to catch
+# real movement while ignoring noise.
+THRESHOLD="0.03"
+COOLDOWN=60          # Seconds between captures
 CHECK_INTERVAL=10    # Seconds between frame checks
-CONFIRM_COUNT=2      # Must detect motion 2 consecutive times
+CONFIRM_COUNT=2      # Must detect motion N consecutive times
 MAX_PENDING=100      # Keep last N pending captures
 
 mkdir -p "$CAPTURES_DIR/pending" "$WORK_DIR" "$(dirname "$LOG")"
@@ -30,9 +34,10 @@ grab_frame() {
   return $?
 }
 
+# Heavy blur + small size to eliminate noise, keep only real movement
 grab_frame_blurred() {
   local output="$1"
-  ffmpeg -y -i "$STREAM" -frames:v 1 -vf "scale=320:240,gblur=sigma=2" -q:v 5 "$output" 2>/dev/null
+  ffmpeg -y -i "$STREAM" -frames:v 1 -vf "scale=160:120,gblur=sigma=5" -q:v 5 "$output" 2>/dev/null
   return $?
 }
 
@@ -44,17 +49,28 @@ compare_frames() {
     return 1
   fi
 
-  local diff=$(compare -metric AE "$frame1" "$frame2" /dev/null 2>&1)
+  # RMSE returns a normalized value (0-1) representing average pixel difference.
+  # Much better than AE (absolute error count) which fires on noise.
+  # Output format: "1234.56 (0.0188)" — we grab the normalized value in parens.
+  local raw=$(compare -metric RMSE "$frame1" "$frame2" /dev/null 2>&1)
+  local rmse=$(echo "$raw" | grep -oP '\([\d.]+\)' | tr -d '()')
 
-  # Total pixels in 320x240 = 76800
-  local total=76800
-  local percent=$(( (diff * 100) / total ))
+  if [ -z "$rmse" ]; then
+    return 1
+  fi
 
-  echo "$percent"
+  echo "$rmse"
+}
+
+exceeds_threshold() {
+  local val="$1"
+  # bc returns 1 if the comparison is true
+  local result=$(echo "$val > $THRESHOLD" | bc -l 2>/dev/null)
+  [ "$result" = "1" ]
 }
 
 trigger_alert() {
-  local percent="$1"
+  local rmse="$1"
   local now=$(date +%s)
 
   if [ $(( now - last_alert )) -lt "$COOLDOWN" ]; then
@@ -66,7 +82,7 @@ trigger_alert() {
 
   cp "$WORK_DIR/current_clean.jpg" "$CAPTURES_DIR/pending/chick-${timestamp}.jpg"
 
-  log "CAPTURE: Motion detected (${percent}% change) - chick-${timestamp}.jpg"
+  log "CAPTURE: Motion detected (RMSE=${rmse}) - chick-${timestamp}.jpg"
 
   # Keep only last MAX_PENDING captures
   ls -t "$CAPTURES_DIR/pending"/chick-*.jpg 2>/dev/null | tail -n +$((MAX_PENDING + 1)) | xargs rm -f 2>/dev/null
@@ -80,7 +96,7 @@ cleanup() {
 
 trap cleanup SIGTERM SIGINT
 
-log "Chick motion detection started (threshold=${THRESHOLD}%, cooldown=${COOLDOWN}s)"
+log "Motion detection started (method=RMSE, threshold=${THRESHOLD}, blur=sigma5@160x120, cooldown=${COOLDOWN}s)"
 
 while true; do
   # Check stream is active
@@ -107,17 +123,23 @@ while true; do
   fi
   grab_frame "$WORK_DIR/current_clean.jpg"
 
-  # Compare blurred frames
+  # Compare blurred frames using RMSE
   if [ -f "$WORK_DIR/previous.jpg" ]; then
-    percent=$(compare_frames "$WORK_DIR/previous.jpg" "$WORK_DIR/current_blur.jpg")
-    if [ -n "$percent" ] && [ "$percent" -gt "$THRESHOLD" ]; then
-      consecutive_triggers=$((consecutive_triggers + 1))
-      if [ "$consecutive_triggers" -ge "$CONFIRM_COUNT" ]; then
-        trigger_alert "$percent"
+    rmse=$(compare_frames "$WORK_DIR/previous.jpg" "$WORK_DIR/current_blur.jpg")
+    if [ -n "$rmse" ]; then
+      if exceeds_threshold "$rmse"; then
+        consecutive_triggers=$((consecutive_triggers + 1))
+        log "DEBUG: RMSE=${rmse} (above ${THRESHOLD}), streak=${consecutive_triggers}/${CONFIRM_COUNT}"
+        if [ "$consecutive_triggers" -ge "$CONFIRM_COUNT" ]; then
+          trigger_alert "$rmse"
+          consecutive_triggers=0
+        fi
+      else
+        if [ "$consecutive_triggers" -gt 0 ]; then
+          log "DEBUG: RMSE=${rmse} (below ${THRESHOLD}), streak reset"
+        fi
         consecutive_triggers=0
       fi
-    else
-      consecutive_triggers=0
     fi
   fi
 
