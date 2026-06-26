@@ -170,8 +170,23 @@ function getAllUsers() {
     email: u.email || null,
     isAdmin: u.isAdmin,
     approved: u.approved !== false,
+    ptzAccess: u.ptzAccess || false,
     createdAt: u.createdAt
   }));
+}
+
+function hasPtzAccess(username) {
+  const user = data.users[username.toLowerCase()];
+  if (!user) return false;
+  return user.isAdmin || user.ptzAccess === true;
+}
+
+function setPtzAccess(username, enabled) {
+  const usernameLower = username.toLowerCase();
+  if (!data.users[usernameLower]) return { error: 'User not found' };
+  data.users[usernameLower].ptzAccess = !!enabled;
+  saveData();
+  return { success: true };
 }
 
 function updateUserEmail(username, email) {
@@ -441,5 +456,7 @@ module.exports = {
   logActivity,
   getActivityLog,
   deleteActivityEntry,
-  clearActivityLog
+  clearActivityLog,
+  hasPtzAccess,
+  setPtzAccess
 };

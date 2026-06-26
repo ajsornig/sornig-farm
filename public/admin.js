@@ -234,6 +234,7 @@ async function loadAdminData() {
         <td>${new Date(user.createdAt).toLocaleDateString()}</td>
         <td>
           <div class="action-buttons">
+            ${user.isAdmin ? '' : `<button class="admin-btn ${user.ptzAccess ? 'cam-hide-btn' : 'cam-show-btn'}" onclick="togglePtzAccess(${jsArg(user.username)}, ${user.ptzAccess ? 'false' : 'true'})">${user.ptzAccess ? 'Revoke PTZ' : 'Grant PTZ'}</button>`}
             <button class="reset-pwd-btn" onclick="resetPassword(${jsArg(user.username)})">
               Reset Password
             </button>
@@ -783,6 +784,24 @@ async function loadInfraData() {
     document.getElementById('infra-updated').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
   } catch (err) {
     console.error('Failed to load infra data:', err);
+  }
+}
+
+// --- PTZ Access Management ---
+
+async function togglePtzAccess(username, enabled) {
+  try {
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(username)}/ptz`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      body: JSON.stringify({ enabled })
+    });
+    const data = await res.json();
+    if (data.success) {
+      loadAdminData();
+    }
+  } catch (err) {
+    console.error('Failed to toggle PTZ access:', err);
   }
 }
 

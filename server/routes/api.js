@@ -809,6 +809,20 @@ router.get('/admin/infra', requireAdmin, (req, res) => {
   }
 });
 
+// --- PTZ Access Management ---
+
+router.post('/admin/users/:username/ptz', (req, res) => {
+  const token = req.headers['x-auth-token'];
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+  const session = db.getSession(token);
+  if (!session || !session.isAdmin) return res.status(403).json({ error: 'Admin only' });
+
+  const { enabled } = req.body;
+  const result = db.setPtzAccess(req.params.username, enabled);
+  if (result.error) return res.status(404).json(result);
+  res.json({ success: true, username: req.params.username, ptzAccess: !!enabled });
+});
+
 // --- PTZ Camera Control ---
 
 function requireAuth(req, res, next) {
@@ -817,6 +831,13 @@ function requireAuth(req, res, next) {
   const session = db.getSession(token);
   if (!session) return res.status(401).json({ error: 'Not authenticated' });
   req.session = session;
+  next();
+}
+
+function requirePtzAccess(req, res, next) {
+  if (!db.hasPtzAccess(req.session.username)) {
+    return res.status(403).json({ error: 'PTZ access not granted' });
+  }
   next();
 }
 
@@ -829,7 +850,7 @@ function findPtzCamera(id) {
 
 const ptzLimiter = createRateLimiter({ windowMs: 1000, max: 20, message: 'PTZ rate limit exceeded' });
 
-router.post('/camera/:id/ptz', requireAuth, ptzLimiter, async (req, res) => {
+router.post('/camera/:id/ptz', requireAuth, requirePtzAccess, ptzLimiter, async (req, res) => {
   const cam = findPtzCamera(req.params.id);
   if (!cam) return res.status(404).json({ error: 'Camera not found or does not support PTZ' });
 
@@ -847,7 +868,7 @@ router.post('/camera/:id/ptz', requireAuth, ptzLimiter, async (req, res) => {
   }
 });
 
-router.get('/camera/:id/presets', requireAuth, async (req, res) => {
+router.get('/camera/:id/presets', requireAuth, requirePtzAccess, async (req, res) => {
   const cam = findPtzCamera(req.params.id);
   if (!cam) return res.status(404).json({ error: 'Camera not found or does not support PTZ' });
 
@@ -860,7 +881,7 @@ router.get('/camera/:id/presets', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/camera/:id/preset/:presetId', requireAuth, async (req, res) => {
+router.post('/camera/:id/preset/:presetId', requireAuth, requirePtzAccess, async (req, res) => {
   const cam = findPtzCamera(req.params.id);
   if (!cam) return res.status(404).json({ error: 'Camera not found or does not support PTZ' });
 
