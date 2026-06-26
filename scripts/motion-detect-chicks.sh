@@ -14,7 +14,7 @@ WORK_DIR="/tmp/motion-detect-chicks"
 # A chick walking across frame is ~0.04-0.08. Set to 0.03 to catch
 # real movement while ignoring noise.
 THRESHOLD="0.03"
-COOLDOWN=60          # Seconds between captures
+COOLDOWN=300         # Seconds between captures (5 minutes)
 CHECK_INTERVAL=30    # Seconds between frame checks
 CONFIRM_COUNT=2      # Must detect motion N consecutive times
 MAX_PENDING=100      # Keep last N pending captures
