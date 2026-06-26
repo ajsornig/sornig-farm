@@ -1,0 +1,15 @@
+[Unit]
+Description=Chick cam motion detection (Peep Show / cam3)
+After=network.target camera-hls-3.service
+
+[Service]
+Type=simple
+User=ajsornig
+ExecStart=/bin/bash /home/ajsornig/chicken-stream/scripts/motion-detect-chicks.sh
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

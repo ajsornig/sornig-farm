@@ -43,6 +43,7 @@
         <button class="admin-tab" data-panel="stats">Stats</button>
         <button class="admin-tab" data-panel="chat">Chat</button>
         <button class="admin-tab" data-panel="broadcast">Broadcast</button>
+        <button class="admin-tab" data-panel="chicks">Chicks</button>
         <button class="admin-tab" data-panel="cameras">Cameras</button>
         <button class="admin-tab" data-panel="infra">Infra</button>
       </div>
@@ -111,6 +112,17 @@
           </div>
           <div id="broadcast-result" class="hidden"></div>
         </div>
+      </div>
+      <div id="admin-chicks" class="admin-content hidden">
+        <h3>Chick Album - Pending Captures</h3>
+        <p class="admin-note">Motion captures from the Peep Show cam. Approve the good ones into the public chick album.</p>
+        <div class="motion-admin-actions">
+          <button id="chick-approve-all-btn" class="admin-btn cam-show-btn">Approve All</button>
+          <button id="chick-reject-all-btn" class="admin-btn">Reject All</button>
+        </div>
+        <div id="chick-pending-list"></div>
+        <h3 style="margin-top:1.5rem;color:var(--wood-brown);">Album (<span id="chick-album-count">0</span> photos)</h3>
+        <div id="chick-album-list"></div>
       </div>
       <div id="admin-cameras" class="admin-content hidden">
         <h3>Camera Visibility</h3>

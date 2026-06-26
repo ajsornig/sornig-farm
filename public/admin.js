@@ -172,6 +172,7 @@ function setupAdminTabs() {
       document.getElementById('admin-stats').classList.toggle('hidden', panel !== 'stats');
       document.getElementById('admin-chat').classList.toggle('hidden', panel !== 'chat');
       document.getElementById('admin-broadcast').classList.toggle('hidden', panel !== 'broadcast');
+      document.getElementById('admin-chicks').classList.toggle('hidden', panel !== 'chicks');
       document.getElementById('admin-cameras').classList.toggle('hidden', panel !== 'cameras');
       document.getElementById('admin-infra').classList.toggle('hidden', panel !== 'infra');
 
@@ -179,6 +180,7 @@ function setupAdminTabs() {
       if (panel === 'motion') loadMotionPending();
       if (panel === 'timelapse') loadTimelapseFrames();
       if (panel === 'broadcast') loadBroadcastRecipients();
+      if (panel === 'chicks') loadChickAlbumAdmin();
       if (panel === 'cameras') loadCameraToggles();
 
       if (panel === 'infra') {
@@ -193,6 +195,8 @@ function setupAdminTabs() {
 
   document.getElementById('admin-clear-btn').onclick = clearChat;
   document.getElementById('reject-all-btn').onclick = rejectAllMotion;
+  document.getElementById('chick-approve-all-btn').onclick = approveAllChicks;
+  document.getElementById('chick-reject-all-btn').onclick = rejectAllChicks;
 }
 
 function setupChatConnection() {
@@ -867,6 +871,156 @@ async function sendBroadcast() {
   } finally {
     btn.disabled = false;
     btn.textContent = 'Send to All';
+  }
+}
+
+// --- Chick Album ---
+
+async function loadChickAlbumAdmin() {
+  await Promise.all([loadChickPending(), loadChickAlbum()]);
+}
+
+async function loadChickPending() {
+  try {
+    const res = await fetch('/api/admin/chick-album/pending', {
+      headers: { 'x-auth-token': authToken }
+    });
+    const captures = await res.json();
+    const list = document.getElementById('chick-pending-list');
+
+    if (captures.length === 0) {
+      list.innerHTML = '<p class="no-pending">No pending chick captures</p>';
+      return;
+    }
+
+    list.innerHTML = captures.map(cap => {
+      const date = new Date(cap.created);
+      const label = date.toLocaleString();
+      return `
+        <div class="motion-pending-item" id="chick-${escapeHtml(cap.filename)}">
+          <img src="${cap.url}" alt="Chick capture" loading="lazy">
+          <div class="motion-pending-info">
+            <span>${label}</span>
+            <div class="motion-pending-actions">
+              <button class="approve-btn" onclick="approveChick(${jsArg(cap.filename)})">Approve</button>
+              <button class="deny-btn" onclick="rejectChick(${jsArg(cap.filename)})">Reject</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Failed to load chick pending:', err);
+  }
+}
+
+async function loadChickAlbum() {
+  try {
+    const res = await fetch('/api/chick-album');
+    const captures = await res.json();
+    const list = document.getElementById('chick-album-list');
+    document.getElementById('chick-album-count').textContent = captures.length;
+
+    if (captures.length === 0) {
+      list.innerHTML = '<p class="no-pending">No approved photos yet</p>';
+      return;
+    }
+
+    list.innerHTML = '<div class="timelapse-grid">' + captures.map(cap => {
+      const date = new Date(cap.created);
+      const label = date.toLocaleString();
+      return `
+        <div class="timelapse-frame-card" id="album-${escapeHtml(cap.filename)}">
+          <img src="${cap.url}" alt="Chick ${label}" loading="lazy" onclick="window.open('${cap.url}','_blank')">
+          <div class="timelapse-frame-info">
+            <span>${label}</span>
+            <button class="deny-btn" onclick="deleteChickAlbum(${jsArg(cap.filename)})">Delete</button>
+          </div>
+        </div>
+      `;
+    }).join('') + '</div>';
+  } catch (err) {
+    console.error('Failed to load chick album:', err);
+  }
+}
+
+async function approveChick(filename) {
+  try {
+    const res = await fetch(`/api/admin/chick-album/pending/${filename}/approve`, {
+      method: 'POST',
+      headers: { 'x-auth-token': authToken }
+    });
+    if ((await res.json()).success) {
+      const el = document.getElementById(`chick-${filename}`);
+      if (el) el.remove();
+      loadChickAlbum();
+    }
+  } catch (err) {
+    console.error('Failed to approve chick:', err);
+  }
+}
+
+async function rejectChick(filename) {
+  try {
+    const res = await fetch(`/api/admin/chick-album/pending/${filename}/reject`, {
+      method: 'POST',
+      headers: { 'x-auth-token': authToken }
+    });
+    if ((await res.json()).success) {
+      const el = document.getElementById(`chick-${filename}`);
+      if (el) el.remove();
+    }
+  } catch (err) {
+    console.error('Failed to reject chick:', err);
+  }
+}
+
+async function approveAllChicks() {
+  if (!confirm('Approve all pending chick captures into the album?')) return;
+  try {
+    const res = await fetch('/api/admin/chick-album/approve-all', {
+      method: 'POST',
+      headers: { 'x-auth-token': authToken }
+    });
+    const data = await res.json();
+    if (data.success) {
+      loadChickAlbumAdmin();
+    }
+  } catch (err) {
+    console.error('Failed to approve all chicks:', err);
+  }
+}
+
+async function rejectAllChicks() {
+  if (!confirm('Reject all pending chick captures?')) return;
+  try {
+    const res = await fetch('/api/admin/chick-album/reject-all', {
+      method: 'POST',
+      headers: { 'x-auth-token': authToken }
+    });
+    const data = await res.json();
+    if (data.success) {
+      loadChickPending();
+    }
+  } catch (err) {
+    console.error('Failed to reject all chicks:', err);
+  }
+}
+
+async function deleteChickAlbum(filename) {
+  try {
+    const res = await fetch(`/api/admin/chick-album/${filename}`, {
+      method: 'DELETE',
+      headers: { 'x-auth-token': authToken }
+    });
+    if ((await res.json()).success) {
+      const el = document.getElementById(`album-${filename}`);
+      if (el) el.remove();
+      const count = document.getElementById('chick-album-count');
+      count.textContent = Math.max(0, parseInt(count.textContent) - 1);
+    }
+  } catch (err) {
+    console.error('Failed to delete chick album photo:', err);
   }
 }
 

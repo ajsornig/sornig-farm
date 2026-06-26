@@ -552,6 +552,127 @@ router.delete('/admin/motion-captures/:filename', requireAdmin, (req, res) => {
   res.json({ success: true });
 });
 
+// --- Chick Album ---
+
+const CHICK_ALBUM_RE = /^chick-\d{4}-\d{2}-\d{2}_\d{6}\.jpg$/;
+
+router.get('/chick-album', (req, res) => {
+  const albumDir = path.join(__dirname, '../../public/chick-album');
+
+  if (!fs.existsSync(albumDir)) {
+    return res.json([]);
+  }
+
+  const files = fs.readdirSync(albumDir)
+    .filter(f => f.endsWith('.jpg'))
+    .map(filename => {
+      const stats = fs.statSync(path.join(albumDir, filename));
+      return {
+        filename,
+        url: `/chick-album/${filename}`,
+        created: stats.birthtime.toISOString()
+      };
+    })
+    .sort((a, b) => new Date(b.created) - new Date(a.created))
+    .slice(0, 100);
+
+  res.json(files);
+});
+
+router.get('/admin/chick-album/pending', requireAdmin, (req, res) => {
+  const pendingDir = path.join(__dirname, '../../public/chick-album/pending');
+
+  if (!fs.existsSync(pendingDir)) {
+    return res.json([]);
+  }
+
+  const files = fs.readdirSync(pendingDir)
+    .filter(f => f.endsWith('.jpg'))
+    .map(filename => {
+      const stats = fs.statSync(path.join(pendingDir, filename));
+      return {
+        filename,
+        url: `/chick-album/pending/${filename}`,
+        created: stats.birthtime.toISOString()
+      };
+    })
+    .sort((a, b) => new Date(b.created) - new Date(a.created));
+
+  res.json(files);
+});
+
+router.post('/admin/chick-album/pending/:filename/approve', requireAdmin, (req, res) => {
+  const filename = path.basename(req.params.filename);
+  if (!CHICK_ALBUM_RE.test(filename)) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+  const pendingDir = path.join(__dirname, '../../public/chick-album/pending');
+  const albumDir = path.join(__dirname, '../../public/chick-album');
+  const src = path.join(pendingDir, filename);
+  const dest = path.join(albumDir, filename);
+
+  if (!fs.existsSync(src)) {
+    return res.status(404).json({ error: 'File not found' });
+  }
+
+  fs.renameSync(src, dest);
+  res.json({ success: true });
+});
+
+router.post('/admin/chick-album/pending/:filename/reject', requireAdmin, (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const pendingDir = path.join(__dirname, '../../public/chick-album/pending');
+  const filepath = path.join(pendingDir, filename);
+
+  if (!fs.existsSync(filepath)) {
+    return res.status(404).json({ error: 'File not found' });
+  }
+
+  fs.unlinkSync(filepath);
+  res.json({ success: true });
+});
+
+router.post('/admin/chick-album/approve-all', requireAdmin, (req, res) => {
+  const pendingDir = path.join(__dirname, '../../public/chick-album/pending');
+  const albumDir = path.join(__dirname, '../../public/chick-album');
+
+  if (!fs.existsSync(pendingDir)) {
+    return res.json({ success: true, count: 0 });
+  }
+
+  const files = fs.readdirSync(pendingDir).filter(f => CHICK_ALBUM_RE.test(f));
+  for (const f of files) {
+    fs.renameSync(path.join(pendingDir, f), path.join(albumDir, f));
+  }
+  res.json({ success: true, count: files.length });
+});
+
+router.post('/admin/chick-album/reject-all', requireAdmin, (req, res) => {
+  const pendingDir = path.join(__dirname, '../../public/chick-album/pending');
+
+  if (!fs.existsSync(pendingDir)) {
+    return res.json({ success: true, count: 0 });
+  }
+
+  const files = fs.readdirSync(pendingDir).filter(f => f.endsWith('.jpg'));
+  for (const f of files) {
+    fs.unlinkSync(path.join(pendingDir, f));
+  }
+  res.json({ success: true, count: files.length });
+});
+
+router.delete('/admin/chick-album/:filename', requireAdmin, (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const filepath = path.join(__dirname, '../../public/chick-album', filename);
+
+  if (!fs.existsSync(filepath)) {
+    return res.status(404).json({ error: 'File not found' });
+  }
+
+  fs.unlinkSync(filepath);
+  res.json({ success: true });
+});
+
 router.get('/status', (req, res) => {
   res.json({
     authEnabled: config.authEnabled,

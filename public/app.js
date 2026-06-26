@@ -20,6 +20,7 @@ async function init() {
     loadRecordings();
     loadTimelapse();
     loadMotionCaptures();
+    loadChickAlbum();
     loadVisitorStats();
   }
   loadWeather();
@@ -141,6 +142,7 @@ function showLoggedInState(skipContentLoad = false) {
     loadRecordings();
     loadTimelapse();
     loadMotionCaptures();
+    loadChickAlbum();
     loadVisitorStats();
   }
 }
@@ -879,6 +881,52 @@ async function deleteMotionCapture(filename, event) {
     }
   } catch (err) {
     console.error('Failed to delete capture:', err);
+  }
+}
+
+async function loadChickAlbum() {
+  try {
+    const res = await fetch('/api/chick-album');
+    const captures = await res.json();
+    const gallery = document.getElementById('chick-album-gallery');
+
+    if (captures.length === 0) {
+      gallery.innerHTML = '<p class="no-recordings">No chick photos yet — the motion detector is watching!</p>';
+      return;
+    }
+
+    gallery.innerHTML = captures.map(cap => {
+      const date = new Date(cap.created);
+      const label = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+      const deleteBtn = isAdmin ? `<button class="motion-delete-btn" onclick="deleteChickPhoto(${jsArg(cap.filename)}, event)" title="Delete">x</button>` : '';
+      return `
+        <div class="motion-thumb" id="chick-${escapeHtml(cap.filename)}">
+          <a href="${cap.url}" target="_blank">
+            <img src="${cap.url}" alt="Chick ${label}" loading="lazy">
+          </a>
+          <span class="motion-time">${label}${deleteBtn}</span>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Failed to load chick album:', err);
+  }
+}
+
+async function deleteChickPhoto(filename, event) {
+  event.preventDefault();
+  event.stopPropagation();
+  try {
+    const res = await fetch(`/api/admin/chick-album/${filename}`, {
+      method: 'DELETE',
+      headers: { 'x-auth-token': authToken }
+    });
+    if ((await res.json()).success) {
+      const el = document.getElementById(`chick-${filename}`);
+      if (el) el.remove();
+    }
+  } catch (err) {
+    console.error('Failed to delete chick photo:', err);
   }
 }
 
