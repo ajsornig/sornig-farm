@@ -430,6 +430,29 @@ router.get('/timelapse', (req, res) => {
   res.json(files);
 });
 
+router.get('/motion-timelapse', (req, res) => {
+  const motionTimelapseDir = path.join(__dirname, '../../public/motion-timelapse');
+
+  if (!fs.existsSync(motionTimelapseDir)) {
+    return res.json([]);
+  }
+
+  const files = fs.readdirSync(motionTimelapseDir)
+    .filter(f => f.endsWith('.mp4'))
+    .map(filename => {
+      const stats = fs.statSync(path.join(motionTimelapseDir, filename));
+      return {
+        filename,
+        url: `/motion-timelapse/${filename}`,
+        size: stats.size,
+        created: stats.birthtime.toISOString()
+      };
+    })
+    .sort((a, b) => new Date(b.created) - new Date(a.created));
+
+  res.json(files);
+});
+
 router.get('/admin/timelapse-frames', requireAdmin, (req, res) => {
   const now = new Date();
   const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -851,6 +874,30 @@ router.get('/timelapse/stats', (req, res) => {
 router.get('/admin/timelapse-analytics', requireAdmin, (req, res) => {
   const analytics = loadAnalytics();
   res.json(analytics);
+});
+
+router.get('/admin/motion-capture-stats', requireAdmin, (req, res) => {
+  const statsLog = path.join(__dirname, '../../logs/motion-capture-stats.log');
+
+  if (!fs.existsSync(statsLog)) {
+    return res.json({ days: {} });
+  }
+
+  const days = {};
+  const lines = fs.readFileSync(statsLog, 'utf8').split('\n').filter(Boolean);
+
+  lines.forEach(line => {
+    const parts = line.split('|');
+    if (parts.length < 3) return;
+
+    const [date, cam, status] = parts;
+    if (!days[date]) days[date] = {};
+    if (!days[date][cam]) days[date][cam] = { captured: 0, skipped: 0 };
+    if (status === 'captured') days[date][cam].captured++;
+    if (status === 'skipped') days[date][cam].skipped++;
+  });
+
+  res.json({ days });
 });
 
 // --- Infrastructure Dashboard ---

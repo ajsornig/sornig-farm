@@ -19,6 +19,7 @@ async function init() {
     await loadCameras();
     loadRecordings();
     loadTimelapse();
+    loadMotionTimelapse();
     loadMotionCaptures();
     loadChickAlbum();
     loadVisitorStats();
@@ -60,7 +61,7 @@ async function checkStatus() {
 function updateContentVisibility() {
   const protectedSections = [
     'video-container', 'chat-messages', 'timelapse-section',
-    'motion-section', 'recordings-section', 'visitors-section'
+    'motion-timelapse-section', 'chick-album-section', 'motion-section', 'recordings-section', 'visitors-section'
   ];
 
   if (requireApproval && !isApproved) {
@@ -825,6 +826,53 @@ async function loadTimelapse() {
     setupTimelapseTracking();
   } catch (err) {
     console.error('Failed to load timelapse:', err);
+  }
+}
+
+async function loadMotionTimelapse() {
+  try {
+    const res = await fetch('/api/motion-timelapse');
+    const videos = await res.json();
+    const list = document.getElementById('motion-timelapse-list');
+
+    if (videos.length === 0) {
+      list.innerHTML = '<p class="no-recordings">No motion timelapses yet — first one generates after midnight tonight</p>';
+      return;
+    }
+
+    const weekly = videos.find(v => v.filename === 'motion-timelapse-weekly.mp4');
+    const daily = videos.filter(v => v.filename !== 'motion-timelapse-weekly.mp4');
+
+    let html = '';
+
+    if (weekly) {
+      html += `
+        <div class="timelapse-weekly">
+          <h3>Last 7 Days</h3>
+          <video src="${weekly.url}" controls preload="none" data-video="${weekly.filename}"></video>
+        </div>
+      `;
+    }
+
+    if (daily.length > 0) {
+      html += daily.map(vid => {
+        const date = vid.filename.replace('motion-timelapse-', '').replace('.mp4', '');
+        const size = formatSize(vid.size);
+        return `
+          <div class="timelapse-card">
+            <video src="${vid.url}" controls preload="none" poster="" data-video="${vid.filename}"></video>
+            <div class="timelapse-info">
+              <span class="timelapse-date">${date}</span>
+              <span class="timelapse-meta">${size}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    list.innerHTML = html;
+  } catch (err) {
+    console.error('Failed to load motion timelapse:', err);
   }
 }
 

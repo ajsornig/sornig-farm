@@ -203,10 +203,12 @@ function setupMediaSubTabs() {
       document.getElementById('media-chicks').classList.toggle('hidden', sub !== 'chicks');
       document.getElementById('media-motion').classList.toggle('hidden', sub !== 'motion');
       document.getElementById('media-timelapse').classList.toggle('hidden', sub !== 'timelapse');
+      document.getElementById('media-capture-stats').classList.toggle('hidden', sub !== 'capture-stats');
 
       if (sub === 'chicks') loadChickAlbumAdmin();
       if (sub === 'motion') loadMotionPending();
       if (sub === 'timelapse') loadTimelapseFrames();
+      if (sub === 'capture-stats') loadCaptureStats();
     };
   });
 }
@@ -720,6 +722,59 @@ async function loadTimelapseFrames() {
     list.innerHTML = html;
   } catch (err) {
     console.error('Failed to load timelapse frames:', err);
+  }
+}
+
+async function loadCaptureStats() {
+  try {
+    const res = await fetch('/api/admin/motion-capture-stats', {
+      headers: { 'x-auth-token': authToken }
+    });
+    const data = await res.json();
+    const table = document.getElementById('capture-stats-table');
+    const dates = Object.keys(data.days || {}).sort((a, b) => b.localeCompare(a));
+
+    if (dates.length === 0) {
+      table.innerHTML = '<p class="no-pending">No capture stats logged yet</p>';
+      return;
+    }
+
+    const fmtCam = (camStats) => {
+      if (!camStats) return '0 / 0';
+      const total = camStats.captured + camStats.skipped;
+      return `${camStats.captured} / ${total}`;
+    };
+
+    let html = `
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Run (captured/total)</th>
+            <th>Coop (captured/total)</th>
+            <th>Chick (captured)</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    html += dates.map(date => {
+      const day = data.days[date];
+      const chickCaptured = day.chick ? day.chick.captured : 0;
+      return `
+        <tr>
+          <td>${escapeHtml(date)}</td>
+          <td>${fmtCam(day.run)}</td>
+          <td>${fmtCam(day.coop)}</td>
+          <td>${chickCaptured}</td>
+        </tr>
+      `;
+    }).join('');
+
+    html += '</tbody></table>';
+    table.innerHTML = html;
+  } catch (err) {
+    console.error('Failed to load capture stats:', err);
   }
 }
 

@@ -67,6 +67,7 @@
           <button class="media-sub-tab active" data-sub="chicks">Chick Album</button>
           <button class="media-sub-tab" data-sub="motion">Night Motion</button>
           <button class="media-sub-tab" data-sub="timelapse">Timelapse</button>
+          <button class="media-sub-tab" data-sub="capture-stats">Capture Stats</button>
         </div>
 
         <div id="media-chicks" class="media-sub-content">
@@ -94,6 +95,12 @@
           <h3>Today's Timelapse Frames</h3>
           <p class="admin-note">Frames captured today. Delete any you don't want in tonight's video.</p>
           <div id="timelapse-frames-list"></div>
+        </div>
+
+        <div id="media-capture-stats" class="media-sub-content hidden">
+          <h3>Motion Capture vs Timelapse</h3>
+          <p class="admin-note">Comparing frames captured by motion detection vs blind timelapse</p>
+          <div id="capture-stats-table"></div>
         </div>
       </div>
 

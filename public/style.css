@@ -1126,6 +1126,31 @@ main {
   content: "⏱";
 }
 
+#motion-timelapse-section {
+  max-width: 1400px;
+  margin: 2rem auto;
+  padding: 0 1.5rem;
+}
+
+#motion-timelapse-section h2 {
+  margin-bottom: 0.25rem;
+  color: var(--wood-dark);
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+#motion-timelapse-section h2::before {
+  content: "⏱";
+}
+
+#motion-timelapse-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+}
+
 #timelapse-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -1511,6 +1536,28 @@ details.collapsible-section:not([open]) summary h2::after {
 
 #users-table th[data-sort]:hover {
   background: var(--wood-dark);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--wood-brown);
+}
+
+.admin-table th {
+  background: var(--wood-brown);
+  color: var(--cream);
+  font-weight: bold;
+}
+
+.admin-table tr:hover {
+  background: var(--cream);
 }
 
 /* Dashboard */
@@ -2192,6 +2239,7 @@ footer {
   }
 
   #timelapse-section,
+  #motion-timelapse-section,
   #chick-album-section,
   #motion-section,
   #admin-panel,
@@ -2202,6 +2250,7 @@ footer {
   }
 
   #timelapse-section h2,
+  #motion-timelapse-section h2,
   #chick-album-section h2,
   #motion-section h2,
   #admin-panel h2,
