@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const config = require('../../config.json');
 const db = require('../db');
-const { sendApprovalRequest, sendApprovalNotification, sendPasswordResetEmail } = require('../mailer');
+const { sendApprovalRequest, sendApprovalNotification, sendPasswordResetEmail, sendBroadcast } = require('../mailer');
 const { atomicWriteJSON } = require('../atomic-write');
 const { getClientIp } = require('../security');
 const { sendPtzCommand, getPresets, gotoPreset, VALID_OPS } = require('../ptz');
@@ -807,6 +807,35 @@ router.get('/admin/infra', requireAdmin, (req, res) => {
     console.error('Infra endpoint error:', err);
     res.status(500).json({ error: 'Failed to read infrastructure data' });
   }
+});
+
+// --- Email Broadcast ---
+
+router.get('/admin/broadcast/recipients', (req, res) => {
+  const token = req.headers['x-auth-token'];
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+  const session = db.getSession(token);
+  if (!session || !session.isAdmin) return res.status(403).json({ error: 'Admin only' });
+
+  const users = db.getAllUsers().filter(u => u.email && u.approved);
+  res.json(users.map(u => ({ username: u.username, email: u.email })));
+});
+
+router.post('/admin/broadcast', async (req, res) => {
+  const token = req.headers['x-auth-token'];
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+  const session = db.getSession(token);
+  if (!session || !session.isAdmin) return res.status(403).json({ error: 'Admin only' });
+
+  const { subject, message } = req.body;
+  if (!subject || !message) return res.status(400).json({ error: 'Subject and message required' });
+  if (subject.length > 200) return res.status(400).json({ error: 'Subject too long' });
+  if (message.length > 5000) return res.status(400).json({ error: 'Message too long' });
+
+  const users = db.getAllUsers().filter(u => u.email && u.approved);
+  const recipients = users.map(u => ({ username: u.username, email: u.email }));
+  const results = await sendBroadcast(subject, message, recipients);
+  res.json(results);
 });
 
 // --- PTZ Access Management ---

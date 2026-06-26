@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Panel - Sornig Farm</title>
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="style.css?v=3">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐔</text></svg>">
 </head>
 <body>
@@ -42,6 +42,7 @@
         <button class="admin-tab" data-panel="activity">Activity</button>
         <button class="admin-tab" data-panel="stats">Stats</button>
         <button class="admin-tab" data-panel="chat">Chat</button>
+        <button class="admin-tab" data-panel="broadcast">Broadcast</button>
         <button class="admin-tab" data-panel="cameras">Cameras</button>
         <button class="admin-tab" data-panel="infra">Infra</button>
       </div>
@@ -98,6 +99,19 @@
         <button id="admin-clear-btn" class="admin-btn">Clear All Chat Messages</button>
         <p class="admin-note">This will permanently delete all chat messages.</p>
       </div>
+      <div id="admin-broadcast" class="admin-content hidden">
+        <h3>Email Broadcast</h3>
+        <p class="admin-note">Send an update to all users with email addresses.</p>
+        <div id="broadcast-recipients"></div>
+        <div class="broadcast-form">
+          <input type="text" id="broadcast-subject" placeholder="Subject" maxlength="200">
+          <textarea id="broadcast-message" rows="6" placeholder="Write your message..." maxlength="5000"></textarea>
+          <div class="broadcast-actions">
+            <button id="broadcast-send-btn" class="admin-btn cam-show-btn" onclick="sendBroadcast()">Send to All</button>
+          </div>
+          <div id="broadcast-result" class="hidden"></div>
+        </div>
+      </div>
       <div id="admin-cameras" class="admin-content hidden">
         <h3>Camera Visibility</h3>
         <p class="admin-note">Toggle cameras on/off for public visitors. Hidden cameras are still visible to you.</p>
@@ -117,6 +131,6 @@
     <p>Sornig Farm Admin Panel</p>
   </footer>
 
-  <script src="admin.js?v=3"></script>
+  <script src="admin.js?v=4"></script>
 </body>
 </html>

@@ -171,12 +171,14 @@ function setupAdminTabs() {
       document.getElementById('admin-activity').classList.toggle('hidden', panel !== 'activity');
       document.getElementById('admin-stats').classList.toggle('hidden', panel !== 'stats');
       document.getElementById('admin-chat').classList.toggle('hidden', panel !== 'chat');
+      document.getElementById('admin-broadcast').classList.toggle('hidden', panel !== 'broadcast');
       document.getElementById('admin-cameras').classList.toggle('hidden', panel !== 'cameras');
       document.getElementById('admin-infra').classList.toggle('hidden', panel !== 'infra');
 
       if (panel === 'activity') loadActivityLog();
       if (panel === 'motion') loadMotionPending();
       if (panel === 'timelapse') loadTimelapseFrames();
+      if (panel === 'broadcast') loadBroadcastRecipients();
       if (panel === 'cameras') loadCameraToggles();
 
       if (panel === 'infra') {
@@ -802,6 +804,69 @@ async function togglePtzAccess(username, enabled) {
     }
   } catch (err) {
     console.error('Failed to toggle PTZ access:', err);
+  }
+}
+
+// --- Email Broadcast ---
+
+async function loadBroadcastRecipients() {
+  try {
+    const res = await fetch('/api/admin/broadcast/recipients', {
+      headers: { 'x-auth-token': authToken }
+    });
+    const recipients = await res.json();
+    const el = document.getElementById('broadcast-recipients');
+    if (recipients.length === 0) {
+      el.innerHTML = '<p class="no-pending">No users have email addresses.</p>';
+      document.getElementById('broadcast-send-btn').disabled = true;
+      return;
+    }
+    document.getElementById('broadcast-send-btn').disabled = false;
+    el.innerHTML = `<p class="admin-note"><strong>${recipients.length}</strong> recipient${recipients.length === 1 ? '' : 's'}: ${recipients.map(r => escapeHtml(r.username)).join(', ')}</p>`;
+  } catch (err) {
+    console.error('Failed to load broadcast recipients:', err);
+  }
+}
+
+async function sendBroadcast() {
+  const subject = document.getElementById('broadcast-subject').value.trim();
+  const message = document.getElementById('broadcast-message').value.trim();
+  if (!subject || !message) {
+    alert('Please fill in both subject and message.');
+    return;
+  }
+  if (!confirm(`Send this email to all users with email addresses?`)) return;
+
+  const btn = document.getElementById('broadcast-send-btn');
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+  const resultEl = document.getElementById('broadcast-result');
+
+  try {
+    const res = await fetch('/api/admin/broadcast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      body: JSON.stringify({ subject, message })
+    });
+    const data = await res.json();
+    resultEl.classList.remove('hidden');
+    if (data.error) {
+      resultEl.textContent = data.error;
+      resultEl.className = 'broadcast-result broadcast-error';
+    } else {
+      resultEl.textContent = `Sent to ${data.sent} user${data.sent === 1 ? '' : 's'}${data.failed ? `, ${data.failed} failed` : ''}`;
+      resultEl.className = 'broadcast-result broadcast-success';
+      document.getElementById('broadcast-subject').value = '';
+      document.getElementById('broadcast-message').value = '';
+    }
+  } catch (err) {
+    resultEl.classList.remove('hidden');
+    resultEl.textContent = 'Failed to send broadcast';
+    resultEl.className = 'broadcast-result broadcast-error';
+    console.error('Broadcast failed:', err);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send to All';
   }
 }
 

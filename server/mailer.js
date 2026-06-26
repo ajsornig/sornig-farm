@@ -109,9 +109,33 @@ async function sendPasswordResetEmail(username, email, resetToken) {
   }
 }
 
+async function sendBroadcast(subject, message, recipients) {
+  if (!transporter) return { error: 'Email not configured' };
+  if (!recipients.length) return { error: 'No recipients' };
+
+  const results = { sent: 0, failed: 0, errors: [] };
+  for (const { username, email } of recipients) {
+    try {
+      await transporter.sendMail({
+        from: emailFrom,
+        to: email,
+        subject: `Sornig Farm: ${subject}`,
+        text: `Hi ${username},\n\n${message}\n\n- Sornig Farm\n${siteUrl}`
+      });
+      results.sent++;
+    } catch (err) {
+      results.failed++;
+      results.errors.push({ username, error: err.message });
+      console.error(`Broadcast failed for ${email}:`, err.message);
+    }
+  }
+  return results;
+}
+
 module.exports = {
   initMailer,
   sendApprovalRequest,
   sendApprovalNotification,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendBroadcast
 };
