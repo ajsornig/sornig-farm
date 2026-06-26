@@ -3,6 +3,9 @@ let currentUser = null;
 let isAdmin = false;
 let ws = null;
 let infraRefreshInterval = null;
+let adminUsers = [];
+let userSortCol = 'created';
+let userSortAsc = false;
 
 // Escape for safe interpolation into HTML TEXT or attribute VALUES (quotes
 // included). NOTE: this is NOT sufficient for a value placed inside an inline
@@ -77,39 +80,8 @@ function showAdminPanel() {
 
   setupAdminTabs();
   setupChatConnection();
-  loadPendingUsers();
   loadAdminData();
-}
-
-async function loadPendingUsers() {
-  try {
-    const res = await fetch('/api/admin/pending', {
-      headers: { 'x-auth-token': authToken }
-    });
-    const pending = await res.json();
-
-    const list = document.getElementById('pending-list');
-    if (pending.length === 0) {
-      list.innerHTML = '<p class="no-pending">No pending approval requests</p>';
-      return;
-    }
-
-    list.innerHTML = pending.map(user => `
-      <div class="pending-user">
-        <div class="pending-info">
-          <strong>${escapeHtml(user.username)}</strong>
-          ${user.email ? `<span class="pending-email">${escapeHtml(user.email)}</span>` : ''}
-          <span class="pending-date">Registered: ${new Date(user.createdAt).toLocaleString()}</span>
-        </div>
-        <div class="pending-actions">
-          <button class="approve-btn" onclick="approveUser(${jsArg(user.username)})">Approve</button>
-          <button class="deny-btn" onclick="denyUser(${jsArg(user.username)})">Deny</button>
-        </div>
-      </div>
-    `).join('');
-  } catch (err) {
-    console.error('Failed to load pending users:', err);
-  }
+  loadDashboard();
 }
 
 async function approveUser(username) {
@@ -122,7 +94,7 @@ async function approveUser(username) {
 
     if (data.success) {
       alert(`User "${username}" has been approved!`);
-      loadPendingUsers();
+      loadDashboard();
       loadAdminData();
     } else {
       alert(data.error || 'Failed to approve user');
@@ -147,7 +119,7 @@ async function denyUser(username) {
 
     if (data.success) {
       alert(`User "${username}" has been denied and removed.`);
-      loadPendingUsers();
+      loadDashboard();
     } else {
       alert(data.error || 'Failed to deny user');
     }
@@ -158,6 +130,19 @@ async function denyUser(username) {
 }
 
 function setupAdminTabs() {
+  const panels = ['dashboard', 'users', 'media', 'cameras', 'comms', 'activity'];
+
+  const hashMigration = {
+    pending: 'dashboard',
+    stats: 'dashboard',
+    motion: 'media',
+    chicks: 'media',
+    timelapse: 'media',
+    chat: 'comms',
+    broadcast: 'comms',
+    infra: 'cameras'
+  };
+
   document.querySelectorAll('.admin-tab').forEach(tab => {
     tab.onclick = () => {
       document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
@@ -165,26 +150,18 @@ function setupAdminTabs() {
 
       const panel = tab.dataset.panel;
       location.hash = panel;
-      document.getElementById('admin-pending').classList.toggle('hidden', panel !== 'pending');
-      document.getElementById('admin-users').classList.toggle('hidden', panel !== 'users');
-      document.getElementById('admin-motion').classList.toggle('hidden', panel !== 'motion');
-      document.getElementById('admin-timelapse').classList.toggle('hidden', panel !== 'timelapse');
-      document.getElementById('admin-activity').classList.toggle('hidden', panel !== 'activity');
-      document.getElementById('admin-stats').classList.toggle('hidden', panel !== 'stats');
-      document.getElementById('admin-chat').classList.toggle('hidden', panel !== 'chat');
-      document.getElementById('admin-broadcast').classList.toggle('hidden', panel !== 'broadcast');
-      document.getElementById('admin-chicks').classList.toggle('hidden', panel !== 'chicks');
-      document.getElementById('admin-cameras').classList.toggle('hidden', panel !== 'cameras');
-      document.getElementById('admin-infra').classList.toggle('hidden', panel !== 'infra');
 
+      panels.forEach(p => {
+        document.getElementById(`admin-${p}`).classList.toggle('hidden', p !== panel);
+      });
+
+      if (panel === 'dashboard') loadDashboard();
+      if (panel === 'media') loadMediaTab();
       if (panel === 'activity') loadActivityLog();
-      if (panel === 'motion') loadMotionPending();
-      if (panel === 'timelapse') loadTimelapseFrames();
-      if (panel === 'broadcast') loadBroadcastRecipients();
-      if (panel === 'chicks') loadChickAlbumAdmin();
-      if (panel === 'cameras') loadCameraToggles();
+      if (panel === 'comms') loadBroadcastRecipients();
 
-      if (panel === 'infra') {
+      if (panel === 'cameras') {
+        loadCameraToggles();
         loadInfraData();
         infraRefreshInterval = setInterval(loadInfraData, 60000);
       } else if (infraRefreshInterval) {
@@ -194,17 +171,191 @@ function setupAdminTabs() {
     };
   });
 
+  // Wire up buttons
   document.getElementById('admin-clear-btn').onclick = clearChat;
   document.getElementById('reject-all-btn').onclick = rejectAllMotion;
   document.getElementById('chick-approve-all-btn').onclick = approveAllChicks;
   document.getElementById('chick-reject-all-btn').onclick = rejectAllChicks;
 
-  // Restore tab from URL hash on load
+  // Media sub-tabs
+  setupMediaSubTabs();
+
+  // Sortable table headers
+  setupSortableTable();
+
+  // Restore tab from URL hash on load (with migration for old hashes)
   const hash = location.hash.replace('#', '');
-  if (hash) {
-    const savedTab = document.querySelector(`.admin-tab[data-panel="${hash}"]`);
+  const mappedHash = hashMigration[hash] || hash;
+  if (mappedHash && panels.includes(mappedHash)) {
+    const savedTab = document.querySelector(`.admin-tab[data-panel="${mappedHash}"]`);
     if (savedTab) savedTab.click();
   }
+}
+
+function setupMediaSubTabs() {
+  document.querySelectorAll('.media-sub-tab').forEach(tab => {
+    tab.onclick = () => {
+      document.querySelectorAll('.media-sub-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      const sub = tab.dataset.sub;
+      document.getElementById('media-chicks').classList.toggle('hidden', sub !== 'chicks');
+      document.getElementById('media-motion').classList.toggle('hidden', sub !== 'motion');
+      document.getElementById('media-timelapse').classList.toggle('hidden', sub !== 'timelapse');
+
+      if (sub === 'chicks') loadChickAlbumAdmin();
+      if (sub === 'motion') loadMotionPending();
+      if (sub === 'timelapse') loadTimelapseFrames();
+    };
+  });
+}
+
+function loadMediaTab() {
+  const activeSub = document.querySelector('.media-sub-tab.active');
+  if (activeSub) activeSub.click();
+}
+
+async function loadDashboard() {
+  const cardsEl = document.getElementById('dashboard-cards');
+
+  try {
+    const [pendingRes, statsRes, infraRes] = await Promise.all([
+      fetch('/api/admin/pending', { headers: { 'x-auth-token': authToken } }),
+      fetch('/api/stats'),
+      fetch('/api/admin/infra', { headers: { 'x-auth-token': authToken } }).catch(() => null)
+    ]);
+
+    const pending = await pendingRes.json();
+    const stats = await statsRes.json();
+    const infra = infraRes ? await infraRes.json() : null;
+
+    const uniqueLocations = new Set(stats.visitors.map(v => `${v.city},${v.country}`));
+    const pendingCount = pending.length;
+
+    let healthStatus = 'healthy';
+    let healthLabel = 'All Systems Healthy';
+    if (infra && infra.success && infra.alerts.length > 0) {
+      const hasCritical = infra.alerts.some(a => a.level === 'critical');
+      healthStatus = hasCritical ? 'critical' : 'warning';
+      healthLabel = infra.alerts.map(a => a.message).join(', ');
+    }
+
+    let html = `
+      <div class="dash-card ${pendingCount > 0 ? 'dash-card-alert' : ''}">
+        <div class="dash-card-label">Pending Approvals</div>
+        <div class="dash-card-value">${pendingCount}</div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-label">Total Views</div>
+        <div class="dash-card-value">${stats.totalViews.toLocaleString()}</div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-label">Registered Users</div>
+        <div class="dash-card-value">${adminUsers.length || '...'}</div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-label">Unique Locations</div>
+        <div class="dash-card-value">${uniqueLocations.size}</div>
+      </div>
+      <div class="dash-card dash-card-health ${healthStatus}">
+        <div class="dash-card-label">System Health</div>
+        <div class="dash-card-value dash-health-dot ${healthStatus}"></div>
+        <div class="dash-card-sub">${escapeHtml(healthLabel)}</div>
+      </div>
+    `;
+
+    if (pendingCount > 0) {
+      html += `
+        <div class="dash-pending-section">
+          <h3>Pending Approval Requests</h3>
+          ${pending.map(user => `
+            <div class="pending-user">
+              <div class="pending-info">
+                <strong>${escapeHtml(user.username)}</strong>
+                ${user.email ? `<span class="pending-email">${escapeHtml(user.email)}</span>` : ''}
+                <span class="pending-date">Registered: ${new Date(user.createdAt).toLocaleString()}</span>
+              </div>
+              <div class="pending-actions">
+                <button class="approve-btn" onclick="approveUser(${jsArg(user.username)})">Approve</button>
+                <button class="deny-btn" onclick="denyUser(${jsArg(user.username)})">Deny</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    cardsEl.innerHTML = html;
+  } catch (err) {
+    console.error('Failed to load dashboard:', err);
+  }
+}
+
+function setupSortableTable() {
+  document.querySelectorAll('#users-table th[data-sort]').forEach(th => {
+    th.style.cursor = 'pointer';
+    th.onclick = () => {
+      const col = th.dataset.sort;
+      if (userSortCol === col) {
+        userSortAsc = !userSortAsc;
+      } else {
+        userSortCol = col;
+        userSortAsc = true;
+      }
+      renderUsersTable();
+    };
+  });
+}
+
+function getSortValue(user, col) {
+  switch (col) {
+    case 'username': return user.username.toLowerCase();
+    case 'email': return (user.email || '').toLowerCase();
+    case 'role': return user.isAdmin ? 'admin' : 'user';
+    case 'created': return new Date(user.createdAt).getTime();
+    default: return '';
+  }
+}
+
+function renderUsersTable() {
+  const sorted = [...adminUsers].sort((a, b) => {
+    const aVal = getSortValue(a, userSortCol);
+    const bVal = getSortValue(b, userSortCol);
+    let cmp = 0;
+    if (typeof aVal === 'number') {
+      cmp = aVal - bVal;
+    } else {
+      cmp = aVal.localeCompare(bVal);
+    }
+    return userSortAsc ? cmp : -cmp;
+  });
+
+  document.querySelectorAll('#users-table th[data-sort]').forEach(th => {
+    const labels = { username: 'Username', email: 'Email', role: 'Role', created: 'Created' };
+    const arrow = th.dataset.sort === userSortCol ? (userSortAsc ? ' ▲' : ' ▼') : '';
+    th.textContent = labels[th.dataset.sort] + arrow;
+  });
+
+  const tbody = document.querySelector('#users-table tbody');
+  tbody.innerHTML = sorted.map(user => `
+    <tr>
+      <td>${escapeHtml(user.username)}</td>
+      <td>
+        <span class="email-display">${user.email ? escapeHtml(user.email) : '<em>none</em>'}</span>
+        <button class="edit-email-btn" onclick="editEmail(${jsArg(user.username)}, ${jsArg(user.email || '')})" title="Edit email">&#9998;</button>
+      </td>
+      <td>${user.isAdmin ? 'Admin' : 'User'}</td>
+      <td>${new Date(user.createdAt).toLocaleDateString()}</td>
+      <td>
+        <div class="action-buttons">
+          ${user.isAdmin ? '' : `<button class="admin-btn ${user.ptzAccess ? 'cam-hide-btn' : 'cam-show-btn'}" onclick="togglePtzAccess(${jsArg(user.username)}, ${user.ptzAccess ? 'false' : 'true'})">${user.ptzAccess ? 'Revoke PTZ' : 'Grant PTZ'}</button>`}
+          <button class="reset-pwd-btn" onclick="resetPassword(${jsArg(user.username)})">Reset Password</button>
+          <button class="delete-user-btn" onclick="deleteUser(${jsArg(user.username)})"
+            ${user.username === currentUser ? 'disabled title="Cannot delete yourself"' : ''}>Delete</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
 }
 
 function setupChatConnection() {
@@ -236,40 +387,8 @@ async function loadAdminData() {
     });
     const users = await usersRes.json();
 
-    const tbody = document.querySelector('#users-table tbody');
-    tbody.innerHTML = users.map(user => `
-      <tr>
-        <td>${escapeHtml(user.username)}</td>
-        <td>
-          <span class="email-display">${user.email ? escapeHtml(user.email) : '<em>none</em>'}</span>
-          <button class="edit-email-btn" onclick="editEmail(${jsArg(user.username)}, ${jsArg(user.email || '')})" title="Edit email">&#9998;</button>
-        </td>
-        <td>${user.isAdmin ? 'Admin' : 'User'}</td>
-        <td>${new Date(user.createdAt).toLocaleDateString()}</td>
-        <td>
-          <div class="action-buttons">
-            ${user.isAdmin ? '' : `<button class="admin-btn ${user.ptzAccess ? 'cam-hide-btn' : 'cam-show-btn'}" onclick="togglePtzAccess(${jsArg(user.username)}, ${user.ptzAccess ? 'false' : 'true'})">${user.ptzAccess ? 'Revoke PTZ' : 'Grant PTZ'}</button>`}
-            <button class="reset-pwd-btn" onclick="resetPassword(${jsArg(user.username)})">
-              Reset Password
-            </button>
-            <button class="delete-user-btn" onclick="deleteUser(${jsArg(user.username)})"
-              ${user.username === currentUser ? 'disabled title="Cannot delete yourself"' : ''}>
-              Delete
-            </button>
-          </div>
-        </td>
-      </tr>
-    `).join('');
-
-    document.getElementById('admin-user-count').textContent = users.length;
-
-    const statsRes = await fetch('/api/stats');
-    const stats = await statsRes.json();
-
-    document.getElementById('admin-total-views').textContent = stats.totalViews.toLocaleString();
-
-    const uniqueLocations = new Set(stats.visitors.map(v => `${v.city},${v.country}`));
-    document.getElementById('admin-locations').textContent = uniqueLocations.size;
+    adminUsers = users;
+    renderUsersTable();
 
   } catch (err) {
     console.error('Failed to load admin data:', err);

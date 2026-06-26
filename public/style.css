@@ -1328,6 +1328,108 @@ details.collapsible-section:not([open]) summary h2::after {
   background: var(--cream);
 }
 
+#users-table th[data-sort] {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+
+#users-table th[data-sort]:hover {
+  background: var(--wood-dark);
+}
+
+/* Dashboard */
+.dashboard-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.dash-card {
+  background: var(--cream);
+  border: 2px solid var(--wood-brown);
+  border-radius: 8px;
+  padding: 1.25rem;
+  text-align: center;
+}
+
+.dash-card-alert {
+  border-color: var(--golden);
+  background: #FFF8E1;
+}
+
+.dash-card-label {
+  font-size: 0.85rem;
+  color: var(--wood-brown);
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+.dash-card-value {
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--text-dark);
+}
+
+.dash-card-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+.dash-health-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-block;
+  margin: 0 auto;
+}
+
+.dash-health-dot.healthy { background: var(--forest-green); }
+.dash-health-dot.warning { background: var(--golden); }
+.dash-health-dot.critical { background: var(--barn-red); }
+
+.dash-pending-section {
+  grid-column: 1 / -1;
+}
+
+.dash-pending-section h3 {
+  margin-bottom: 1rem;
+  color: var(--wood-dark);
+}
+
+/* Media sub-tabs */
+.media-sub-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.media-sub-tab {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--wood-brown);
+  border-radius: 4px;
+  background: var(--cream);
+  color: var(--wood-brown);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+.media-sub-tab:hover {
+  background: var(--cream-dark);
+}
+
+.media-sub-tab.active {
+  background: var(--wood-brown);
+  color: var(--cream);
+}
+
+.media-sub-content.hidden {
+  display: none;
+}
+
 .email-display {
   font-size: 0.85rem;
 }
@@ -1386,33 +1488,6 @@ details.collapsible-section:not([open]) summary h2::after {
 .delete-user-btn:disabled {
   background: var(--text-muted);
   cursor: not-allowed;
-}
-
-#admin-stats {
-  display: flex;
-  gap: 1.5rem;
-  flex-wrap: wrap;
-}
-
-.stat-card {
-  background: var(--cream);
-  border-radius: 8px;
-  padding: 1.5rem;
-  text-align: center;
-  min-width: 150px;
-  border: 2px solid var(--wood-brown);
-}
-
-.stat-label {
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  margin-bottom: 0.5rem;
-}
-
-.stat-value {
-  font-size: 2rem;
-  font-weight: bold;
-  color: var(--barn-red);
 }
 
 .admin-link {
@@ -1562,11 +1637,6 @@ details.collapsible-section:not([open]) summary h2::after {
   background: var(--barn-red-light);
 }
 
-#admin-pending h3 {
-  margin-bottom: 1rem;
-  color: var(--wood-dark);
-}
-
 #activity-table {
   width: 100%;
   border-collapse: collapse;
@@ -1703,11 +1773,6 @@ details.collapsible-section:not([open]) summary h2::after {
 .motion-pending-actions .deny-btn {
   padding: 0.3rem 0.6rem;
   font-size: 0.75rem;
-}
-
-#admin-chat .admin-btn {
-  padding: 0.8rem 1.5rem;
-  font-size: 1rem;
 }
 
 /* Weather Widget */
@@ -2008,12 +2073,12 @@ footer {
     padding: 0.5rem;
   }
 
-  #admin-stats {
-    flex-direction: column;
+  .dashboard-cards {
+    grid-template-columns: 1fr;
   }
 
-  .stat-card {
-    min-width: 100%;
+  .media-sub-tabs {
+    flex-wrap: wrap;
   }
 
   #visitor-map {
