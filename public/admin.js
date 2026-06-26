@@ -164,6 +164,7 @@ function setupAdminTabs() {
       tab.classList.add('active');
 
       const panel = tab.dataset.panel;
+      location.hash = panel;
       document.getElementById('admin-pending').classList.toggle('hidden', panel !== 'pending');
       document.getElementById('admin-users').classList.toggle('hidden', panel !== 'users');
       document.getElementById('admin-motion').classList.toggle('hidden', panel !== 'motion');
@@ -197,6 +198,13 @@ function setupAdminTabs() {
   document.getElementById('reject-all-btn').onclick = rejectAllMotion;
   document.getElementById('chick-approve-all-btn').onclick = approveAllChicks;
   document.getElementById('chick-reject-all-btn').onclick = rejectAllChicks;
+
+  // Restore tab from URL hash on load
+  const hash = location.hash.replace('#', '');
+  if (hash) {
+    const savedTab = document.querySelector(`.admin-tab[data-panel="${hash}"]`);
+    if (savedTab) savedTab.click();
+  }
 }
 
 function setupChatConnection() {
