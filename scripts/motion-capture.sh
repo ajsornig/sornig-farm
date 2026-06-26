@@ -16,7 +16,7 @@ CAM="${1:-run}"
 case "$CAM" in
   coop)
     STREAM="$BASE_DIR/public/hls2/stream.m3u8"
-    THRESHOLD="0.04"
+    THRESHOLD="0.06"
     FRAMES_DIR="$BASE_DIR/motion-timelapse/frames-coop"
     ;;
   chick)
