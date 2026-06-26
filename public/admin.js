@@ -659,6 +659,8 @@ function infraCardStatus(metric, value) {
     case 'streamAge': return value === null ? 'critical' : (value > 30 ? 'critical' : (value > 15 ? 'warning' : 'healthy'));
     case 'eth0': return value === 'up' ? 'healthy' : 'critical';
     case 'ffmpeg': return value >= 2 ? 'healthy' : (value >= 1 ? 'warning' : 'critical');
+    case 'cpu': return value === null ? 'healthy' : (value > 80 ? 'critical' : (value > 50 ? 'warning' : 'healthy'));
+    case 'temp': return value === null ? 'healthy' : (value > 82 ? 'critical' : (value > 75 ? 'warning' : 'healthy'));
     case 'network': return 'healthy';
     default: return 'healthy';
   }
@@ -736,7 +738,21 @@ async function loadInfraData() {
 
     const streamStatus = infraCardStatus('ffmpeg', d.ffmpegCount);
 
+    const sys = d.system || {};
+    const sysStatus = worstStatus(
+      infraCardStatus('cpu', sys.cpu),
+      infraCardStatus('temp', sys.temp)
+    );
+    const memPct = sys.memUsed && sys.memTotal ? ((sys.memUsed / sys.memTotal) * 100).toFixed(0) : null;
+
     cardsEl.innerHTML = `
+      <div class="infra-card ${sysStatus}">
+        <div class="infra-card-title">System</div>
+        <div class="infra-card-row"><span>CPU</span><span>${sys.cpu !== null ? sys.cpu.toFixed(1) + '%' : '?'}</span></div>
+        <div class="infra-card-row"><span>Memory</span><span>${sys.memUsed !== null ? sys.memUsed + ' / ' + sys.memTotal + ' MB (' + memPct + '%)' : '?'}</span></div>
+        <div class="infra-card-row"><span>Load (1 min)</span><span>${sys.load !== null ? sys.load.toFixed(2) : '?'}</span></div>
+        <div class="infra-card-row"><span>CPU Temp</span><span>${sys.temp !== null ? sys.temp.toFixed(1) + '°C' : '?'}</span></div>
+      </div>
       <div class="infra-card ${networkStatus}">
         <div class="infra-card-title">Network</div>
         <div class="infra-card-row"><span>eth0</span><span>${escapeHtml(d.eth0.state)}${d.eth0.speed ? ' @ ' + d.eth0.speed + ' Mbps' : ''}</span></div>
@@ -769,6 +785,9 @@ async function loadInfraData() {
     const fmtSparkVal = (v, unit) => v === null ? '?' : `${typeof v === 'number' && v % 1 !== 0 ? v.toFixed(1) : v}${unit}`;
 
     const sparklines = [
+      { label: 'CPU Usage', values: h.map(e => e.system ? e.system.cpu : null), color: 'var(--forest-green)', unit: '%', threshold: 80, good: 'Under 80% is healthy' },
+      { label: 'CPU Temperature', values: h.map(e => e.system ? e.system.temp : null), color: '#c0392b', unit: '°C', threshold: 75, good: 'Under 75°C is healthy' },
+      { label: 'Load Average', values: h.map(e => e.system ? e.system.load : null), color: 'var(--wood-brown)', unit: '', threshold: 4, good: 'Under 4 is healthy (4 cores)' },
       { label: 'Run Camera Latency', values: h.map(e => e.pings.cam1.ms), color: 'var(--forest-green)', unit: 'ms', threshold: 10, good: 'Under 10ms is healthy' },
       { label: 'Coop Camera Latency', values: h.map(e => e.pings.cam2.ms), color: 'var(--forest-green)', unit: 'ms', threshold: 10, good: 'Under 10ms is healthy' },
       { label: 'Run Stream Age', values: h.map(e => e.streams.stream1.age), color: 'var(--wood-brown)', unit: 's', threshold: 30, good: 'Under 30s is healthy' },

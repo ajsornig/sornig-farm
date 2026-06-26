@@ -47,7 +47,13 @@ while true; do
   # ffmpeg process count
   ffmpeg_count=$(pgrep -c -f 'ffmpeg.*hls' 2>/dev/null || echo "0")
 
-  echo "${timestamp} | eth0=${eth0_state}@${eth0_speed}Mbps | wlan0=${wlan0_signal:-?}dBm | wlan1=${wlan1_signal:-?}dBm | cam1=${ping1_ms}ms cam2=${ping2_ms}ms wavlink=${wavlink_ms}ms | stream1=${stream1_age}s stream2=${stream2_age}s | restarts=${restarts1}/${restarts2} | ffmpeg=${ffmpeg_count}" >> "$LOG"
+  # System resources
+  cpu_pct=$(awk '{u=$2+$4; t=$2+$4+$5; if(NR==1){ou=u;ot=t} else printf "%.1f", (u-ou)/(t-ot)*100}' <(grep '^cpu ' /proc/stat; sleep 1; grep '^cpu ' /proc/stat) 2>/dev/null || echo "?")
+  mem_info=$(awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{printf "%.0f/%.0f", (t-a)/1024, t/1024}' /proc/meminfo 2>/dev/null || echo "?/?")
+  load_avg=$(awk '{print $1}' /proc/loadavg 2>/dev/null || echo "?")
+  cpu_temp=$(awk '{printf "%.1f", $1/1000}' /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo "?")
+
+  echo "${timestamp} | eth0=${eth0_state}@${eth0_speed}Mbps | wlan0=${wlan0_signal:-?}dBm | wlan1=${wlan1_signal:-?}dBm | cam1=${ping1_ms}ms cam2=${ping2_ms}ms wavlink=${wavlink_ms}ms | stream1=${stream1_age}s stream2=${stream2_age}s | restarts=${restarts1}/${restarts2} | ffmpeg=${ffmpeg_count} | cpu=${cpu_pct}% mem=${mem_info}MB load=${load_avg} temp=${cpu_temp}C" >> "$LOG"
 
   sleep 60
 done

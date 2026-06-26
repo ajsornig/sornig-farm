@@ -875,6 +875,22 @@ function parseInfraLine(line) {
   const restartsMatch = parts[pingIdx + 2].match(/restarts=(\d+)\/(\d+)/);
   const ffmpegMatch = parts[pingIdx + 3] && parts[pingIdx + 3].match(/ffmpeg=(\d+)/);
 
+  let system = { cpu: null, memUsed: null, memTotal: null, load: null, temp: null };
+  const sysSection = parts[pingIdx + 4];
+  if (sysSection) {
+    const cpuM = sysSection.match(/cpu=([\d.]+|[?])%/);
+    const memM = sysSection.match(/mem=(\d+)\/(\d+)MB/);
+    const loadM = sysSection.match(/load=([\d.]+|[?])/);
+    const tempM = sysSection.match(/temp=([\d.]+|[?])C/);
+    system = {
+      cpu: cpuM && cpuM[1] !== '?' ? parseFloat(cpuM[1]) : null,
+      memUsed: memM ? Number(memM[1]) : null,
+      memTotal: memM ? Number(memM[2]) : null,
+      load: loadM && loadM[1] !== '?' ? parseFloat(loadM[1]) : null,
+      temp: tempM && tempM[1] !== '?' ? parseFloat(tempM[1]) : null
+    };
+  }
+
   return {
     timestamp,
     eth0,
@@ -883,7 +899,8 @@ function parseInfraLine(line) {
     pings: { cam1: parsePing('cam1'), cam2: parsePing('cam2'), wavlink: parsePing('wavlink') },
     streams: { stream1: parseStream('stream1'), stream2: parseStream('stream2') },
     restarts: restartsMatch ? { cam1: Number(restartsMatch[1]), cam2: Number(restartsMatch[2]) } : { cam1: 0, cam2: 0 },
-    ffmpegCount: ffmpegMatch ? Number(ffmpegMatch[1]) : 0
+    ffmpegCount: ffmpegMatch ? Number(ffmpegMatch[1]) : 0,
+    system
   };
 }
 
@@ -906,6 +923,15 @@ function generateInfraAlerts(entry) {
     if (entry.wlan0.signal !== null && entry.wlan0.signal < -70) {
       alerts.push({ level: 'warning', message: `Failover WiFi signal weak (${entry.wlan0.signal} dBm)` });
     }
+  }
+  if (entry.system.cpu !== null && entry.system.cpu > 80) {
+    alerts.push({ level: 'critical', message: `CPU usage high (${entry.system.cpu.toFixed(1)}%)` });
+  }
+  if (entry.system.temp !== null && entry.system.temp > 75) {
+    alerts.push({ level: 'warning', message: `CPU temperature high (${entry.system.temp.toFixed(1)}°C)` });
+  }
+  if (entry.system.temp !== null && entry.system.temp > 82) {
+    alerts.push({ level: 'critical', message: `CPU temperature critical (${entry.system.temp.toFixed(1)}°C) — throttling likely` });
   }
 
   return alerts;
