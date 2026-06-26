@@ -1178,6 +1178,28 @@ main {
   color: var(--text-dark);
 }
 
+/* Collapsible sections */
+.collapsible-section h2.section-toggle {
+  cursor: pointer;
+  user-select: none;
+  justify-content: space-between;
+}
+
+.section-chevron {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+  margin-left: auto;
+}
+
+.collapsible-section.section-collapsed .section-chevron {
+  transform: rotate(-90deg);
+}
+
+.collapsible-section.section-collapsed .section-body {
+  display: none;
+}
+
 #total-views strong {
   color: var(--barn-red);
   font-size: 1.3rem;

@@ -26,9 +26,28 @@ async function init() {
   loadWeather();
   setupChat();
   setupAuthUI();
+  setupCollapsibleSections();
   updateNightMode();
   setInterval(updateNightMode, 60000);
   setInterval(loadWeather, 15 * 60000);
+}
+
+function setupCollapsibleSections() {
+  const isMobile = window.matchMedia('(max-width: 768px)').matches;
+  document.querySelectorAll('.collapsible-section').forEach(section => {
+    const toggle = section.querySelector('.section-toggle');
+    if (!toggle) return;
+    const storageKey = `section-collapsed-${section.id}`;
+    const stored = localStorage.getItem(storageKey);
+    const collapsed = stored !== null ? stored === 'true' : isMobile;
+    section.classList.toggle('section-collapsed', collapsed);
+
+    toggle.addEventListener('click', () => {
+      const nowCollapsed = !section.classList.contains('section-collapsed');
+      section.classList.toggle('section-collapsed', nowCollapsed);
+      localStorage.setItem(storageKey, nowCollapsed);
+    });
+  });
 }
 
 async function checkStatus() {
