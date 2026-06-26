@@ -912,7 +912,7 @@ function generateInfraAlerts(entry) {
 
   if (!entry.pings.cam1.ok) alerts.push({ level: 'critical', message: 'Chicken Run camera ping FAILED' });
   if (!entry.pings.cam2.ok) alerts.push({ level: 'critical', message: 'Chicken Coop camera ping FAILED' });
-  if (cam3Enabled && !entry.pings.cam3.ok) alerts.push({ level: 'critical', message: 'Peep Show camera ping FAILED' });
+  if (cam3Enabled && !entry.pings.cam3.ok) alerts.push({ level: 'critical', message: 'Chick Cam ping FAILED' });
   if (!entry.streams.stream1.ok) {
     alerts.push({ level: 'critical', message: entry.streams.stream1.age === null ? 'Stream 1 NO_FILE' : `Stream 1 stale (${entry.streams.stream1.age}s)` });
   }
