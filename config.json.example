@@ -16,7 +16,7 @@
     },
     {
       "id": "cam3",
-      "name": "Peep Show",
+      "name": "Chick Cam",
       "streamUrl": "/hls3/stream.m3u8",
       "enabled": true,
       "ptz": {
