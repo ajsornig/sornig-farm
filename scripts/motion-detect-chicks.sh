@@ -15,7 +15,7 @@ WORK_DIR="/tmp/motion-detect-chicks"
 # real movement while ignoring noise.
 THRESHOLD="0.03"
 COOLDOWN=60          # Seconds between captures
-CHECK_INTERVAL=10    # Seconds between frame checks
+CHECK_INTERVAL=30    # Seconds between frame checks
 CONFIRM_COUNT=2      # Must detect motion N consecutive times
 MAX_PENDING=100      # Keep last N pending captures
 
