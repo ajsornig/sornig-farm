@@ -200,6 +200,7 @@ function setupMediaSubTabs() {
       tab.classList.add('active');
 
       const sub = tab.dataset.sub;
+      localStorage.setItem('adminMediaSubTab', sub);
       document.getElementById('media-chicks').classList.toggle('hidden', sub !== 'chicks');
       document.getElementById('media-motion').classList.toggle('hidden', sub !== 'motion');
       document.getElementById('media-timelapse').classList.toggle('hidden', sub !== 'timelapse');
@@ -216,7 +217,9 @@ function setupMediaSubTabs() {
 }
 
 function loadMediaTab() {
-  const activeSub = document.querySelector('.media-sub-tab.active');
+  const saved = localStorage.getItem('adminMediaSubTab');
+  const target = saved ? document.querySelector(`.media-sub-tab[data-sub="${saved}"]`) : null;
+  const activeSub = target || document.querySelector('.media-sub-tab.active');
   if (activeSub) activeSub.click();
 }
 

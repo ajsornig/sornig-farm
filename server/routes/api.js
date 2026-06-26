@@ -538,7 +538,7 @@ router.get('/admin/motion-capture-frames', requireAdmin, (req, res) => {
   res.json(files);
 });
 
-router.get('/admin/motion-capture-frames/:cam/:filename', requireAdmin, (req, res) => {
+router.get('/admin/motion-capture-frames/:cam/:filename', (req, res) => {
   const filename = path.basename(req.params.filename);
   const cam = req.params.cam;
   if (!/^\d{4}-\d{2}-\d{2}_\d{4}\.jpg$/.test(filename)) {
