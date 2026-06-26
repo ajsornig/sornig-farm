@@ -513,6 +513,65 @@ router.delete('/admin/timelapse-frames/:cam/:filename', requireAdmin, (req, res)
   res.json({ success: true });
 });
 
+router.get('/admin/motion-capture-frames', requireAdmin, (req, res) => {
+  const now = new Date();
+  const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  const cams = [
+    { dir: path.join(__dirname, '../../motion-timelapse/frames-run'), label: 'run' },
+    { dir: path.join(__dirname, '../../motion-timelapse/frames-coop'), label: 'coop' },
+    { dir: path.join(__dirname, '../../motion-timelapse/frames-chick'), label: 'chick' }
+  ];
+
+  const files = cams.flatMap(cam => {
+    if (!fs.existsSync(cam.dir)) return [];
+    return fs.readdirSync(cam.dir)
+      .filter(f => f.endsWith('.jpg') && f.startsWith(today))
+      .sort()
+      .map(filename => ({
+        filename,
+        cam: cam.label,
+        url: `/api/admin/motion-capture-frames/${cam.label}/${filename}`,
+        time: filename.replace(today + '_', '').replace('.jpg', '').replace(/(\d{2})(\d{2})/, '$1:$2')
+      }));
+  });
+
+  res.json(files);
+});
+
+router.get('/admin/motion-capture-frames/:cam/:filename', requireAdmin, (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const cam = req.params.cam;
+  if (!/^\d{4}-\d{2}-\d{2}_\d{4}\.jpg$/.test(filename)) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+  if (cam !== 'run' && cam !== 'coop' && cam !== 'chick') {
+    return res.status(400).json({ error: 'Invalid camera' });
+  }
+  const filepath = path.join(__dirname, '../../motion-timelapse', `frames-${cam}`, filename);
+
+  if (!fs.existsSync(filepath)) {
+    return res.status(404).json({ error: 'Frame not found' });
+  }
+
+  res.sendFile(filepath);
+});
+
+router.delete('/admin/motion-capture-frames/:cam/:filename', requireAdmin, (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const cam = req.params.cam;
+  if (cam !== 'run' && cam !== 'coop' && cam !== 'chick') {
+    return res.status(400).json({ error: 'Invalid camera' });
+  }
+  const filepath = path.join(__dirname, '../../motion-timelapse', `frames-${cam}`, filename);
+
+  if (!fs.existsSync(filepath)) {
+    return res.status(404).json({ error: 'Frame not found' });
+  }
+
+  fs.unlinkSync(filepath);
+  res.json({ success: true });
+});
+
 router.get('/motion-captures', (req, res) => {
   const capturesDir = path.join(__dirname, '../../public/motion-captures');
 

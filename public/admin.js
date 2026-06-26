@@ -203,11 +203,13 @@ function setupMediaSubTabs() {
       document.getElementById('media-chicks').classList.toggle('hidden', sub !== 'chicks');
       document.getElementById('media-motion').classList.toggle('hidden', sub !== 'motion');
       document.getElementById('media-timelapse').classList.toggle('hidden', sub !== 'timelapse');
+      document.getElementById('media-motion-frames').classList.toggle('hidden', sub !== 'motion-frames');
       document.getElementById('media-capture-stats').classList.toggle('hidden', sub !== 'capture-stats');
 
       if (sub === 'chicks') loadChickAlbumAdmin();
       if (sub === 'motion') loadMotionPending();
       if (sub === 'timelapse') loadTimelapseFrames();
+      if (sub === 'motion-frames') loadMotionCaptureFrames();
       if (sub === 'capture-stats') loadCaptureStats();
     };
   });
@@ -722,6 +724,64 @@ async function loadTimelapseFrames() {
     list.innerHTML = html;
   } catch (err) {
     console.error('Failed to load timelapse frames:', err);
+  }
+}
+
+async function loadMotionCaptureFrames() {
+  try {
+    const res = await fetch('/api/admin/motion-capture-frames', {
+      headers: { 'x-auth-token': authToken }
+    });
+    const frames = await res.json();
+    const list = document.getElementById('motion-capture-frames-list');
+
+    if (frames.length === 0) {
+      list.innerHTML = '<p class="no-pending">No motion-capture frames today yet</p>';
+      return;
+    }
+
+    const runFrames = frames.filter(f => f.cam === 'run');
+    const coopFrames = frames.filter(f => f.cam === 'coop');
+    const chickFrames = frames.filter(f => f.cam === 'chick');
+
+    let html = `<p style="margin-bottom:0.5rem;color:var(--wood-brown);">${frames.length} frames today (${runFrames.length} run, ${coopFrames.length} coop, ${chickFrames.length} chick)</p>`;
+
+    const renderCamFrames = (camFrames, label) => {
+      if (camFrames.length === 0) return '';
+      let s = `<h4 style="margin:0.75rem 0 0.5rem;color:var(--forest-green);">${label}</h4>`;
+      s += '<div class="timelapse-grid">' + camFrames.map(frame => `
+        <div class="timelapse-frame-card" id="mframe-${escapeHtml(frame.cam)}-${escapeHtml(frame.filename)}">
+          <img src="${frame.url}" alt="${frame.time}" loading="lazy" onclick="openLightbox('${frame.url}','m-${escapeHtml(frame.cam)}','${escapeHtml(frame.filename)}')">
+          <div class="timelapse-frame-info">
+            <span>${frame.time}</span>
+            <button class="deny-btn" onclick="deleteMotionCaptureFrame(${jsArg(frame.cam)},${jsArg(frame.filename)})">Delete</button>
+          </div>
+        </div>
+      `).join('') + '</div>';
+      return s;
+    };
+
+    html += renderCamFrames(runFrames, 'Chicken Run');
+    html += renderCamFrames(coopFrames, 'Chicken Coop');
+    html += renderCamFrames(chickFrames, 'Chick Cam');
+
+    list.innerHTML = html;
+  } catch (err) {
+    console.error('Failed to load motion capture frames:', err);
+  }
+}
+
+async function deleteMotionCaptureFrame(cam, filename) {
+  try {
+    const res = await fetch(`/api/admin/motion-capture-frames/${cam}/${filename}`, {
+      method: 'DELETE',
+      headers: { 'x-auth-token': authToken }
+    });
+    if ((await res.json()).success) {
+      document.getElementById(`mframe-${cam}-${filename}`).remove();
+    }
+  } catch (err) {
+    console.error('Failed to delete motion capture frame:', err);
   }
 }
 
