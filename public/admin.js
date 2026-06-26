@@ -736,7 +736,14 @@ async function loadInfraData() {
       infraCardStatus('streamAge', d.streams.stream2.ok ? d.streams.stream2.age : null)
     );
 
-    const streamStatus = infraCardStatus('ffmpeg', d.ffmpegCount);
+    const cam3Online = d.pings.cam3 && d.pings.cam3.ok;
+    const cam3Status = !data.cam3Enabled ? 'disabled' : worstStatus(
+      infraCardStatus('ping', d.pings.cam3 && d.pings.cam3.ok ? d.pings.cam3.ms : null),
+      infraCardStatus('streamAge', d.streams.stream3 && d.streams.stream3.ok ? d.streams.stream3.age : null)
+    );
+
+    const expectedFfmpeg = data.cam3Enabled ? 3 : 2;
+    const streamStatus = infraCardStatus('ffmpeg', d.ffmpegCount >= expectedFfmpeg ? expectedFfmpeg : d.ffmpegCount);
 
     const sys = d.system || {};
     const sysStatus = worstStatus(
@@ -770,11 +777,20 @@ async function loadInfraData() {
         <div class="infra-card-row"><span>Ping</span><span>${fmtMs(d.pings.cam2)}</span></div>
         <div class="infra-card-row"><span>Stream Age</span><span>${fmtAge(d.streams.stream2)}</span></div>
       </div>
+      <div class="infra-card ${cam3Status}">
+        <div class="infra-card-title">Peep Show</div>
+        ${!data.cam3Enabled
+          ? '<div class="infra-card-row"><span>Status</span><span class="infra-offline-badge">Offline</span></div>'
+          : `<div class="infra-card-row"><span>Ping</span><span>${d.pings.cam3 ? fmtMs(d.pings.cam3) : '?'}</span></div>
+             <div class="infra-card-row"><span>Stream Age</span><span>${d.streams.stream3 ? fmtAge(d.streams.stream3) : '?'}</span></div>`
+        }
+      </div>
       <div class="infra-card ${streamStatus}">
         <div class="infra-card-title">Streaming</div>
-        <div class="infra-card-row"><span>FFmpeg Processes</span><span>${d.ffmpegCount}</span></div>
+        <div class="infra-card-row"><span>FFmpeg Processes</span><span>${d.ffmpegCount} / ${expectedFfmpeg}</span></div>
         <div class="infra-card-row"><span>Restarts (Run)</span><span>${d.restarts.cam1}</span></div>
         <div class="infra-card-row"><span>Restarts (Coop)</span><span>${d.restarts.cam2}</span></div>
+        ${data.cam3Enabled ? `<div class="infra-card-row"><span>Restarts (Peep Show)</span><span>${d.restarts.cam3}</span></div>` : ''}
       </div>
     `;
 
@@ -790,8 +806,14 @@ async function loadInfraData() {
       { label: 'Load Average', values: h.map(e => e.system ? e.system.load : null), color: 'var(--wood-brown)', unit: '', threshold: 4, good: 'Under 4 is healthy (4 cores)' },
       { label: 'Run Camera Latency', values: h.map(e => e.pings.cam1.ms), color: 'var(--forest-green)', unit: 'ms', threshold: 10, good: 'Under 10ms is healthy' },
       { label: 'Coop Camera Latency', values: h.map(e => e.pings.cam2.ms), color: 'var(--forest-green)', unit: 'ms', threshold: 10, good: 'Under 10ms is healthy' },
+      ...(data.cam3Enabled ? [
+        { label: 'Peep Show Latency', values: h.map(e => e.pings.cam3 ? e.pings.cam3.ms : null), color: 'var(--forest-green)', unit: 'ms', threshold: 10, good: 'Under 10ms is healthy' },
+      ] : []),
       { label: 'Run Stream Age', values: h.map(e => e.streams.stream1.age), color: 'var(--wood-brown)', unit: 's', threshold: 30, good: 'Under 30s is healthy' },
       { label: 'Coop Stream Age', values: h.map(e => e.streams.stream2.age), color: 'var(--wood-brown)', unit: 's', threshold: 30, good: 'Under 30s is healthy' },
+      ...(data.cam3Enabled ? [
+        { label: 'Peep Show Stream Age', values: h.map(e => e.streams.stream3 ? e.streams.stream3.age : null), color: 'var(--wood-brown)', unit: 's', threshold: 30, good: 'Under 30s is healthy' },
+      ] : []),
       { label: 'Fallback WiFi Signal', values: h.map(e => e.wlan0.signal), color: 'var(--wood-brown)', unit: ' dBm', threshold: null, good: 'Closer to 0 is stronger' }
     ];
 

@@ -2215,7 +2215,7 @@ footer {
 
 .infra-cards {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
 }
 
@@ -2237,6 +2237,21 @@ footer {
 
 .infra-card.critical {
   border-left-color: var(--barn-red);
+}
+
+.infra-card.disabled {
+  border-left-color: #999;
+  opacity: 0.6;
+}
+
+.infra-offline-badge {
+  background: #999;
+  color: #fff;
+  padding: 0.1rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  text-transform: uppercase;
 }
 
 .infra-card-title {

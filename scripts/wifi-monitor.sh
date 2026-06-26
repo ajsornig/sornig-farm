@@ -22,6 +22,7 @@ while true; do
   # Ping cameras
   ping1_ms=$(ping -c 1 -W 2 10.0.0.10 2>/dev/null | grep 'time=' | sed 's/.*time=\([^ ]*\).*/\1/' || echo "FAIL")
   ping2_ms=$(ping -c 1 -W 2 10.0.0.11 2>/dev/null | grep 'time=' | sed 's/.*time=\([^ ]*\).*/\1/' || echo "FAIL")
+  ping3_ms=$(ping -c 1 -W 2 192.168.4.75 2>/dev/null | grep 'time=' | sed 's/.*time=\([^ ]*\).*/\1/' || echo "FAIL")
 
   # Ping Wavlink AP
   wavlink_ms=$(ping -c 1 -W 2 10.0.0.49 2>/dev/null | grep 'time=' | sed 's/.*time=\([^ ]*\).*/\1/' || echo "FAIL")
@@ -40,9 +41,17 @@ while true; do
     stream2_age="NO_FILE"
   fi
 
+  # Stream freshness (cam3 - Peep Show)
+  if [ -f /home/ajsornig/chicken-stream/public/hls3/stream.m3u8 ]; then
+    stream3_age=$(( $(date +%s) - $(stat -c %Y /home/ajsornig/chicken-stream/public/hls3/stream.m3u8) ))
+  else
+    stream3_age="NO_FILE"
+  fi
+
   # ffmpeg restart counts
   restarts1=$(sudo systemctl show camera-hls --property=NRestarts 2>/dev/null | cut -d= -f2)
   restarts2=$(sudo systemctl show camera-hls-2 --property=NRestarts 2>/dev/null | cut -d= -f2)
+  restarts3=$(sudo systemctl show camera-hls-3 --property=NRestarts 2>/dev/null | cut -d= -f2)
 
   # ffmpeg process count
   ffmpeg_count=$(pgrep -c -f 'ffmpeg.*hls' 2>/dev/null || echo "0")
@@ -53,7 +62,7 @@ while true; do
   load_avg=$(awk '{print $1}' /proc/loadavg 2>/dev/null || echo "?")
   cpu_temp=$(awk '{printf "%.1f", $1/1000}' /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo "?")
 
-  echo "${timestamp} | eth0=${eth0_state}@${eth0_speed}Mbps | wlan0=${wlan0_signal:-?}dBm | wlan1=${wlan1_signal:-?}dBm | cam1=${ping1_ms}ms cam2=${ping2_ms}ms wavlink=${wavlink_ms}ms | stream1=${stream1_age}s stream2=${stream2_age}s | restarts=${restarts1}/${restarts2} | ffmpeg=${ffmpeg_count} | cpu=${cpu_pct}% mem=${mem_info}MB load=${load_avg} temp=${cpu_temp}C" >> "$LOG"
+  echo "${timestamp} | eth0=${eth0_state}@${eth0_speed}Mbps | wlan0=${wlan0_signal:-?}dBm | wlan1=${wlan1_signal:-?}dBm | cam1=${ping1_ms}ms cam2=${ping2_ms}ms cam3=${ping3_ms}ms wavlink=${wavlink_ms}ms | stream1=${stream1_age}s stream2=${stream2_age}s stream3=${stream3_age}s | restarts=${restarts1}/${restarts2}/${restarts3} | ffmpeg=${ffmpeg_count} | cpu=${cpu_pct}% mem=${mem_info}MB load=${load_avg} temp=${cpu_temp}C" >> "$LOG"
 
   sleep 60
 done

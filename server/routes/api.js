@@ -872,7 +872,7 @@ function parseInfraLine(line) {
     return m[1] === 'NO_FILE' ? { age: null, ok: false } : { age: Number(m[1]), ok: Number(m[1]) <= 30 };
   };
 
-  const restartsMatch = parts[pingIdx + 2].match(/restarts=(\d+)\/(\d+)/);
+  const restartsMatch = parts[pingIdx + 2].match(/restarts=(\d+)\/(\d+)(?:\/(\d+))?/);
   const ffmpegMatch = parts[pingIdx + 3] && parts[pingIdx + 3].match(/ffmpeg=(\d+)/);
 
   let system = { cpu: null, memUsed: null, memTotal: null, load: null, temp: null };
@@ -896,9 +896,9 @@ function parseInfraLine(line) {
     eth0,
     wlan0,
     wlan1,
-    pings: { cam1: parsePing('cam1'), cam2: parsePing('cam2'), wavlink: parsePing('wavlink') },
-    streams: { stream1: parseStream('stream1'), stream2: parseStream('stream2') },
-    restarts: restartsMatch ? { cam1: Number(restartsMatch[1]), cam2: Number(restartsMatch[2]) } : { cam1: 0, cam2: 0 },
+    pings: { cam1: parsePing('cam1'), cam2: parsePing('cam2'), cam3: parsePing('cam3'), wavlink: parsePing('wavlink') },
+    streams: { stream1: parseStream('stream1'), stream2: parseStream('stream2'), stream3: parseStream('stream3') },
+    restarts: restartsMatch ? { cam1: Number(restartsMatch[1]), cam2: Number(restartsMatch[2]), cam3: restartsMatch[3] ? Number(restartsMatch[3]) : 0 } : { cam1: 0, cam2: 0, cam3: 0 },
     ffmpegCount: ffmpegMatch ? Number(ffmpegMatch[1]) : 0,
     system
   };
@@ -908,16 +908,23 @@ function generateInfraAlerts(entry) {
   const alerts = [];
   if (!entry) return [{ level: 'warning', message: 'No monitoring data available' }];
 
+  const cam3Enabled = (config.cameras || []).some(c => c.id === 'cam3' && c.enabled);
+
   if (!entry.pings.cam1.ok) alerts.push({ level: 'critical', message: 'Chicken Run camera ping FAILED' });
   if (!entry.pings.cam2.ok) alerts.push({ level: 'critical', message: 'Chicken Coop camera ping FAILED' });
+  if (cam3Enabled && !entry.pings.cam3.ok) alerts.push({ level: 'critical', message: 'Peep Show camera ping FAILED' });
   if (!entry.streams.stream1.ok) {
     alerts.push({ level: 'critical', message: entry.streams.stream1.age === null ? 'Stream 1 NO_FILE' : `Stream 1 stale (${entry.streams.stream1.age}s)` });
   }
   if (!entry.streams.stream2.ok) {
     alerts.push({ level: 'critical', message: entry.streams.stream2.age === null ? 'Stream 2 NO_FILE' : `Stream 2 stale (${entry.streams.stream2.age}s)` });
   }
+  if (cam3Enabled && !entry.streams.stream3.ok) {
+    alerts.push({ level: 'critical', message: entry.streams.stream3.age === null ? 'Stream 3 NO_FILE' : `Stream 3 stale (${entry.streams.stream3.age}s)` });
+  }
   if (entry.eth0.state !== 'up') alerts.push({ level: 'critical', message: 'eth0 link DOWN' });
-  if (entry.ffmpegCount < 2) alerts.push({ level: 'warning', message: `Only ${entry.ffmpegCount} ffmpeg process(es) running` });
+  const expectedFfmpeg = cam3Enabled ? 3 : 2;
+  if (entry.ffmpegCount < expectedFfmpeg) alerts.push({ level: 'warning', message: `Only ${entry.ffmpegCount} of ${expectedFfmpeg} ffmpeg process(es) running` });
   if (entry.wlan1.signal === null) {
     alerts.push({ level: 'warning', message: 'Primary uplink (wlan1) signal lost — failover active' });
     if (entry.wlan0.signal !== null && entry.wlan0.signal < -70) {
@@ -949,7 +956,8 @@ router.get('/admin/infra', requireAdmin, (req, res) => {
     const latest = history.length > 0 ? history[history.length - 1] : null;
     const alerts = generateInfraAlerts(latest);
 
-    res.json({ success: true, latest, history, alerts });
+    const cam3Enabled = (config.cameras || []).some(c => c.id === 'cam3' && c.enabled);
+    res.json({ success: true, latest, history, alerts, cam3Enabled });
   } catch (err) {
     console.error('Infra endpoint error:', err);
     res.status(500).json({ error: 'Failed to read infrastructure data' });
