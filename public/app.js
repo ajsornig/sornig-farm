@@ -26,7 +26,6 @@ async function init() {
   loadWeather();
   setupChat();
   setupAuthUI();
-  setupCollapsibleSections();
   updateNightMode();
   setInterval(updateNightMode, 60000);
   setInterval(loadWeather, 15 * 60000);
@@ -1253,4 +1252,5 @@ async function sendPtz(op) {
   }
 }
 
+setupCollapsibleSections();
 init();
