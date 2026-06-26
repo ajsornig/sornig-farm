@@ -175,6 +175,7 @@ router.get('/me', (req, res) => {
     approved: approved,
     requireApproval: config.requireApproval,
     email: user ? user.email : null,
+    emailOptOut: user ? !!user.emailOptOut : false,
     createdAt: user ? user.createdAt : null
   });
 });
@@ -194,6 +195,27 @@ router.post('/account/email', (req, res) => {
     return res.status(400).json(result);
   }
   res.json({ success: true });
+});
+
+router.post('/account/email-preferences', (req, res) => {
+  const token = req.headers['x-auth-token'];
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+  const session = db.getSession(token);
+  if (!session) return res.status(401).json({ error: 'Not authenticated' });
+
+  const { optOut } = req.body;
+  const result = db.setEmailOptOut(session.username, optOut);
+  if (result.error) return res.status(400).json(result);
+  res.json({ success: true });
+});
+
+router.get('/unsubscribe/:token', (req, res) => {
+  const user = db.getUserByUnsubscribeToken(req.params.token);
+  if (!user) {
+    return res.send('<html><body style="font-family:sans-serif;text-align:center;padding:2rem;"><h2>Invalid Link</h2><p>This unsubscribe link is not valid or has expired.</p></body></html>');
+  }
+  db.setEmailOptOut(user.username, true);
+  res.send(`<html><body style="font-family:sans-serif;text-align:center;padding:2rem;"><h2>Unsubscribed</h2><p>${user.username}, you have been unsubscribed from Sornig Farm email updates.</p><p>You can re-subscribe anytime from your <a href="/account.html">account settings</a>.</p></body></html>`);
 });
 
 router.delete('/account', (req, res) => {
@@ -974,7 +996,7 @@ router.get('/admin/broadcast/recipients', (req, res) => {
   if (!session || !session.isAdmin) return res.status(403).json({ error: 'Admin only' });
 
   const users = db.getAllUsers().filter(u => u.email && u.approved);
-  res.json(users.map(u => ({ username: u.username, email: u.email })));
+  res.json(users.map(u => ({ username: u.username, email: u.email, optedOut: !!u.emailOptOut })));
 });
 
 router.post('/admin/broadcast', async (req, res) => {
@@ -988,9 +1010,13 @@ router.post('/admin/broadcast', async (req, res) => {
   if (subject.length > 200) return res.status(400).json({ error: 'Subject too long' });
   if (message.length > 5000) return res.status(400).json({ error: 'Message too long' });
 
-  const users = db.getAllUsers().filter(u => u.email && u.approved);
-  const recipients = users.map(u => ({ username: u.username, email: u.email }));
-  const results = await sendBroadcast(subject, message, recipients);
+  const users = db.getAllUsers().filter(u => u.email && u.approved && !u.emailOptOut);
+  const recipients = users.map(u => ({
+    username: u.username,
+    email: u.email,
+    unsubscribeToken: db.getUnsubscribeToken(u.username)
+  }));
+  const results = await sendBroadcast(subject, message, recipients, config.siteUrl || 'https://sornigfarm.com');
   res.json(results);
 });
 

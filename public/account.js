@@ -57,6 +57,7 @@ function showAccountPanel(data) {
   document.getElementById('account-created').textContent = data.createdAt
     ? new Date(data.createdAt).toLocaleDateString()
     : 'Unknown';
+  document.getElementById('email-opt-in').checked = !data.emailOptOut;
 }
 
 async function editMyEmail() {
@@ -171,6 +172,21 @@ async function doLogout() {
   authToken = null;
   currentUser = null;
   window.location.href = '/';
+}
+
+async function updateEmailPreference() {
+  const optOut = !document.getElementById('email-opt-in').checked;
+  try {
+    const res = await fetch('/api/account/email-preferences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      body: JSON.stringify({ optOut })
+    });
+    const data = await res.json();
+    if (!data.success) alert(data.error || 'Failed to update preference');
+  } catch (err) {
+    console.error('Failed to update email preference:', err);
+  }
 }
 
 init();

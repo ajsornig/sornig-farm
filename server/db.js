@@ -427,6 +427,33 @@ function clearActivityLog() {
   saveActivityLog([]);
 }
 
+function setEmailOptOut(username, optOut) {
+  const usernameLower = username.toLowerCase();
+  const user = data.users[usernameLower];
+  if (!user) return { error: 'User not found' };
+  data.users[usernameLower] = { ...user, emailOptOut: !!optOut };
+  saveData();
+  return { success: true };
+}
+
+function getUnsubscribeToken(username) {
+  const usernameLower = username.toLowerCase();
+  const user = data.users[usernameLower];
+  if (!user) return null;
+  if (!user.unsubscribeToken) {
+    data.users[usernameLower] = { ...user, unsubscribeToken: generateToken() };
+    saveData();
+  }
+  return data.users[usernameLower].unsubscribeToken;
+}
+
+function getUserByUnsubscribeToken(token) {
+  for (const user of Object.values(data.users)) {
+    if (user.unsubscribeToken === token) return user;
+  }
+  return null;
+}
+
 module.exports = {
   initDb,
   createUser,
@@ -458,5 +485,8 @@ module.exports = {
   deleteActivityEntry,
   clearActivityLog,
   hasPtzAccess,
-  setPtzAccess
+  setPtzAccess,
+  setEmailOptOut,
+  getUnsubscribeToken,
+  getUserByUnsubscribeToken
 };

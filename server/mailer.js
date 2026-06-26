@@ -109,18 +109,25 @@ async function sendPasswordResetEmail(username, email, resetToken) {
   }
 }
 
-async function sendBroadcast(subject, message, recipients) {
+async function sendBroadcast(subject, message, recipients, siteBaseUrl) {
   if (!transporter) return { error: 'Email not configured' };
-  if (!recipients.length) return { error: 'No recipients' };
+  if (!recipients.length) return { error: 'No recipients', sent: 0, failed: 0 };
 
+  const baseUrl = siteBaseUrl || siteUrl;
   const results = { sent: 0, failed: 0, errors: [] };
-  for (const { username, email } of recipients) {
+  for (const { username, email, unsubscribeToken } of recipients) {
+    const unsubLink = unsubscribeToken ? `${baseUrl}/api/unsubscribe/${unsubscribeToken}` : '';
+    const footer = unsubLink
+      ? `\n\n---\nTo unsubscribe from future emails: ${unsubLink}`
+      : '';
+
     try {
       await transporter.sendMail({
         from: emailFrom,
         to: email,
         subject: `Sornig Farm: ${subject}`,
-        text: `Hi ${username},\n\n${message}\n\n- Sornig Farm\n${siteUrl}`
+        text: `Hi ${username},\n\n${message}\n\n- Sornig Farm\n${baseUrl}${footer}`,
+        headers: unsubLink ? { 'List-Unsubscribe': `<${unsubLink}>` } : {}
       });
       results.sent++;
     } catch (err) {

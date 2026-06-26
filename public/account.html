@@ -54,6 +54,17 @@
       </div>
 
       <div class="account-section">
+        <h3>Email Preferences</h3>
+        <div class="account-field">
+          <label class="checkbox-label">
+            <input type="checkbox" id="email-opt-in" onchange="updateEmailPreference()">
+            <span>Receive farm updates and announcements via email</span>
+          </label>
+          <p class="admin-note" style="margin-top:0.3rem;">You can also unsubscribe via the link in any email.</p>
+        </div>
+      </div>
+
+      <div class="account-section">
         <h3>Change Password</h3>
         <form id="change-password-form" onsubmit="changePassword(event)">
           <div class="form-group">
@@ -85,6 +96,6 @@
     <p>Sornig Farm</p>
   </footer>
 
-  <script src="account.js"></script>
+  <script src="account.js?v=2"></script>
 </body>
 </html>
