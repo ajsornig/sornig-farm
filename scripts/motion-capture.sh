@@ -12,7 +12,7 @@ CAM="${1:-run}"
 case "$CAM" in
   coop)
     STREAM="$BASE_DIR/public/hls2/stream.m3u8"
-    THRESHOLD="0.025"
+    THRESHOLD="0.04"
     FRAMES_DIR="$BASE_DIR/motion-timelapse/frames-coop"
     ;;
   chick)
@@ -23,7 +23,7 @@ case "$CAM" in
   *)
     CAM="run"
     STREAM="$BASE_DIR/public/hls/stream.m3u8"
-    THRESHOLD="0.025"
+    THRESHOLD="0.04"
     FRAMES_DIR="$BASE_DIR/motion-timelapse/frames-run"
     ;;
 esac
