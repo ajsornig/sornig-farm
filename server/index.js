@@ -129,8 +129,7 @@ app.get('/api/admin/cameras', (req, res) => {
   if (!session || !session.isAdmin) return res.status(403).json({ error: 'Admin required' });
 
   const cameras = config.cameras
-    .filter(cam => cam.enabled)
-    .map(({ id, name }) => ({ id, name, hidden: isCameraHidden(id) }));
+    .map(({ id, name, enabled }) => ({ id, name, enabled, hidden: isCameraHidden(id) }));
   res.json(cameras);
 });
 
@@ -146,6 +145,22 @@ app.post('/api/admin/cameras/:id/toggle', (req, res) => {
   const currentlyHidden = isCameraHidden(cam.id);
   setCameraHidden(cam.id, !currentlyHidden);
   res.json({ id: cam.id, hidden: !currentlyHidden });
+});
+
+const CONFIG_PATH = path.join(__dirname, '../config.json');
+
+app.post('/api/admin/cameras/:id/enable', (req, res) => {
+  const token = req.headers['x-auth-token'];
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+  const session = getSession(token);
+  if (!session || !session.isAdmin) return res.status(403).json({ error: 'Admin required' });
+
+  const cam = config.cameras.find(c => c.id === req.params.id);
+  if (!cam) return res.status(404).json({ error: 'Camera not found' });
+
+  cam.enabled = !cam.enabled;
+  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+  res.json({ id: cam.id, enabled: cam.enabled });
 });
 
 const wss = new WebSocketServer({ server, path: '/chat' });

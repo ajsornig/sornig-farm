@@ -1089,18 +1089,40 @@ async function loadCameraToggles() {
     }
 
     list.innerHTML = cameras.map(cam => `
-      <div class="camera-toggle-row" id="cam-row-${escapeHtml(cam.id)}">
+      <div class="camera-toggle-row ${cam.enabled ? '' : 'cam-disabled'}" id="cam-row-${escapeHtml(cam.id)}">
         <div class="camera-toggle-info">
           <strong>${escapeHtml(cam.name)}</strong>
-          <span class="camera-toggle-status ${cam.hidden ? 'status-hidden' : 'status-live'}">${cam.hidden ? 'Hidden from public' : 'Live for everyone'}</span>
+          <span class="camera-toggle-status ${!cam.enabled ? 'status-offline' : (cam.hidden ? 'status-hidden' : 'status-live')}">
+            ${!cam.enabled ? 'Disabled' : (cam.hidden ? 'Hidden from public' : 'Live for everyone')}
+          </span>
         </div>
-        <button class="admin-btn ${cam.hidden ? 'cam-show-btn' : 'cam-hide-btn'}" onclick="toggleCamera(${jsArg(cam.id)})">
-          ${cam.hidden ? 'Make Public' : 'Hide'}
-        </button>
+        <div class="camera-toggle-actions">
+          <button class="admin-btn ${cam.enabled ? 'cam-disable-btn' : 'cam-enable-btn'}" onclick="toggleCameraEnabled(${jsArg(cam.id)})">
+            ${cam.enabled ? 'Disable' : 'Enable'}
+          </button>
+          ${cam.enabled ? `<button class="admin-btn ${cam.hidden ? 'cam-show-btn' : 'cam-hide-btn'}" onclick="toggleCamera(${jsArg(cam.id)})">
+            ${cam.hidden ? 'Make Public' : 'Hide'}
+          </button>` : ''}
+        </div>
       </div>
     `).join('');
   } catch (err) {
     console.error('Failed to load camera toggles:', err);
+  }
+}
+
+async function toggleCameraEnabled(camId) {
+  try {
+    const res = await fetch(`/api/admin/cameras/${encodeURIComponent(camId)}/enable`, {
+      method: 'POST',
+      headers: { 'x-auth-token': authToken }
+    });
+    const data = await res.json();
+    if (data.id) {
+      loadCameraToggles();
+    }
+  } catch (err) {
+    console.error('Failed to toggle camera enabled:', err);
   }
 }
 

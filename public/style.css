@@ -439,6 +439,37 @@ main {
   color: var(--text-muted);
 }
 
+.camera-toggle-status.status-offline {
+  color: #999;
+  font-style: italic;
+}
+
+.camera-toggle-row.cam-disabled {
+  opacity: 0.6;
+  border-style: dashed;
+}
+
+.camera-toggle-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.cam-enable-btn {
+  background: var(--forest-green) !important;
+}
+
+.cam-enable-btn:hover {
+  filter: brightness(1.2);
+}
+
+.cam-disable-btn {
+  background: #999 !important;
+}
+
+.cam-disable-btn:hover {
+  background: var(--barn-red) !important;
+}
+
 .cam-show-btn {
   background: var(--forest-green) !important;
 }
