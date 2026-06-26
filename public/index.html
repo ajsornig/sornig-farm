@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sornig Farm - Live Chicken Cam</title>
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=7">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐔</text></svg>">
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
@@ -41,6 +41,43 @@
         </div>
       </div>
       <div id="video-grid" class="hidden"></div>
+      <div id="ptz-extended" class="hidden">
+        <div class="ptz-section">
+          <h4>Presets</h4>
+          <div id="preset-pills"></div>
+          <div id="preset-save" class="admin-only hidden">
+            <input type="text" id="preset-name-input" placeholder="Position name..." maxlength="30">
+            <button id="preset-save-btn" class="ptz-action-btn">Save Current</button>
+          </div>
+        </div>
+        <div class="ptz-section">
+          <h4>Auto-Track</h4>
+          <div class="ptz-toggle-row">
+            <label class="ptz-switch">
+              <input type="checkbox" id="autotrack-toggle">
+              <span class="ptz-slider"></span>
+            </label>
+            <span id="autotrack-label">Off</span>
+          </div>
+          <div id="track-targets" class="hidden">
+            <label><input type="checkbox" id="track-people" checked> People</label>
+            <label><input type="checkbox" id="track-animals"> Animals</label>
+            <label><input type="checkbox" id="track-vehicles"> Vehicles</label>
+          </div>
+        </div>
+        <div class="ptz-section admin-only hidden">
+          <h4>Guard Position</h4>
+          <div class="ptz-toggle-row">
+            <label class="ptz-switch">
+              <input type="checkbox" id="guard-toggle">
+              <span class="ptz-slider"></span>
+            </label>
+            <span>Return after</span>
+            <input type="number" id="guard-timeout" value="60" min="10" max="300" class="ptz-number-input">
+            <span>sec</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <aside id="chat-container">
@@ -114,6 +151,6 @@
     <p>Welcome to the Sornig Farm! Watch our chickens live, 24/7.</p>
   </footer>
 
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>

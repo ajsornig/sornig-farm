@@ -6,7 +6,8 @@ const db = require('../db');
 const { sendApprovalRequest, sendApprovalNotification, sendPasswordResetEmail, sendBroadcast } = require('../mailer');
 const { atomicWriteJSON } = require('../atomic-write');
 const { getClientIp } = require('../security');
-const { sendPtzCommand, getPresets, gotoPreset, VALID_OPS } = require('../ptz');
+const { sendPtzCommand, getPresets, gotoPreset, setPreset, removePreset, VALID_OPS } = require('../ptz');
+const { getAiConfig, setAiTrack, setTrackTypes, getPtzGuard, setPtzGuard } = require('../reolink-api');
 const { createRateLimiter } = require('../security');
 
 const router = express.Router();
@@ -1065,21 +1066,130 @@ router.get('/camera/:id/presets', requireAuth, requirePtzAccess, async (req, res
   }
 });
 
-router.post('/camera/:id/preset/:presetId', requireAuth, requirePtzAccess, async (req, res) => {
+router.post('/camera/:id/preset/:presetToken/goto', requireAuth, requirePtzAccess, async (req, res) => {
   const cam = findPtzCamera(req.params.id);
   if (!cam) return res.status(404).json({ error: 'Camera not found or does not support PTZ' });
 
-  const presetId = parseInt(req.params.presetId);
-  if (isNaN(presetId) || presetId < 0 || presetId > 63) {
-    return res.status(400).json({ error: 'Invalid preset ID' });
+  const { presetToken } = req.params;
+  if (!presetToken || presetToken.length > 10) {
+    return res.status(400).json({ error: 'Invalid preset token' });
   }
 
   try {
-    const result = await gotoPreset(cam, presetId, req.body.speed || 32);
+    const result = await gotoPreset(cam, presetToken);
     res.json(result);
   } catch (err) {
     console.error('Goto preset failed:', err.message);
     res.status(502).json({ error: 'Failed to move to preset' });
+  }
+});
+
+router.post('/camera/:id/preset', requireAuth, requireAdmin, async (req, res) => {
+  const cam = findPtzCamera(req.params.id);
+  if (!cam) return res.status(404).json({ error: 'Camera not found or does not support PTZ' });
+
+  const { name } = req.body;
+  if (!name || typeof name !== 'string' || name.length > 50) {
+    return res.status(400).json({ error: 'Preset name required (max 50 chars)' });
+  }
+
+  try {
+    const result = await setPreset(cam, name);
+    res.json(result);
+  } catch (err) {
+    console.error('Set preset failed:', err.message);
+    res.status(502).json({ error: 'Failed to save preset' });
+  }
+});
+
+router.delete('/camera/:id/preset/:presetToken', requireAuth, requireAdmin, async (req, res) => {
+  const cam = findPtzCamera(req.params.id);
+  if (!cam) return res.status(404).json({ error: 'Camera not found or does not support PTZ' });
+
+  const { presetToken } = req.params;
+  if (!presetToken || presetToken.length > 10) {
+    return res.status(400).json({ error: 'Invalid preset token' });
+  }
+
+  try {
+    const result = await removePreset(cam, presetToken);
+    res.json(result);
+  } catch (err) {
+    console.error('Remove preset failed:', err.message);
+    res.status(502).json({ error: 'Failed to remove preset' });
+  }
+});
+
+router.get('/camera/:id/tracking', requireAuth, requirePtzAccess, async (req, res) => {
+  const cam = findPtzCamera(req.params.id);
+  if (!cam) return res.status(404).json({ error: 'Camera not found or does not support PTZ' });
+
+  try {
+    const config = await getAiConfig(cam);
+    res.json({
+      aiTrack: config.aiTrack === 1,
+      trackType: {
+        people: config.trackType?.people === 1,
+        dogCat: config.trackType?.dog_cat === 1,
+        vehicle: config.trackType?.vehicle === 1,
+        face: config.trackType?.face === 1
+      },
+      aiStopBackTime: config.aiStopBackTime,
+      aiDisappearBackTime: config.aiDisappearBackTime
+    });
+  } catch (err) {
+    console.error('Get tracking config failed:', err.message);
+    res.status(502).json({ error: 'Failed to get tracking config' });
+  }
+});
+
+router.post('/camera/:id/tracking', requireAuth, requirePtzAccess, async (req, res) => {
+  const cam = findPtzCamera(req.params.id);
+  if (!cam) return res.status(404).json({ error: 'Camera not found or does not support PTZ' });
+
+  try {
+    const { aiTrack, trackType } = req.body;
+    if (aiTrack !== undefined) {
+      await setAiTrack(cam, aiTrack);
+    }
+    if (trackType) {
+      await setTrackTypes(cam, trackType);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Set tracking config failed:', err.message);
+    res.status(502).json({ error: 'Failed to update tracking config' });
+  }
+});
+
+router.get('/camera/:id/guard', requireAuth, requireAdmin, async (req, res) => {
+  const cam = findPtzCamera(req.params.id);
+  if (!cam) return res.status(404).json({ error: 'Camera not found or does not support PTZ' });
+
+  try {
+    const guard = await getPtzGuard(cam);
+    res.json({ enable: guard.benable === 1, timeout: guard.timeout });
+  } catch (err) {
+    console.error('Get guard config failed:', err.message);
+    res.status(502).json({ error: 'Failed to get guard config' });
+  }
+});
+
+router.post('/camera/:id/guard', requireAuth, requireAdmin, async (req, res) => {
+  const cam = findPtzCamera(req.params.id);
+  if (!cam) return res.status(404).json({ error: 'Camera not found or does not support PTZ' });
+
+  const { enable, timeout } = req.body;
+  if (timeout !== undefined && (timeout < 10 || timeout > 300)) {
+    return res.status(400).json({ error: 'Timeout must be between 10 and 300 seconds' });
+  }
+
+  try {
+    await setPtzGuard(cam, { enable, timeout: timeout || 60 });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Set guard config failed:', err.message);
+    res.status(502).json({ error: 'Failed to update guard config' });
   }
 });
 

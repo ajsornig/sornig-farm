@@ -103,21 +103,40 @@ async function getPresets(cameraConfig) {
   const resp = await soapRequest(ip, 'ptz_service', body, username, password);
 
   const presets = [];
-  const re = /<tptz:Preset[^>]*token="(\d+)"[^>]*>.*?<tt:Name>([^<]+)<\/tt:Name>/gs;
+  const re = /<tptz:Preset[^>]*token="([^"]+)"[^>]*>.*?<tt:Name>([^<]+)<\/tt:Name>/gs;
   let m;
   while ((m = re.exec(resp)) !== null) {
-    presets.push({ id: parseInt(m[1]), name: m[2] });
+    presets.push({ token: m[1], name: m[2] });
   }
   return presets;
 }
 
-async function gotoPreset(cameraConfig, presetId, speed = 0.5) {
+async function gotoPreset(cameraConfig, presetToken) {
   const { ip, username, password } = cameraConfig.ptz;
   const profileToken = await getProfileToken(ip, username, password);
 
-  const body = `<GotoPreset xmlns="http://www.onvif.org/ver20/ptz/wsdl"><ProfileToken>${profileToken}</ProfileToken><PresetToken>${presetId}</PresetToken><Speed><tt:PanTiltSpeed>${speed}</tt:PanTiltSpeed></Speed></GotoPreset>`;
+  const body = `<GotoPreset xmlns="http://www.onvif.org/ver20/ptz/wsdl"><ProfileToken>${profileToken}</ProfileToken><PresetToken>${presetToken}</PresetToken></GotoPreset>`;
   await soapRequest(ip, 'ptz_service', body, username, password);
   return { success: true };
 }
 
-module.exports = { sendPtzCommand, getPresets, gotoPreset, VALID_OPS };
+async function setPreset(cameraConfig, name) {
+  const { ip, username, password } = cameraConfig.ptz;
+  const profileToken = await getProfileToken(ip, username, password);
+
+  const body = `<SetPreset xmlns="http://www.onvif.org/ver20/ptz/wsdl"><ProfileToken>${profileToken}</ProfileToken><PresetName>${name}</PresetName></SetPreset>`;
+  const resp = await soapRequest(ip, 'ptz_service', body, username, password);
+  const tokenMatch = resp.match(/PresetToken>([^<]+)</);
+  return { success: true, token: tokenMatch ? tokenMatch[1] : null };
+}
+
+async function removePreset(cameraConfig, presetToken) {
+  const { ip, username, password } = cameraConfig.ptz;
+  const profileToken = await getProfileToken(ip, username, password);
+
+  const body = `<RemovePreset xmlns="http://www.onvif.org/ver20/ptz/wsdl"><ProfileToken>${profileToken}</ProfileToken><PresetToken>${presetToken}</PresetToken></RemovePreset>`;
+  await soapRequest(ip, 'ptz_service', body, username, password);
+  return { success: true };
+}
+
+module.exports = { sendPtzCommand, getPresets, gotoPreset, setPreset, removePreset, VALID_OPS };

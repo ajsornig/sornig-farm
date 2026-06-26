@@ -23,6 +23,7 @@
         "ip": "CAMERA_IP_HERE",
         "username": "admin",
         "password": "CAMERA_PASSWORD_HERE",
+        "httpPort": 80,
         "capabilities": ["pan", "tilt"]
       }
     }

@@ -409,7 +409,14 @@ async function loadCameras() {
       tabs.appendChild(btn);
     });
 
-    if (cameras.length > 1) {
+    const savedCamId = localStorage.getItem('selectedCamera');
+    const savedCam = savedCamId ? cameras.find(c => c.id === savedCamId) : null;
+
+    if (savedCam) {
+      const btn = [...tabs.querySelectorAll('.camera-tab')].find(t => t.textContent === savedCam.name);
+      if (btn) selectCamera(savedCam, btn);
+      else showAllCams(tabs.querySelector('.camera-tab'));
+    } else if (cameras.length > 1) {
       showAllCams(tabs.querySelector('.camera-tab'));
     } else if (cameras.length === 1) {
       selectCamera(cameras[0], tabs.querySelector('.camera-tab'));
@@ -423,6 +430,7 @@ async function loadCameras() {
 }
 
 function showAllCams(tabBtn) {
+  localStorage.removeItem('selectedCamera');
   document.querySelectorAll('.camera-tab').forEach(t => t.classList.remove('active'));
   tabBtn.classList.add('active');
 
@@ -431,6 +439,8 @@ function showAllCams(tabBtn) {
 
   const ptzEl = document.getElementById('ptz-controls');
   if (ptzEl) ptzEl.classList.add('hidden');
+  const ptzExtEl = document.getElementById('ptz-extended');
+  if (ptzExtEl) ptzExtEl.classList.add('hidden');
 
   if (hls) { hls.destroy(); hls = null; }
   destroyGridPlayers();
@@ -467,6 +477,7 @@ function destroyGridPlayers() {
 
 function selectCamera(cam, tabBtn) {
   currentCamera = cam;
+  localStorage.setItem('selectedCamera', cam.id);
 
   document.querySelectorAll('.camera-tab').forEach(t => t.classList.remove('active'));
   tabBtn.classList.add('active');
@@ -477,6 +488,7 @@ function selectCamera(cam, tabBtn) {
 
   playStream(cam.streamUrl, !!cam.ptz);
   updatePtzControls(cam);
+  updatePtzExtended(cam);
 }
 
 function playStream(url, lowLatency) {
@@ -1250,5 +1262,231 @@ async function sendPtz(op) {
   }
 }
 
+// --- PTZ Extended Controls (Presets, Tracking, Guard) ---
+
+function updatePtzExtended(cam) {
+  const el = document.getElementById('ptz-extended');
+  if (!el) return;
+
+  if (cam && cam.hasPtz && authToken) {
+    el.classList.remove('hidden');
+    el.dataset.camId = cam.id;
+    document.querySelectorAll('#ptz-extended .admin-only').forEach(section => {
+      section.classList.toggle('hidden', !isAdmin);
+    });
+    loadPresets();
+    loadTracking();
+    if (isAdmin) loadGuard();
+  } else {
+    el.classList.add('hidden');
+  }
+}
+
+async function loadPresets() {
+  const container = document.getElementById('ptz-extended');
+  if (!container) return;
+  const camId = container.dataset.camId;
+  const pillsEl = document.getElementById('preset-pills');
+
+  try {
+    const resp = await fetch(`/api/camera/${encodeURIComponent(camId)}/presets`, {
+      headers: { 'x-auth-token': authToken }
+    });
+    const presets = await resp.json();
+    pillsEl.innerHTML = presets.map(p => {
+      const deleteBtn = isAdmin
+        ? `<button class="preset-pill-delete" onclick="event.stopPropagation();deletePreset('${p.token}')">&times;</button>`
+        : '';
+      return `<button class="preset-pill" onclick="gotoPreset('${p.token}')">${p.name}${deleteBtn}</button>`;
+    }).join('');
+    if (presets.length === 0) {
+      pillsEl.innerHTML = '<span style="font-size:0.8rem;color:#888;">No presets saved</span>';
+    }
+  } catch (err) {
+    console.error('Failed to load presets:', err);
+  }
+}
+
+async function gotoPreset(token) {
+  const container = document.getElementById('ptz-extended');
+  const camId = container.dataset.camId;
+  const pills = document.querySelectorAll('.preset-pill');
+  pills.forEach(p => p.disabled = true);
+
+  try {
+    await fetch(`/api/camera/${encodeURIComponent(camId)}/preset/${encodeURIComponent(token)}/goto`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken }
+    });
+  } catch (err) {
+    console.error('Goto preset failed:', err);
+  } finally {
+    setTimeout(() => pills.forEach(p => p.disabled = false), 1000);
+  }
+}
+
+async function savePreset() {
+  const container = document.getElementById('ptz-extended');
+  const camId = container.dataset.camId;
+  const input = document.getElementById('preset-name-input');
+  const name = input.value.trim();
+  if (!name) return;
+
+  try {
+    const resp = await fetch(`/api/camera/${encodeURIComponent(camId)}/preset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      body: JSON.stringify({ name })
+    });
+    if (resp.ok) {
+      input.value = '';
+      loadPresets();
+    }
+  } catch (err) {
+    console.error('Save preset failed:', err);
+  }
+}
+
+async function deletePreset(token) {
+  const container = document.getElementById('ptz-extended');
+  const camId = container.dataset.camId;
+
+  try {
+    const resp = await fetch(`/api/camera/${encodeURIComponent(camId)}/preset/${encodeURIComponent(token)}`, {
+      method: 'DELETE',
+      headers: { 'x-auth-token': authToken }
+    });
+    if (resp.ok) loadPresets();
+  } catch (err) {
+    console.error('Delete preset failed:', err);
+  }
+}
+
+async function loadTracking() {
+  const container = document.getElementById('ptz-extended');
+  if (!container) return;
+  const camId = container.dataset.camId;
+
+  try {
+    const resp = await fetch(`/api/camera/${encodeURIComponent(camId)}/tracking`, {
+      headers: { 'x-auth-token': authToken }
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const toggle = document.getElementById('autotrack-toggle');
+    const label = document.getElementById('autotrack-label');
+    const targets = document.getElementById('track-targets');
+
+    toggle.checked = data.aiTrack;
+    label.textContent = data.aiTrack ? 'On' : 'Off';
+    targets.classList.toggle('hidden', !data.aiTrack);
+
+    document.getElementById('track-people').checked = data.trackType.people;
+    document.getElementById('track-animals').checked = data.trackType.dogCat;
+    document.getElementById('track-vehicles').checked = data.trackType.vehicle;
+  } catch (err) {
+    console.error('Failed to load tracking config:', err);
+  }
+}
+
+async function toggleAutotrack() {
+  const container = document.getElementById('ptz-extended');
+  const camId = container.dataset.camId;
+  const toggle = document.getElementById('autotrack-toggle');
+  const label = document.getElementById('autotrack-label');
+  const targets = document.getElementById('track-targets');
+  const enabled = toggle.checked;
+
+  label.textContent = enabled ? 'On' : 'Off';
+  targets.classList.toggle('hidden', !enabled);
+
+  try {
+    const resp = await fetch(`/api/camera/${encodeURIComponent(camId)}/tracking`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      body: JSON.stringify({ aiTrack: enabled })
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      console.error('Toggle autotrack response:', resp.status, err);
+    }
+  } catch (err) {
+    console.error('Toggle autotrack failed:', err);
+    toggle.checked = !enabled;
+    label.textContent = !enabled ? 'On' : 'Off';
+    targets.classList.toggle('hidden', enabled);
+  }
+}
+
+async function updateTrackTypes() {
+  const container = document.getElementById('ptz-extended');
+  const camId = container.dataset.camId;
+
+  const trackType = {
+    people: document.getElementById('track-people').checked,
+    dogCat: document.getElementById('track-animals').checked,
+    vehicle: document.getElementById('track-vehicles').checked,
+    face: false
+  };
+
+  try {
+    await fetch(`/api/camera/${encodeURIComponent(camId)}/tracking`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      body: JSON.stringify({ trackType })
+    });
+  } catch (err) {
+    console.error('Update track types failed:', err);
+  }
+}
+
+async function loadGuard() {
+  const container = document.getElementById('ptz-extended');
+  if (!container) return;
+  const camId = container.dataset.camId;
+
+  try {
+    const resp = await fetch(`/api/camera/${encodeURIComponent(camId)}/guard`, {
+      headers: { 'x-auth-token': authToken }
+    });
+    const data = await resp.json();
+    document.getElementById('guard-toggle').checked = data.enable;
+    document.getElementById('guard-timeout').value = data.timeout;
+  } catch (err) {
+    console.error('Failed to load guard config:', err);
+  }
+}
+
+async function toggleGuard() {
+  const container = document.getElementById('ptz-extended');
+  const camId = container.dataset.camId;
+  const enable = document.getElementById('guard-toggle').checked;
+  const timeout = parseInt(document.getElementById('guard-timeout').value) || 60;
+
+  try {
+    await fetch(`/api/camera/${encodeURIComponent(camId)}/guard`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      body: JSON.stringify({ enable, timeout })
+    });
+  } catch (err) {
+    console.error('Toggle guard failed:', err);
+  }
+}
+
+function setupPtzExtended() {
+  document.getElementById('autotrack-toggle')?.addEventListener('change', toggleAutotrack);
+  document.getElementById('track-people')?.addEventListener('change', updateTrackTypes);
+  document.getElementById('track-animals')?.addEventListener('change', updateTrackTypes);
+  document.getElementById('track-vehicles')?.addEventListener('change', updateTrackTypes);
+  document.getElementById('preset-save-btn')?.addEventListener('click', savePreset);
+  document.getElementById('preset-name-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') savePreset();
+  });
+  document.getElementById('guard-toggle')?.addEventListener('change', toggleGuard);
+  document.getElementById('guard-timeout')?.addEventListener('change', toggleGuard);
+}
+
+setupPtzExtended();
 setupCollapsibleSections();
 init();
