@@ -1,0 +1,15 @@
+[Unit]
+Description=Motion-capture timelapse (Chicken Run)
+After=camera-hls.service
+
+[Service]
+Type=simple
+User=ajsornig
+ExecStart=/bin/bash /home/ajsornig/chicken-stream/scripts/motion-capture.sh run
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

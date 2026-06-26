@@ -14,11 +14,7 @@
 # Weekly timelapse montage - compile last 7 days at 1 AM
 0 1 * * * /home/ajsornig/chicken-stream/scripts/timelapse.sh --weekly
 
-# Motion-capture timelapse (test — runs alongside existing)
-*/5 * * * * /home/ajsornig/chicken-stream/scripts/motion-capture.sh run
-*/5 * * * * /home/ajsornig/chicken-stream/scripts/motion-capture.sh coop
-*/5 * * * * /home/ajsornig/chicken-stream/scripts/motion-capture.sh chick
-
 # Motion-timelapse stitch (10 min offset to avoid contention with existing)
+# Capture is now via systemd services (motion-capture-run/coop/chick), not cron
 10 0 * * * /home/ajsornig/chicken-stream/scripts/motion-timelapse-stitch.sh --stitch
 10 1 * * * /home/ajsornig/chicken-stream/scripts/motion-timelapse-stitch.sh --weekly

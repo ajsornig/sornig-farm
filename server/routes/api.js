@@ -531,7 +531,7 @@ router.get('/admin/motion-capture-frames', requireAdmin, (req, res) => {
         filename,
         cam: cam.label,
         url: `/api/admin/motion-capture-frames/${cam.label}/${filename}`,
-        time: filename.replace(today + '_', '').replace('.jpg', '').replace(/(\d{2})(\d{2})/, '$1:$2')
+        time: filename.replace(today + '_', '').replace('.jpg', '').replace(/(\d{2})(\d{2})(\d{2})?/, (_, h, m, s) => s ? `${h}:${m}:${s}` : `${h}:${m}`)
       }));
   });
 
@@ -541,7 +541,7 @@ router.get('/admin/motion-capture-frames', requireAdmin, (req, res) => {
 router.get('/admin/motion-capture-frames/:cam/:filename', (req, res) => {
   const filename = path.basename(req.params.filename);
   const cam = req.params.cam;
-  if (!/^\d{4}-\d{2}-\d{2}_\d{4}\.jpg$/.test(filename)) {
+  if (!/^\d{4}-\d{2}-\d{2}_\d{4,6}\.jpg$/.test(filename)) {
     return res.status(400).json({ error: 'Invalid filename' });
   }
   if (cam !== 'run' && cam !== 'coop' && cam !== 'chick') {

@@ -1,0 +1,15 @@
+[Unit]
+Description=Motion-capture timelapse (Chicken Coop)
+After=camera-hls-2.service
+
+[Service]
+Type=simple
+User=ajsornig
+ExecStart=/bin/bash /home/ajsornig/chicken-stream/scripts/motion-capture.sh coop
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
