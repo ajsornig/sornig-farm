@@ -33,18 +33,16 @@ async function init() {
 
 function setupCollapsibleSections() {
   const isMobile = window.matchMedia('(max-width: 768px)').matches;
-  document.querySelectorAll('.collapsible-section').forEach(section => {
-    const toggle = section.querySelector('.section-toggle');
-    if (!toggle) return;
-    const storageKey = `section-collapsed-${section.id}`;
+  document.querySelectorAll('details.collapsible-section').forEach(details => {
+    const storageKey = `section-open-${details.id}`;
     const stored = localStorage.getItem(storageKey);
-    const collapsed = stored !== null ? stored === 'true' : isMobile;
-    section.classList.toggle('section-collapsed', collapsed);
-
-    toggle.addEventListener('click', () => {
-      const nowCollapsed = !section.classList.contains('section-collapsed');
-      section.classList.toggle('section-collapsed', nowCollapsed);
-      localStorage.setItem(storageKey, nowCollapsed);
+    if (stored !== null) {
+      details.open = stored === 'true';
+    } else if (isMobile) {
+      details.open = false;
+    }
+    details.addEventListener('toggle', () => {
+      localStorage.setItem(storageKey, details.open);
     });
   });
 }

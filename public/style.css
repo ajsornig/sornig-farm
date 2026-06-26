@@ -1178,26 +1178,27 @@ main {
   color: var(--text-dark);
 }
 
-/* Collapsible sections */
-.collapsible-section h2.section-toggle {
+/* Collapsible sections (native details/summary) */
+details.collapsible-section summary {
   cursor: pointer;
+  list-style: none;
   user-select: none;
-  justify-content: space-between;
 }
 
-.section-chevron {
+details.collapsible-section summary::-webkit-details-marker {
+  display: none;
+}
+
+details.collapsible-section summary h2::after {
+  content: "▾";
   font-size: 1.1rem;
   color: var(--text-muted);
-  transition: transform 0.2s;
   margin-left: auto;
+  transition: transform 0.2s;
 }
 
-.collapsible-section.section-collapsed .section-chevron {
+details.collapsible-section:not([open]) summary h2::after {
   transform: rotate(-90deg);
-}
-
-.collapsible-section.section-collapsed .section-body {
-  display: none;
 }
 
 #total-views strong {
