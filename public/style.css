@@ -987,6 +987,33 @@ main {
   background: #000;
 }
 
+/* Chick Album */
+#chick-album-section {
+  max-width: 1400px;
+  margin: 2rem auto;
+  padding: 0 1.5rem;
+}
+
+#chick-album-section h2 {
+  margin-bottom: 0.25rem;
+  color: var(--wood-dark);
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+#chick-album-section h2::before {
+  content: "🐥";
+}
+
+#chick-album-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
 /* Motion Captures */
 #motion-section {
   max-width: 1400px;
@@ -1871,6 +1898,7 @@ footer {
   }
 
   #timelapse-section,
+  #chick-album-section,
   #motion-section,
   #admin-panel,
   #recordings-section,
@@ -1880,6 +1908,7 @@ footer {
   }
 
   #timelapse-section h2,
+  #chick-album-section h2,
   #motion-section h2,
   #admin-panel h2,
   #recordings-section h2,
