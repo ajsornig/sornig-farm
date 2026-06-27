@@ -1242,87 +1242,11 @@ main {
   margin-top: 0.5rem;
 }
 
-/* Motion Captures */
-#motion-section {
-  max-width: 1400px;
-  margin: 2rem auto;
-  padding: 0 1.5rem;
-}
-
-#motion-section h2 {
-  margin-bottom: 0.25rem;
-  color: var(--wood-dark);
-  font-size: 1.5rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-#motion-section h2::before {
-  content: "🦊";
-}
-
 .section-subtitle {
   color: var(--text-muted);
   font-size: 0.9rem;
   margin-bottom: 1rem;
   font-style: italic;
-}
-
-#motion-gallery {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1rem;
-}
-
-.motion-thumb {
-  display: block;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 2px solid var(--wood-brown);
-  text-decoration: none;
-  transition: all 0.2s;
-}
-
-.motion-thumb:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
-  border-color: var(--forest-green);
-}
-
-.motion-thumb img {
-  width: 100%;
-  display: block;
-  aspect-ratio: 4/3;
-  object-fit: cover;
-  background: #000;
-}
-
-.motion-time {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.6rem;
-  background: var(--cream-dark);
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  text-align: center;
-}
-
-.motion-delete-btn {
-  background: var(--barn-red);
-  color: var(--cream);
-  border: none;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 0.7rem;
-  padding: 0.1rem 0.4rem;
-  opacity: 0.6;
-}
-
-.motion-delete-btn:hover {
-  opacity: 1;
 }
 
 #recordings-section {
@@ -2282,7 +2206,6 @@ footer {
   #timelapse-section,
   #motion-timelapse-section,
   #chick-growth-section,
-  #motion-section,
   #admin-panel,
   #recordings-section,
   #visitors-section {
@@ -2293,7 +2216,6 @@ footer {
   #timelapse-section h2,
   #motion-timelapse-section h2,
   #chick-growth-section h2,
-  #motion-section h2,
   #admin-panel h2,
   #recordings-section h2,
   #visitors-section h2 {
@@ -2306,11 +2228,6 @@ footer {
 
   #timelapse-list {
     grid-template-columns: 1fr;
-  }
-
-  #motion-gallery {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 0.75rem;
   }
 
   #admin-tabs {

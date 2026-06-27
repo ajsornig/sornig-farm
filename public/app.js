@@ -20,7 +20,6 @@ async function init() {
     loadRecordings();
     loadTimelapse();
     loadMotionTimelapse();
-    loadMotionCaptures();
     loadChickGrowth();
     loadVisitorStats();
   }
@@ -61,7 +60,7 @@ async function checkStatus() {
 function updateContentVisibility() {
   const protectedSections = [
     'video-container', 'chat-messages', 'timelapse-section',
-    'motion-timelapse-section', 'chick-growth-section', 'motion-section', 'recordings-section', 'visitors-section'
+    'motion-timelapse-section', 'chick-growth-section', 'recordings-section', 'visitors-section'
   ];
 
   if (requireApproval && !isApproved) {
@@ -158,7 +157,6 @@ function showLoggedInState(skipContentLoad = false) {
     loadCameras();
     loadRecordings();
     loadTimelapse();
-    loadMotionCaptures();
     loadChickGrowth();
     loadVisitorStats();
   }
@@ -912,52 +910,6 @@ function trackTimelapse(video, event) {
       watchedSeconds: Math.round(video.currentTime || 0)
     })
   }).catch(() => {});
-}
-
-async function loadMotionCaptures() {
-  try {
-    const res = await fetch('/api/motion-captures');
-    const captures = await res.json();
-    const gallery = document.getElementById('motion-gallery');
-
-    if (captures.length === 0) {
-      gallery.innerHTML = '<p class="no-recordings">No motion captures yet — check back after nightfall</p>';
-      return;
-    }
-
-    gallery.innerHTML = captures.map(cap => {
-      const date = new Date(cap.created);
-      const label = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-      const deleteBtn = isAdmin ? `<button class="motion-delete-btn" onclick="deleteMotionCapture(${jsArg(cap.filename)}, event)" title="Delete">x</button>` : '';
-      return `
-        <div class="motion-thumb" id="capture-${escapeHtml(cap.filename)}">
-          <a href="${cap.url}" target="_blank">
-            <img src="${cap.url}" alt="Motion ${label}" loading="lazy">
-          </a>
-          <span class="motion-time">${label}${deleteBtn}</span>
-        </div>
-      `;
-    }).join('');
-  } catch (err) {
-    console.error('Failed to load motion captures:', err);
-  }
-}
-
-async function deleteMotionCapture(filename, event) {
-  event.preventDefault();
-  event.stopPropagation();
-  try {
-    const res = await fetch(`/api/admin/motion-captures/${filename}`, {
-      method: 'DELETE',
-      headers: { 'x-auth-token': authToken }
-    });
-    if ((await res.json()).success) {
-      const el = document.getElementById(`capture-${filename}`);
-      if (el) el.remove();
-    }
-  } catch (err) {
-    console.error('Failed to delete capture:', err);
-  }
 }
 
 async function loadChickGrowth() {

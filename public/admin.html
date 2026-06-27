@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Panel - Sornig Farm</title>
-  <link rel="stylesheet" href="style.css?v=10">
+  <link rel="stylesheet" href="style.css?v=11">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐔</text></svg>">
 </head>
@@ -66,7 +66,6 @@
       <div id="admin-media" class="admin-content hidden">
         <div class="media-sub-tabs">
           <button class="media-sub-tab active" data-sub="growth">Growth Picks</button>
-          <button class="media-sub-tab" data-sub="motion">Night Motion</button>
           <button class="media-sub-tab" data-sub="timelapse">Timelapse</button>
           <button class="media-sub-tab" data-sub="motion-frames">Motion Frames</button>
           <button class="media-sub-tab" data-sub="capture-stats">Capture Stats</button>
@@ -79,14 +78,6 @@
           <div id="growth-chosen-list"></div>
         </div>
 
-        <div id="media-motion" class="media-sub-content hidden">
-          <h3>Pending Motion Captures</h3>
-          <p class="admin-note">Approve captures to show on main site, or reject false positives.</p>
-          <div class="motion-admin-actions">
-            <button id="reject-all-btn" class="admin-btn">Reject All</button>
-          </div>
-          <div id="motion-pending-list"></div>
-        </div>
 
         <div id="media-timelapse" class="media-sub-content hidden">
           <h3>Today's Timelapse Frames</h3>
@@ -159,6 +150,6 @@
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="admin.js?v=17"></script>
+  <script src="admin.js?v=18"></script>
 </body>
 </html>

@@ -179,7 +179,6 @@ function setupAdminTabs() {
 
   // Wire up buttons
   document.getElementById('admin-clear-btn').onclick = clearChat;
-  document.getElementById('reject-all-btn').onclick = rejectAllMotion;
 
   // Media sub-tabs
   setupMediaSubTabs();
@@ -205,13 +204,11 @@ function setupMediaSubTabs() {
       const sub = tab.dataset.sub;
       localStorage.setItem('adminMediaSubTab', sub);
       document.getElementById('media-growth').classList.toggle('hidden', sub !== 'growth');
-      document.getElementById('media-motion').classList.toggle('hidden', sub !== 'motion');
       document.getElementById('media-timelapse').classList.toggle('hidden', sub !== 'timelapse');
       document.getElementById('media-motion-frames').classList.toggle('hidden', sub !== 'motion-frames');
       document.getElementById('media-capture-stats').classList.toggle('hidden', sub !== 'capture-stats');
 
       if (sub === 'growth') loadGrowthPicksAdmin();
-      if (sub === 'motion') loadMotionPending();
       if (sub === 'timelapse') loadTimelapseFrames();
       if (sub === 'motion-frames') loadMotionCaptureFrames();
       if (sub === 'capture-stats') loadCaptureStats();
@@ -222,6 +219,7 @@ function setupMediaSubTabs() {
 function loadMediaTab() {
   let saved = localStorage.getItem('adminMediaSubTab');
   if (saved === 'chicks') saved = 'growth';
+  if (saved === 'motion') saved = 'motion-frames';
   const target = saved ? document.querySelector(`.media-sub-tab[data-sub="${saved}"]`) : null;
   const activeSub = target || document.querySelector('.media-sub-tab.active');
   if (activeSub) activeSub.click();
@@ -485,89 +483,6 @@ async function deleteUser(username) {
   } catch (err) {
     console.error('Failed to delete user:', err);
     alert('Failed to delete user');
-  }
-}
-
-async function loadMotionPending() {
-  try {
-    const res = await fetch('/api/admin/motion-pending', {
-      headers: { 'x-auth-token': authToken }
-    });
-    const captures = await res.json();
-    const list = document.getElementById('motion-pending-list');
-
-    if (captures.length === 0) {
-      list.innerHTML = '<p class="no-pending">No pending motion captures</p>';
-      return;
-    }
-
-    list.innerHTML = captures.map(cap => {
-      const date = new Date(cap.created);
-      const label = date.toLocaleString();
-      return `
-        <div class="motion-pending-item" id="motion-${escapeHtml(cap.filename)}">
-          <img src="${cap.url}" alt="Motion capture" loading="lazy">
-          <div class="motion-pending-info">
-            <span>${label}</span>
-            <div class="motion-pending-actions">
-              <button class="approve-btn" onclick="approveMotion(${jsArg(cap.filename)})">Approve</button>
-              <button class="deny-btn" onclick="rejectMotion(${jsArg(cap.filename)})">Reject</button>
-            </div>
-          </div>
-        </div>
-      `;
-    }).join('');
-  } catch (err) {
-    console.error('Failed to load motion pending:', err);
-  }
-}
-
-async function approveMotion(filename) {
-  try {
-    const res = await fetch(`/api/admin/motion-pending/${filename}/approve`, {
-      method: 'POST',
-      headers: { 'x-auth-token': authToken }
-    });
-    if ((await res.json()).success) {
-      document.getElementById(`motion-${filename}`).remove();
-    }
-  } catch (err) {
-    console.error('Failed to approve:', err);
-  }
-}
-
-async function rejectMotion(filename) {
-  try {
-    const res = await fetch(`/api/admin/motion-pending/${filename}/reject`, {
-      method: 'POST',
-      headers: { 'x-auth-token': authToken }
-    });
-    if ((await res.json()).success) {
-      document.getElementById(`motion-${filename}`).remove();
-    }
-  } catch (err) {
-    console.error('Failed to reject:', err);
-  }
-}
-
-async function rejectAllMotion() {
-  if (!confirm('Reject all pending motion captures?')) return;
-
-  try {
-    const res = await fetch('/api/admin/motion-pending', {
-      headers: { 'x-auth-token': authToken }
-    });
-    const captures = await res.json();
-
-    for (const cap of captures) {
-      await fetch(`/api/admin/motion-pending/${cap.filename}/reject`, {
-        method: 'POST',
-        headers: { 'x-auth-token': authToken }
-      });
-    }
-    loadMotionPending();
-  } catch (err) {
-    console.error('Failed to reject all:', err);
   }
 }
 
