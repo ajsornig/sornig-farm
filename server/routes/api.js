@@ -1154,6 +1154,9 @@ function findPtzCamera(id) {
 
 const ptzLimiter = createRateLimiter({ windowMs: 1000, max: 20, message: 'PTZ rate limit exceeded' });
 
+const ptzDriveLog = new Map();
+const PTZ_LOG_COOLDOWN = 5 * 60 * 1000;
+
 router.post('/camera/:id/ptz', requireAuth, requirePtzDriving, ptzLimiter, async (req, res) => {
   const cam = findPtzCamera(req.params.id);
   if (!cam) return res.status(404).json({ error: 'Camera not found or does not support PTZ' });
@@ -1161,6 +1164,13 @@ router.post('/camera/:id/ptz', requireAuth, requirePtzDriving, ptzLimiter, async
   const { op, speed } = req.body;
   if (!op || !VALID_OPS.includes(op)) {
     return res.status(400).json({ error: `Invalid op. Valid: ${VALID_OPS.join(', ')}` });
+  }
+
+  const logKey = `${req.session.username}:${req.params.id}`;
+  const lastLogged = ptzDriveLog.get(logKey) || 0;
+  if (Date.now() - lastLogged > PTZ_LOG_COOLDOWN) {
+    ptzDriveLog.set(logKey, Date.now());
+    db.logActivity(req.session.username, 'ptz_drive', { camera: req.params.id });
   }
 
   try {
@@ -1196,6 +1206,7 @@ router.post('/camera/:id/preset/:presetToken/goto', requireAuth, requirePtzAcces
 
   try {
     const result = await gotoPreset(cam, presetToken);
+    db.logActivity(req.session.username, 'ptz_preset', { camera: req.params.id, preset: presetToken });
     res.json(result);
   } catch (err) {
     console.error('Goto preset failed:', err.message);
@@ -1274,6 +1285,7 @@ router.post('/camera/:id/tracking', requireAuth, requireAdmin, async (req, res) 
     if (trackType) {
       await setTrackTypes(cam, trackType);
     }
+    db.logActivity(req.session.username, 'ptz_autotrack', { camera: req.params.id, aiTrack });
     res.json({ success: true });
   } catch (err) {
     console.error('Set tracking config failed:', err.message);
