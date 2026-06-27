@@ -951,9 +951,10 @@ router.get('/admin/motion-capture-stats', requireAdmin, (req, res) => {
 
     const [date, cam, status] = parts;
     if (!days[date]) days[date] = {};
-    if (!days[date][cam]) days[date][cam] = { captured: 0, skipped: 0 };
+    if (!days[date][cam]) days[date][cam] = { captured: 0, skipped: 0, cooldown: 0 };
     if (status === 'captured') days[date][cam].captured++;
-    if (status === 'skipped') days[date][cam].skipped++;
+    else if (status === 'skipped_cooldown') days[date][cam].cooldown++;
+    else if (status === 'skipped') days[date][cam].skipped++;
   });
 
   res.json({ days });

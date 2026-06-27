@@ -803,9 +803,10 @@ async function loadCaptureStats() {
     }
 
     const fmtCam = (camStats) => {
-      if (!camStats) return '0 / 0';
-      const total = camStats.captured + camStats.skipped;
-      return `${camStats.captured} / ${total}`;
+      if (!camStats) return '-';
+      const parts = [`${camStats.captured} saved`];
+      if (camStats.cooldown > 0) parts.push(`${camStats.cooldown} during cooldown`);
+      return parts.join(', ');
     };
 
     let html = `
@@ -813,9 +814,9 @@ async function loadCaptureStats() {
         <thead>
           <tr>
             <th>Date</th>
-            <th>Run (captured/total)</th>
-            <th>Coop (captured/total)</th>
-            <th>Chick (captured)</th>
+            <th>Run</th>
+            <th>Coop</th>
+            <th>Chick</th>
           </tr>
         </thead>
         <tbody>
@@ -823,13 +824,12 @@ async function loadCaptureStats() {
 
     html += dates.map(date => {
       const day = data.days[date];
-      const chickCaptured = day.chick ? day.chick.captured : 0;
       return `
         <tr>
           <td>${escapeHtml(date)}</td>
           <td>${fmtCam(day.run)}</td>
           <td>${fmtCam(day.coop)}</td>
-          <td>${chickCaptured}</td>
+          <td>${fmtCam(day.chick)}</td>
         </tr>
       `;
     }).join('');
