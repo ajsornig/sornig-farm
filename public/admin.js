@@ -805,6 +805,7 @@ async function loadCaptureStats() {
     const fmtCam = (camStats) => {
       if (!camStats) return '-';
       const parts = [`${camStats.captured} saved`];
+      if (camStats.night > 0) parts.push(`${camStats.night} night`);
       if (camStats.cooldown > 0) parts.push(`${camStats.cooldown} during cooldown`);
       return parts.join(', ');
     };
