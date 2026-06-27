@@ -3,6 +3,7 @@ const { getRecentMessages, saveMessage, pruneOldMessages, getSession, clearAllMe
 const { filterProfanity } = require('./profanity');
 const { isBot, isSuspicious } = require('./botDetect');
 const { getClientIp } = require('./security');
+const { geolocateIP } = require('./geo');
 
 const MAX_CONNECTIONS_PER_IP = 15;
 
@@ -11,29 +12,6 @@ const MAX_CONNECTIONS_PER_IP = 15;
 // per-IP cap and rate limit onto a single global bucket. Detect that case.
 function isLoopback(ip) {
   return !ip || ip === 'unknown' || ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
-}
-
-async function geolocateIP(ip) {
-  // Skip localhost/private IPs
-  if (!ip || ip === '127.0.0.1' || ip === '::1' || ip.startsWith('192.168.') || ip.startsWith('10.')) {
-    return null;
-  }
-
-  try {
-    const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,city,lat,lon`);
-    const data = await response.json();
-    if (data.status === 'success') {
-      return {
-        city: data.city,
-        country: data.country,
-        lat: data.lat,
-        lng: data.lon
-      };
-    }
-  } catch (err) {
-    console.error('Geolocation failed:', err.message);
-  }
-  return null;
 }
 
 const clients = new Map();

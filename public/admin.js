@@ -7,6 +7,7 @@ let adminUsers = [];
 let userSortCol = 'created';
 let userSortAsc = false;
 let activityData = [];
+let adminVisitorMap = null;
 
 // Escape for safe interpolation into HTML TEXT or attribute VALUES (quotes
 // included). NOTE: this is NOT sufficient for a value placed inside an inline
@@ -159,7 +160,10 @@ function setupAdminTabs() {
 
       if (panel === 'dashboard') loadDashboard();
       if (panel === 'media') loadMediaTab();
-      if (panel === 'activity') loadActivityLog();
+      if (panel === 'activity') {
+        loadActivityLog();
+        initAdminVisitorMap();
+      }
       if (panel === 'comms') loadBroadcastRecipients();
 
       if (panel === 'cameras') {
@@ -594,6 +598,68 @@ async function loadActivityLog() {
   }
 }
 
+function initAdminVisitorMap() {
+  if (adminVisitorMap) {
+    // Map already exists - just refresh markers and fix sizing in case the
+    // container was hidden (0 width/height) the first time it was created.
+    adminVisitorMap.invalidateSize();
+    loadVisitorMapData();
+    return;
+  }
+
+  adminVisitorMap = L.map('admin-visitor-map', {
+    maxBounds: [[-90, -180], [90, 180]],
+    maxBoundsViscosity: 1.0,
+    minZoom: 2
+  }).setView([39, -98], 3);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    noWrap: true
+  }).addTo(adminVisitorMap);
+
+  // Tab content was hidden when the map was created, so Leaflet measured a
+  // zero-size container. Re-measure once the tab is actually visible.
+  setTimeout(() => adminVisitorMap.invalidateSize(), 0);
+
+  loadVisitorMapData();
+}
+
+let visitorMarkers = [];
+
+async function loadVisitorMapData() {
+  try {
+    const res = await fetch('/api/admin/visitor-map', {
+      headers: { 'x-auth-token': authToken }
+    });
+    const visitors = await res.json();
+
+    visitorMarkers.forEach(m => adminVisitorMap.removeLayer(m));
+    visitorMarkers = [];
+
+    const now = Date.now();
+    const DAY = 24 * 60 * 60 * 1000;
+
+    visitors.forEach(v => {
+      const isRecent = (now - v.lastSeen) < DAY;
+      const icon = L.divIcon({
+        className: 'visitor-marker',
+        html: `<span style="font-size: 20px;">${isRecent ? '🐔' : '🥚'}</span>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      });
+
+      const lastSeenStr = new Date(v.lastSeen).toLocaleString();
+      const marker = L.marker([v.lat, v.lng], { icon })
+        .addTo(adminVisitorMap)
+        .bindPopup(`<strong>${escapeHtml(v.username)}</strong><br>${escapeHtml(v.city)}, ${escapeHtml(v.country)}<br><small>Last: ${escapeHtml(lastSeenStr)}</small>`);
+      visitorMarkers.push(marker);
+    });
+  } catch (err) {
+    console.error('Failed to load visitor map:', err);
+  }
+}
+
 function setupActivityFilters() {
   const userInput = document.getElementById('activity-filter-user');
   const actionSelect = document.getElementById('activity-filter-action');
@@ -807,6 +873,7 @@ async function loadCaptureStats() {
       const parts = [`${camStats.captured} saved`];
       if (camStats.night > 0) parts.push(`${camStats.night} night`);
       if (camStats.cooldown > 0) parts.push(`${camStats.cooldown} during cooldown`);
+      if (camStats.exposure > 0) parts.push(`${camStats.exposure} bad exposure`);
       return parts.join(', ');
     };
 

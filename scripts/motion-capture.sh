@@ -109,6 +109,18 @@ while true; do
     continue
   fi
 
+  # Skip washed-out or pitch-black frames (IR switching, overexposure)
+  brightness=$(convert "$WORK_DIR/current_blur.jpg" -format "%[fx:mean]" info: 2>/dev/null)
+  if [ -n "$brightness" ]; then
+    too_bright=$(echo "$brightness > 0.90" | bc -l 2>/dev/null)
+    too_dark=$(echo "$brightness < 0.05" | bc -l 2>/dev/null)
+    if [ "$too_bright" = "1" ] || [ "$too_dark" = "1" ]; then
+      stat_log "skipped_exposure" "$brightness"
+      sleep "$CHECK_INTERVAL"
+      continue
+    fi
+  fi
+
   # First-run bootstrap
   if [ ! -f "$WORK_DIR/previous.jpg" ]; then
     cp "$WORK_DIR/current_blur.jpg" "$WORK_DIR/previous.jpg"

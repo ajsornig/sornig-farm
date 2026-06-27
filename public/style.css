@@ -2744,6 +2744,13 @@ footer {
   }
 }
 
+#admin-visitor-map {
+  height: 300px;
+  border-radius: 8px;
+  border: 2px solid var(--wood-brown);
+  margin-bottom: 1rem;
+}
+
 .activity-filters {
   display: flex;
   gap: 0.75rem;

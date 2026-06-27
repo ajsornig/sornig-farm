@@ -6,6 +6,7 @@ const db = require('../db');
 const { sendApprovalRequest, sendApprovalNotification, sendPasswordResetEmail, sendBroadcast } = require('../mailer');
 const { atomicWriteJSON } = require('../atomic-write');
 const { getClientIp } = require('../security');
+const { geolocateIP } = require('../geo');
 const { sendPtzCommand, getPresets, gotoPreset, setPreset, removePreset, VALID_OPS } = require('../ptz');
 const { getAiConfig, setAiTrack, setTrackTypes, getPtzGuard, setPtzGuard } = require('../reolink-api');
 const { createRateLimiter } = require('../security');
@@ -67,7 +68,9 @@ router.post('/login', (req, res) => {
   }
   const ip = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.ip;
   if (!result.isAdmin) {
-    db.logActivity(result.username, 'login', { ip });
+    geolocateIP(ip).then(geo => {
+      db.logActivity(result.username, 'login', { ip, ...(geo || {}) });
+    });
   }
   res.json({ ...result, approved: true, requireApproval: config.requireApproval || false });
 });
@@ -167,7 +170,9 @@ router.get('/me', (req, res) => {
   const user = db.getUser(session.username);
   const ip = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.ip;
   if (!session.isAdmin) {
-    db.logActivity(session.username, 'page_visit', { ip });
+    geolocateIP(ip).then(geo => {
+      db.logActivity(session.username, 'page_visit', { ip, ...(geo || {}) });
+    });
   }
   res.json({
     loggedIn: true,
@@ -301,6 +306,29 @@ router.post('/admin/users/:username/email', requireAdmin, (req, res) => {
 
 router.get('/admin/activity', requireAdmin, (req, res) => {
   res.json(db.getActivityLog());
+});
+
+router.get('/admin/visitor-map', requireAdmin, (req, res) => {
+  const log = db.getActivityLog();
+  const userMap = {};
+
+  log.forEach(entry => {
+    if (!entry.details || !entry.details.lat) return;
+    const existing = userMap[entry.username];
+    if (!existing || entry.timestamp > existing.lastSeen) {
+      userMap[entry.username] = {
+        username: entry.username,
+        city: entry.details.city || 'Unknown',
+        country: entry.details.country || 'Unknown',
+        lat: entry.details.lat,
+        lng: entry.details.lng,
+        lastSeen: entry.timestamp,
+        action: entry.action
+      };
+    }
+  });
+
+  res.json(Object.values(userMap));
 });
 
 router.delete('/admin/activity', requireAdmin, (req, res) => {
@@ -951,10 +979,11 @@ router.get('/admin/motion-capture-stats', requireAdmin, (req, res) => {
 
     const [date, cam, status] = parts;
     if (!days[date]) days[date] = {};
-    if (!days[date][cam]) days[date][cam] = { captured: 0, night: 0, skipped: 0, cooldown: 0 };
+    if (!days[date][cam]) days[date][cam] = { captured: 0, night: 0, skipped: 0, cooldown: 0, exposure: 0 };
     if (status === 'captured') days[date][cam].captured++;
     else if (status === 'captured_night') days[date][cam].night++;
     else if (status === 'skipped_cooldown') days[date][cam].cooldown++;
+    else if (status === 'skipped_exposure') days[date][cam].exposure++;
     else if (status === 'skipped') days[date][cam].skipped++;
   });
 
