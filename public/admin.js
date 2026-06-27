@@ -711,8 +711,45 @@ async function loadTimelapseFrames() {
   }
 }
 
+let currentFavorites = [];
+
+async function loadFavoritesList() {
+  try {
+    const res = await fetch('/api/favorites');
+    currentFavorites = await res.json();
+  } catch (err) {
+    currentFavorites = [];
+  }
+}
+
+function isFavorited(cam, filename) {
+  const favName = `${cam}_${filename}`;
+  return currentFavorites.some(f => f.filename === favName);
+}
+
+async function starFrame(cam, filename, source) {
+  try {
+    const res = await fetch('/api/admin/favorites', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      body: JSON.stringify({ cam, filename, source })
+    });
+    if ((await res.json()).success) {
+      await loadFavoritesList();
+      if (source === 'highlights') {
+        loadHighlights();
+      } else {
+        loadMotionCaptureFrames();
+      }
+    }
+  } catch (err) {
+    console.error('Failed to star frame:', err);
+  }
+}
+
 async function loadMotionCaptureFrames() {
   try {
+    await loadFavoritesList();
     const res = await fetch('/api/admin/motion-capture-frames', {
       headers: { 'x-auth-token': authToken }
     });
@@ -720,7 +757,8 @@ async function loadMotionCaptureFrames() {
     const list = document.getElementById('motion-capture-frames-list');
 
     if (frames.length === 0) {
-      list.innerHTML = '<p class="no-pending">No motion-capture frames today yet</p>';
+      list.innerHTML = '<p class="no-pending">No motion-capture frames yet</p>';
+      loadHighlights();
       return;
     }
 
@@ -728,20 +766,23 @@ async function loadMotionCaptureFrames() {
     const coopFrames = frames.filter(f => f.cam === 'coop');
     const chickFrames = frames.filter(f => f.cam === 'chick');
 
-    let html = `<p style="margin-bottom:0.5rem;color:var(--wood-brown);">${frames.length} frames today (${runFrames.length} run, ${coopFrames.length} coop, ${chickFrames.length} chick)</p>`;
+    let html = `<p style="margin-bottom:0.5rem;color:var(--wood-brown);">${frames.length} frames (${runFrames.length} run, ${coopFrames.length} coop, ${chickFrames.length} chick)</p>`;
 
     const renderCamFrames = (camFrames, label) => {
       if (camFrames.length === 0) return '';
       let s = `<h4 style="margin:0.75rem 0 0.5rem;color:var(--forest-green);">${label}</h4>`;
-      s += '<div class="timelapse-grid">' + camFrames.map(frame => `
+      s += '<div class="timelapse-grid">' + camFrames.map(frame => {
+        const starred = isFavorited(frame.cam, frame.filename);
+        return `
         <div class="timelapse-frame-card" id="mframe-${escapeHtml(frame.cam)}-${escapeHtml(frame.filename)}">
           <img src="${frame.url}" alt="${frame.time}" loading="lazy" onclick="openLightbox('${frame.url}','m-${escapeHtml(frame.cam)}','${escapeHtml(frame.filename)}')">
           <div class="timelapse-frame-info">
             <span>${frame.time}</span>
+            <button class="star-btn ${starred ? 'starred' : ''}" onclick="starFrame(${jsArg(frame.cam)},${jsArg(frame.filename)},'frames')" title="${starred ? 'Favorited' : 'Add to favorites'}">${starred ? '★' : '☆'}</button>
             <button class="deny-btn" onclick="deleteMotionCaptureFrame(${jsArg(frame.cam)},${jsArg(frame.filename)})">Delete</button>
           </div>
         </div>
-      `).join('') + '</div>';
+      `}).join('') + '</div>';
       return s;
     };
 
@@ -750,8 +791,55 @@ async function loadMotionCaptureFrames() {
     html += renderCamFrames(chickFrames, 'Chick Cam');
 
     list.innerHTML = html;
+    loadHighlights();
   } catch (err) {
     console.error('Failed to load motion capture frames:', err);
+  }
+}
+
+async function loadHighlights() {
+  try {
+    const res = await fetch('/api/admin/highlights', {
+      headers: { 'x-auth-token': authToken }
+    });
+    const data = await res.json();
+    let container = document.getElementById('highlights-list');
+    if (!container) {
+      const parent = document.getElementById('motion-capture-frames-list');
+      container = document.createElement('div');
+      container.id = 'highlights-list';
+      parent.parentNode.appendChild(container);
+    }
+
+    const dates = Object.keys(data.dates).sort().reverse();
+    if (dates.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+
+    let html = '<h3 style="margin-top:1.5rem;color:var(--wood-brown);">Recent Highlights (past 7 days)</h3>';
+
+    dates.forEach(date => {
+      const items = data.dates[date];
+      const label = new Date(date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+      html += `<h4 style="margin:0.75rem 0 0.5rem;color:var(--forest-green);">${label}</h4>`;
+      html += '<div class="timelapse-grid">' + items.map(item => {
+        const starred = currentFavorites.some(f => f.filename === item.filename);
+        const origFilename = item.filename.replace(/^(run|coop|chick)_/, '');
+        return `
+        <div class="timelapse-frame-card">
+          <img src="${item.url}" alt="${item.cam} ${item.time}" loading="lazy" onclick="openLightbox('${item.url}','hl-${escapeHtml(item.cam)}','${escapeHtml(item.filename)}')">
+          <div class="timelapse-frame-info">
+            <span>${item.cam} ${item.time}</span>
+            <button class="star-btn ${starred ? 'starred' : ''}" onclick="starFrame(${jsArg(item.cam)},${jsArg(origFilename)},'highlights')" title="${starred ? 'Favorited' : 'Add to favorites'}">${starred ? '★' : '☆'}</button>
+          </div>
+        </div>
+      `}).join('') + '</div>';
+    });
+
+    container.innerHTML = html;
+  } catch (err) {
+    console.error('Failed to load highlights:', err);
   }
 }
 
@@ -786,7 +874,6 @@ async function loadCaptureStats() {
     const fmtCam = (camStats) => {
       if (!camStats) return '-';
       const parts = [`${camStats.captured} saved`];
-      if (camStats.night > 0) parts.push(`${camStats.night} night`);
       if (camStats.cooldown > 0) parts.push(`${camStats.cooldown} during cooldown`);
       if (camStats.exposure > 0) parts.push(`${camStats.exposure} bad exposure`);
       return parts.join(', ');

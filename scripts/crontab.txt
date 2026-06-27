@@ -17,6 +17,9 @@
 # Chick growth timelapse — pick best frame from yesterday before stitch deletes them
 5 0 * * * /home/ajsornig/chicken-stream/scripts/chick-growth-pick.sh
 
+# Motion highlights — save 5 best per cam from yesterday, clean up after 7 days
+6 0 * * * /home/ajsornig/chicken-stream/scripts/motion-highlights.sh
+
 # Motion-timelapse stitch (10 min offset to avoid contention with existing)
 # Capture is now via systemd services (motion-capture-run/coop/chick), not cron
 10 0 * * * /home/ajsornig/chicken-stream/scripts/motion-timelapse-stitch.sh --stitch

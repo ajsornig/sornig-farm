@@ -17,7 +17,7 @@ async function init() {
   updateContentVisibility();
   if (isApproved || !requireApproval) {
     await loadCameras();
-    loadRecordings();
+    loadFavorites();
     loadTimelapse();
     loadMotionTimelapse();
     loadChickGrowth();
@@ -60,7 +60,7 @@ async function checkStatus() {
 function updateContentVisibility() {
   const protectedSections = [
     'video-container', 'chat-messages', 'timelapse-section',
-    'motion-timelapse-section', 'chick-growth-section', 'recordings-section', 'visitors-section'
+    'motion-timelapse-section', 'chick-growth-section', 'favorites-section', 'visitors-section'
   ];
 
   if (requireApproval && !isApproved) {
@@ -81,10 +81,6 @@ function updateContentVisibility() {
       const el = document.getElementById(id);
       if (el) el.classList.remove('hidden');
     });
-    const recSection = document.getElementById('recordings-section');
-    if (recSection) {
-      recSection.classList.toggle('hidden', !isAdmin);
-    }
   }
 }
 
@@ -155,7 +151,7 @@ function showLoggedInState(skipContentLoad = false) {
 
   if (!skipContentLoad && (isApproved || !requireApproval)) {
     loadCameras();
-    loadRecordings();
+    loadFavorites();
     loadTimelapse();
     loadChickGrowth();
     loadVisitorStats();
@@ -976,43 +972,56 @@ async function deleteGrowthFrame(filename, event) {
   }
 }
 
-async function loadRecordings() {
-  if (!isAdmin) return;
+async function loadFavorites() {
   try {
-    const res = await fetch('/api/recordings', {
-      headers: { 'x-auth-token': authToken }
-    });
-    if (!res.ok) return;
-    const recordings = await res.json();
+    const res = await fetch('/api/favorites');
+    const favorites = await res.json();
+    const list = document.getElementById('favorites-list');
 
-    const list = document.getElementById('recordings-list');
-    if (!Array.isArray(recordings) || recordings.length === 0) {
-      list.innerHTML = '<p class="no-recordings">No recordings yet</p>';
+    if (!Array.isArray(favorites) || favorites.length === 0) {
+      list.innerHTML = '<p class="no-recordings">No favorites yet — admin can star frames from the Motion Frames tab</p>';
       return;
     }
 
-    list.innerHTML = recordings.map(rec => `
-      <div class="recording-card" onclick="playRecording(${jsArg(rec.filename)})">
-        <div class="filename">${escapeHtml(rec.filename)}</div>
-        <div class="meta">
-          ${formatSize(rec.size)} - ${new Date(rec.created).toLocaleString()}
+    list.innerHTML = '<div class="favorites-grid">' + favorites.map(fav => {
+      const dateMatch = fav.filename.match(/(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})(\d{2})/);
+      const cam = fav.cam || fav.filename.split('_')[0];
+      let label = fav.filename;
+      if (dateMatch) {
+        const d = new Date(dateMatch[1] + 'T12:00:00');
+        label = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + dateMatch[2] + ':' + dateMatch[3];
+      }
+      const deleteBtn = isAdmin ? `<button class="motion-delete-btn" onclick="deleteFavorite(${jsArg(fav.filename)}, event)" title="Remove">x</button>` : '';
+      return `
+        <div class="favorites-thumb" id="fav-${escapeHtml(fav.filename)}">
+          <a href="${fav.url}" target="_blank">
+            <img src="${fav.url}" alt="${label}" loading="lazy">
+          </a>
+          <span class="favorites-label">${escapeHtml(cam)} — ${label}${deleteBtn}</span>
         </div>
-      </div>
-    `).join('');
+      `;
+    }).join('') + '</div>';
   } catch (err) {
-    console.error('Failed to load recordings:', err);
+    console.error('Failed to load favorites:', err);
   }
 }
 
-function playRecording(filename) {
-  const url = `/api/recordings/${encodeURIComponent(filename)}?token=${encodeURIComponent(authToken)}`;
-  playStream(url);
-}
-
-function formatSize(bytes) {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+async function deleteFavorite(filename, event) {
+  event.preventDefault();
+  event.stopPropagation();
+  if (!confirm('Remove this favorite?')) return;
+  try {
+    const res = await fetch(`/api/admin/favorites/${filename}`, {
+      method: 'DELETE',
+      headers: { 'x-auth-token': authToken }
+    });
+    if ((await res.json()).success) {
+      const el = document.getElementById(`fav-${filename}`);
+      if (el) el.remove();
+    }
+  } catch (err) {
+    console.error('Failed to delete favorite:', err);
+  }
 }
 
 async function loadVisitorStats() {

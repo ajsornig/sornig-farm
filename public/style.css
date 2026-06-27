@@ -1249,14 +1249,14 @@ main {
   font-style: italic;
 }
 
-#recordings-section {
+#favorites-section {
   max-width: 1400px;
   margin: 2rem auto;
   padding: 0 1.5rem;
 }
 
-#recordings-section h2 {
-  margin-bottom: 1rem;
+#favorites-section h2 {
+  margin-bottom: 0.25rem;
   color: var(--wood-dark);
   font-size: 1.5rem;
   display: flex;
@@ -1264,40 +1264,82 @@ main {
   gap: 0.5rem;
 }
 
-#recordings-section h2::before {
-  content: "📹";
+#favorites-section h2::before {
+  content: "⭐";
 }
 
-#recordings-list {
+.favorites-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 1rem;
 }
 
-.recording-card {
-  background: var(--cream-dark);
-  border-radius: 10px;
-  padding: 1rem;
-  cursor: pointer;
-  transition: all 0.2s;
+.favorites-thumb {
+  display: block;
+  border-radius: 8px;
+  overflow: hidden;
   border: 2px solid var(--wood-brown);
+  text-decoration: none;
+  transition: all 0.2s;
 }
 
-.recording-card:hover {
+.favorites-thumb:hover {
   transform: translateY(-3px);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
   border-color: var(--forest-green);
 }
 
-.recording-card .filename {
-  font-weight: bold;
-  margin-bottom: 0.5rem;
-  color: var(--wood-dark);
+.favorites-thumb img {
+  width: 100%;
+  display: block;
+  aspect-ratio: 4/3;
+  object-fit: cover;
+  background: #000;
 }
 
-.recording-card .meta {
-  font-size: 0.85rem;
+.favorites-label {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  background: var(--cream-dark);
   color: var(--text-muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.motion-delete-btn {
+  background: var(--barn-red);
+  color: var(--cream);
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 0.1rem 0.4rem;
+  opacity: 0.6;
+}
+
+.motion-delete-btn:hover {
+  opacity: 1;
+}
+
+.star-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0;
+  color: var(--text-muted);
+  transition: color 0.2s;
+}
+
+.star-btn:hover {
+  color: #d4a017;
+}
+
+.star-btn.starred {
+  color: #d4a017;
 }
 
 .no-recordings {
@@ -2207,7 +2249,7 @@ footer {
   #motion-timelapse-section,
   #chick-growth-section,
   #admin-panel,
-  #recordings-section,
+  #favorites-section,
   #visitors-section {
     padding: 0 0.75rem;
     margin: 1rem auto;
@@ -2217,7 +2259,7 @@ footer {
   #motion-timelapse-section h2,
   #chick-growth-section h2,
   #admin-panel h2,
-  #recordings-section h2,
+  #favorites-section h2,
   #visitors-section h2 {
     font-size: 1.2rem;
   }
@@ -2345,8 +2387,9 @@ footer {
     font-size: 0.65rem;
   }
 
-  #recordings-list {
-    grid-template-columns: 1fr;
+  .favorites-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.75rem;
   }
 
   .recording-card {

@@ -402,38 +402,72 @@ router.get('/deny/:token', async (req, res) => {
   res.send(`<h1>Denied</h1><p>User &quot;${escapeHtml(user.username)}&quot; has been denied and removed.</p><p><a href="/">Go to site</a></p>`);
 });
 
-router.get('/recordings', requireAdmin, (req, res) => {
-  const recordingsDir = path.join(__dirname, '../../recordings');
+// --- Favorites ---
 
-  if (!fs.existsSync(recordingsDir)) {
-    return res.json([]);
-  }
-
-  const files = fs.readdirSync(recordingsDir)
-    .filter(f => f.endsWith('.mp4') || f.endsWith('.m3u8'))
-    .map(filename => {
-      const filepath = path.join(recordingsDir, filename);
-      const stats = fs.statSync(filepath);
-      return {
-        filename,
-        size: stats.size,
-        created: stats.birthtime.toISOString()
-      };
-    })
-    .sort((a, b) => new Date(b.created) - new Date(a.created));
-
-  res.json(files);
+router.get('/favorites', (req, res) => {
+  const favorites = db.getFavorites();
+  const favDir = path.join(__dirname, '../../public/favorites');
+  const result = favorites.filter(f => fs.existsSync(path.join(favDir, f.filename))).map(f => ({
+    filename: f.filename,
+    cam: f.cam,
+    starred: f.starred,
+    url: `/favorites/${f.filename}`
+  }));
+  res.json(result);
 });
 
-router.get('/recordings/:filename', requireAdmin, (req, res) => {
-  const filename = path.basename(req.params.filename);
-  const filepath = path.join(__dirname, '../../recordings', filename);
+router.post('/admin/favorites', requireAdmin, (req, res) => {
+  const { cam, filename, source } = req.body;
+  if (!cam || !filename) return res.status(400).json({ error: 'Missing cam or filename' });
+  if (!['run', 'coop', 'chick'].includes(cam)) return res.status(400).json({ error: 'Invalid cam' });
 
-  if (!fs.existsSync(filepath)) {
-    return res.status(404).json({ error: 'Recording not found' });
+  const favFilename = `${cam}_${filename}`;
+  const favDir = path.join(__dirname, '../../public/favorites');
+  if (!fs.existsSync(favDir)) fs.mkdirSync(favDir, { recursive: true });
+
+  let srcPath;
+  if (source === 'highlights') {
+    srcPath = path.join(__dirname, '../../public/highlights', `${cam}_${filename}`);
+  } else {
+    srcPath = path.join(__dirname, '../../motion-timelapse', `frames-${cam}`, filename);
   }
 
-  res.sendFile(filepath);
+  if (!fs.existsSync(srcPath)) return res.status(404).json({ error: 'Source frame not found' });
+
+  fs.copyFileSync(srcPath, path.join(favDir, favFilename));
+  db.addFavorite(favFilename, cam);
+  res.json({ success: true, filename: favFilename });
+});
+
+router.delete('/admin/favorites/:filename', requireAdmin, (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const filepath = path.join(__dirname, '../../public/favorites', filename);
+
+  if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
+  db.removeFavorite(filename);
+  res.json({ success: true });
+});
+
+// --- Highlights ---
+
+router.get('/admin/highlights', requireAdmin, (req, res) => {
+  const hlDir = path.join(__dirname, '../../public/highlights');
+  if (!fs.existsSync(hlDir)) return res.json({ dates: {} });
+
+  const files = fs.readdirSync(hlDir)
+    .filter(f => f.endsWith('.jpg'))
+    .sort();
+
+  const dates = {};
+  files.forEach(f => {
+    const match = f.match(/^(run|coop|chick)_(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})(\d{2})\.jpg$/);
+    if (!match) return;
+    const [, cam, date, h, m, s] = match;
+    if (!dates[date]) dates[date] = [];
+    dates[date].push({ filename: f, cam, time: `${h}:${m}:${s}`, url: `/highlights/${f}` });
+  });
+
+  res.json({ dates });
 });
 
 router.get('/timelapse', (req, res) => {
@@ -545,6 +579,7 @@ router.delete('/admin/timelapse-frames/:cam/:filename', requireAdmin, (req, res)
 router.get('/admin/motion-capture-frames', requireAdmin, (req, res) => {
   const now = new Date();
   const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  const yesterday = new Date(now.getTime() - now.getTimezoneOffset() * 60000 - 86400000).toISOString().slice(0, 10);
   const cams = [
     { dir: path.join(__dirname, '../../motion-timelapse/frames-run'), label: 'run' },
     { dir: path.join(__dirname, '../../motion-timelapse/frames-coop'), label: 'coop' },
@@ -554,7 +589,7 @@ router.get('/admin/motion-capture-frames', requireAdmin, (req, res) => {
   const files = cams.flatMap(cam => {
     if (!fs.existsSync(cam.dir)) return [];
     return fs.readdirSync(cam.dir)
-      .filter(f => f.endsWith('.jpg') && f.startsWith(today))
+      .filter(f => f.endsWith('.jpg') && (f.startsWith(today) || f.startsWith(yesterday)))
       .sort()
       .map(filename => ({
         filename,
@@ -894,9 +929,8 @@ router.get('/admin/motion-capture-stats', requireAdmin, (req, res) => {
 
     const [date, cam, status] = parts;
     if (!days[date]) days[date] = {};
-    if (!days[date][cam]) days[date][cam] = { captured: 0, night: 0, skipped: 0, cooldown: 0, exposure: 0 };
+    if (!days[date][cam]) days[date][cam] = { captured: 0, skipped: 0, cooldown: 0, exposure: 0 };
     if (status === 'captured') days[date][cam].captured++;
-    else if (status === 'captured_night') days[date][cam].night++;
     else if (status === 'skipped_cooldown') days[date][cam].cooldown++;
     else if (status === 'skipped_exposure') days[date][cam].exposure++;
     else if (status === 'skipped') days[date][cam].skipped++;

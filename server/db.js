@@ -454,6 +454,28 @@ function getUserByUnsubscribeToken(token) {
   return null;
 }
 
+function getFavorites() {
+  if (!data.favorites) data.favorites = [];
+  return [...data.favorites].sort((a, b) => b.starred - a.starred);
+}
+
+function addFavorite(filename, cam) {
+  if (!data.favorites) data.favorites = [];
+  if (data.favorites.some(f => f.filename === filename)) return false;
+  data.favorites = [...data.favorites, { filename, cam, starred: Date.now() }];
+  saveData();
+  return true;
+}
+
+function removeFavorite(filename) {
+  if (!data.favorites) return false;
+  const before = data.favorites.length;
+  data.favorites = data.favorites.filter(f => f.filename !== filename);
+  if (data.favorites.length === before) return false;
+  saveData();
+  return true;
+}
+
 module.exports = {
   initDb,
   createUser,
@@ -488,5 +510,8 @@ module.exports = {
   setPtzAccess,
   setEmailOptOut,
   getUnsubscribeToken,
-  getUserByUnsubscribeToken
+  getUserByUnsubscribeToken,
+  getFavorites,
+  addFavorite,
+  removeFavorite
 };
