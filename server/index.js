@@ -6,7 +6,7 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 const { WebSocketServer } = require('ws');
 const config = require('../config.json');
-const { initDb, getSession, hasPtzAccess } = require('./db');
+const { initDb, getSession, hasPtzAccess, hasPtzDriving } = require('./db');
 const { setupChat } = require('./chat');
 const apiRoutes = require('./routes/api');
 const { initMailer } = require('./mailer');
@@ -105,6 +105,7 @@ app.get('/config/cameras', (req, res) => {
   const session = token ? getSession(token) : null;
   const isAdminUser = session && session.isAdmin;
   const canPtz = session && hasPtzAccess(session.username);
+  const canDrive = session && hasPtzDriving(session.username);
 
   const cameras = config.cameras
     .filter(cam => cam.enabled)
@@ -116,6 +117,7 @@ app.get('/config/cameras', (req, res) => {
     .map(({ id, name, streamUrl, ptz }) => ({
       id, name, streamUrl,
       hasPtz: canPtz && !!(ptz && ptz.ip),
+      hasPtzDriving: canDrive && !!(ptz && ptz.ip),
       ptzCapabilities: canPtz && ptz && ptz.ip ? (ptz.capabilities || ['pan', 'tilt']) : [],
       hidden: isCameraHidden(id)
     }));

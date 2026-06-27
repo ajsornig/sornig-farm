@@ -171,6 +171,7 @@ function getAllUsers() {
     isAdmin: u.isAdmin,
     approved: u.approved !== false,
     ptzAccess: u.ptzAccess || false,
+    ptzDriving: u.ptzDriving || false,
     createdAt: u.createdAt
   }));
 }
@@ -181,10 +182,17 @@ function hasPtzAccess(username) {
   return user.isAdmin || user.ptzAccess === true;
 }
 
-function setPtzAccess(username, enabled) {
+function hasPtzDriving(username) {
+  const user = data.users[username.toLowerCase()];
+  if (!user) return false;
+  return user.isAdmin || (user.ptzAccess === true && user.ptzDriving === true);
+}
+
+function setPtzAccess(username, enabled, driving) {
   const usernameLower = username.toLowerCase();
   if (!data.users[usernameLower]) return { error: 'User not found' };
   data.users[usernameLower].ptzAccess = !!enabled;
+  data.users[usernameLower].ptzDriving = enabled ? !!driving : false;
   saveData();
   return { success: true };
 }
@@ -507,6 +515,7 @@ module.exports = {
   deleteActivityEntry,
   clearActivityLog,
   hasPtzAccess,
+  hasPtzDriving,
   setPtzAccess,
   setEmailOptOut,
   getUnsubscribeToken,

@@ -359,6 +359,13 @@ function renderUsersTable() {
       <td>
         <div class="action-buttons">
           ${user.isAdmin ? '' : `<button class="admin-btn ${user.ptzAccess ? 'cam-hide-btn' : 'cam-show-btn'}" onclick="togglePtzAccess(${jsArg(user.username)}, ${user.ptzAccess ? 'false' : 'true'})">${user.ptzAccess ? 'Revoke PTZ' : 'Grant PTZ'}</button>`}
+          ${(!user.isAdmin && user.ptzAccess) ? `
+            <label class="driving-toggle" title="Allow camera driving (d-pad, zoom)">
+              <input type="checkbox" ${user.ptzDriving ? 'checked' : ''}
+                onchange="togglePtzDriving(${jsArg(user.username)}, this.checked)">
+              Driving
+            </label>
+          ` : ''}
           <button class="reset-pwd-btn" onclick="resetPassword(${jsArg(user.username)})">Reset Password</button>
           <button class="delete-user-btn" onclick="deleteUser(${jsArg(user.username)})"
             ${user.username === currentUser ? 'disabled title="Cannot delete yourself"' : ''}>Delete</button>
@@ -1191,12 +1198,12 @@ async function loadInfraData() {
 
 // --- PTZ Access Management ---
 
-async function togglePtzAccess(username, enabled) {
+async function togglePtzAccess(username, enabled, driving) {
   try {
     const res = await fetch(`/api/admin/users/${encodeURIComponent(username)}/ptz`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
-      body: JSON.stringify({ enabled })
+      body: JSON.stringify({ enabled, driving: !!driving })
     });
     const data = await res.json();
     if (data.success) {
@@ -1204,6 +1211,20 @@ async function togglePtzAccess(username, enabled) {
     }
   } catch (err) {
     console.error('Failed to toggle PTZ access:', err);
+  }
+}
+
+async function togglePtzDriving(username, driving) {
+  try {
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(username)}/ptz`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      body: JSON.stringify({ enabled: true, driving })
+    });
+    const data = await res.json();
+    if (data.success) loadAdminData();
+  } catch (err) {
+    console.error('Failed to toggle PTZ driving:', err);
   }
 }
 

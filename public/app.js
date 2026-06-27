@@ -1189,7 +1189,7 @@ function updatePtzControls(cam) {
     container = createPtzControls();
   }
 
-  if (cam && cam.hasPtz && authToken) {
+  if (cam && cam.hasPtz && authToken && (cam.hasPtzDriving || isAdmin)) {
     container.classList.remove('hidden');
     container.dataset.camId = cam.id;
     const zoomBtns = container.querySelector('.ptz-zoom');
@@ -1302,7 +1302,7 @@ function updatePtzExtended(cam) {
       section.classList.toggle('hidden', !isAdmin);
     });
     loadPresets();
-    loadTracking();
+    if (isAdmin) loadTracking();
     if (isAdmin) loadGuard();
   } else {
     el.classList.add('hidden');
