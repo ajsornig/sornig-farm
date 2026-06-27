@@ -64,23 +64,18 @@
 
       <div id="admin-media" class="admin-content hidden">
         <div class="media-sub-tabs">
-          <button class="media-sub-tab active" data-sub="chicks">Chick Album</button>
+          <button class="media-sub-tab active" data-sub="growth">Growth Picks</button>
           <button class="media-sub-tab" data-sub="motion">Night Motion</button>
           <button class="media-sub-tab" data-sub="timelapse">Timelapse</button>
           <button class="media-sub-tab" data-sub="motion-frames">Motion Frames</button>
           <button class="media-sub-tab" data-sub="capture-stats">Capture Stats</button>
         </div>
 
-        <div id="media-chicks" class="media-sub-content">
-          <h3>Chick Album - Pending Captures</h3>
-          <p class="admin-note">Motion captures from the Chick Cam. Approve the good ones into the public chick album.</p>
-          <div class="motion-admin-actions">
-            <button id="chick-approve-all-btn" class="admin-btn cam-show-btn">Approve All</button>
-            <button id="chick-reject-all-btn" class="admin-btn">Reject All</button>
-          </div>
-          <div id="chick-pending-list"></div>
-          <h3 style="margin-top:1.5rem;color:var(--wood-brown);">Album (<span id="chick-album-count">0</span> photos)</h3>
-          <div id="chick-album-list"></div>
+        <div id="media-growth" class="media-sub-content">
+          <h3>Growth Picks - Pending</h3>
+          <div id="growth-pending-list"></div>
+          <h3 style="margin-top:1.5rem;color:var(--wood-brown);">Chosen Frames (<span id="growth-chosen-count">0</span>)</h3>
+          <div id="growth-chosen-list"></div>
         </div>
 
         <div id="media-motion" class="media-sub-content hidden">
@@ -160,6 +155,6 @@
     <p>Sornig Farm Admin Panel</p>
   </footer>
 
-  <script src="admin.js?v=14"></script>
+  <script src="admin.js?v=15"></script>
 </body>
 </html>

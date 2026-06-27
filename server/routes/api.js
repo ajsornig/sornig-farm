@@ -9,6 +9,7 @@ const { getClientIp } = require('../security');
 const { sendPtzCommand, getPresets, gotoPreset, setPreset, removePreset, VALID_OPS } = require('../ptz');
 const { getAiConfig, setAiTrack, setTrackTypes, getPtzGuard, setPtzGuard } = require('../reolink-api');
 const { createRateLimiter } = require('../security');
+const { execSync } = require('child_process');
 
 const router = express.Router();
 
@@ -657,121 +658,120 @@ router.delete('/admin/motion-captures/:filename', requireAdmin, (req, res) => {
   res.json({ success: true });
 });
 
-// --- Chick Album ---
+// --- Chick Growth Timelapse ---
 
-const CHICK_ALBUM_RE = /^chick-\d{4}-\d{2}-\d{2}_\d{6}\.jpg$/;
+router.get('/chick-growth', (req, res) => {
+  const growthDir = path.join(__dirname, '../../public/chick-growth');
+  if (!fs.existsSync(growthDir)) return res.json({ frames: [], video: null });
 
-router.get('/chick-album', (req, res) => {
-  const albumDir = path.join(__dirname, '../../public/chick-album');
+  const frames = fs.readdirSync(growthDir)
+    .filter(f => f.endsWith('.jpg') && !f.includes('_'))  // YYYY-MM-DD.jpg only, not pending _1 _2 etc
+    .sort()
+    .map(filename => ({
+      filename,
+      url: `/chick-growth/${filename}`,
+      date: filename.replace('.jpg', '')
+    }));
 
-  if (!fs.existsSync(albumDir)) {
-    return res.json([]);
-  }
+  const videoFile = 'chick-growth.mp4';
+  const videoPath = path.join(growthDir, videoFile);
+  const video = fs.existsSync(videoPath) ? { url: `/chick-growth/${videoFile}`, size: fs.statSync(videoPath).size } : null;
 
-  const files = fs.readdirSync(albumDir)
-    .filter(f => f.endsWith('.jpg'))
-    .map(filename => {
-      const stats = fs.statSync(path.join(albumDir, filename));
-      return {
-        filename,
-        url: `/chick-album/${filename}`,
-        created: stats.birthtime.toISOString()
-      };
-    })
-    .sort((a, b) => new Date(b.created) - new Date(a.created))
-    .slice(0, 100);
-
-  res.json(files);
+  res.json({ frames, video });
 });
 
-router.get('/admin/chick-album/pending', requireAdmin, (req, res) => {
-  const pendingDir = path.join(__dirname, '../../public/chick-album/pending');
+router.get('/admin/chick-growth/pending', requireAdmin, (req, res) => {
+  const pendingDir = path.join(__dirname, '../../public/chick-growth/pending');
+  if (!fs.existsSync(pendingDir)) return res.json({ dates: {} });
 
-  if (!fs.existsSync(pendingDir)) {
-    return res.json([]);
-  }
+  const files = fs.readdirSync(pendingDir).filter(f => f.endsWith('.jpg')).sort();
+  const dates = {};
 
-  const files = fs.readdirSync(pendingDir)
-    .filter(f => f.endsWith('.jpg'))
-    .map(filename => {
-      const stats = fs.statSync(path.join(pendingDir, filename));
-      return {
-        filename,
-        url: `/chick-album/pending/${filename}`,
-        created: stats.birthtime.toISOString()
-      };
-    })
-    .sort((a, b) => new Date(b.created) - new Date(a.created));
+  files.forEach(f => {
+    // Format: YYYY-MM-DD_N.jpg
+    const match = f.match(/^(\d{4}-\d{2}-\d{2})_(\d)\.jpg$/);
+    if (!match) return;
+    const [, date, num] = match;
+    if (!dates[date]) dates[date] = [];
+    dates[date].push({
+      filename: f,
+      number: parseInt(num),
+      url: `/chick-growth/pending/${f}`
+    });
+  });
 
-  res.json(files);
+  // Check which dates already have a chosen frame
+  const growthDir = path.join(__dirname, '../../public/chick-growth');
+  Object.keys(dates).forEach(date => {
+    const chosenPath = path.join(growthDir, `${date}.jpg`);
+    dates[date].chosen = fs.existsSync(chosenPath) ? 3 : null;  // default auto-pick is #3
+    // Figure out which candidate matches the current chosen frame
+    if (fs.existsSync(chosenPath)) {
+      const chosenSize = fs.statSync(chosenPath).size;
+      const match = dates[date].find(c => {
+        const candidatePath = path.join(pendingDir, c.filename);
+        return fs.existsSync(candidatePath) && fs.statSync(candidatePath).size === chosenSize;
+      });
+      if (match) dates[date].chosen = match.number;
+    }
+  });
+
+  res.json({ dates });
 });
 
-router.post('/admin/chick-album/pending/:filename/approve', requireAdmin, (req, res) => {
+router.post('/admin/chick-growth/pending/:date/choose/:number', requireAdmin, (req, res) => {
+  const { date, number } = req.params;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^[1-5]$/.test(number)) {
+    return res.status(400).json({ error: 'Invalid date or number' });
+  }
+
+  const pendingDir = path.join(__dirname, '../../public/chick-growth/pending');
+  const growthDir = path.join(__dirname, '../../public/chick-growth');
+  const candidatePath = path.join(pendingDir, `${date}_${number}.jpg`);
+  const chosenPath = path.join(growthDir, `${date}.jpg`);
+
+  if (!fs.existsSync(candidatePath)) {
+    return res.status(404).json({ error: 'Candidate not found' });
+  }
+
+  fs.copyFileSync(candidatePath, chosenPath);
+
+  // Regenerate growth video
+  try {
+    execSync('/home/ajsornig/chicken-stream/scripts/chick-growth-pick.sh --stitch', { timeout: 30000 });
+  } catch (err) {
+    console.error('Growth stitch failed:', err.message);
+  }
+
+  res.json({ success: true, chosen: parseInt(number) });
+});
+
+router.post('/admin/chick-growth/pending/:date/confirm', requireAdmin, (req, res) => {
+  const { date } = req.params;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ error: 'Invalid date' });
+  }
+
+  const pendingDir = path.join(__dirname, '../../public/chick-growth/pending');
+
+  // Delete all pending candidates for this date
+  for (let i = 1; i <= 5; i++) {
+    const candidatePath = path.join(pendingDir, `${date}_${i}.jpg`);
+    if (fs.existsSync(candidatePath)) fs.unlinkSync(candidatePath);
+  }
+
+  res.json({ success: true });
+});
+
+router.delete('/admin/chick-growth/:filename', requireAdmin, (req, res) => {
   const filename = path.basename(req.params.filename);
-  if (!CHICK_ALBUM_RE.test(filename)) {
+  if (!/^\d{4}-\d{2}-\d{2}\.jpg$/.test(filename)) {
     return res.status(400).json({ error: 'Invalid filename' });
   }
-  const pendingDir = path.join(__dirname, '../../public/chick-album/pending');
-  const albumDir = path.join(__dirname, '../../public/chick-album');
-  const src = path.join(pendingDir, filename);
-  const dest = path.join(albumDir, filename);
 
-  if (!fs.existsSync(src)) {
-    return res.status(404).json({ error: 'File not found' });
-  }
-
-  fs.renameSync(src, dest);
-  res.json({ success: true });
-});
-
-router.post('/admin/chick-album/pending/:filename/reject', requireAdmin, (req, res) => {
-  const filename = path.basename(req.params.filename);
-  const pendingDir = path.join(__dirname, '../../public/chick-album/pending');
-  const filepath = path.join(pendingDir, filename);
-
+  const filepath = path.join(__dirname, '../../public/chick-growth', filename);
   if (!fs.existsSync(filepath)) {
-    return res.status(404).json({ error: 'File not found' });
-  }
-
-  fs.unlinkSync(filepath);
-  res.json({ success: true });
-});
-
-router.post('/admin/chick-album/approve-all', requireAdmin, (req, res) => {
-  const pendingDir = path.join(__dirname, '../../public/chick-album/pending');
-  const albumDir = path.join(__dirname, '../../public/chick-album');
-
-  if (!fs.existsSync(pendingDir)) {
-    return res.json({ success: true, count: 0 });
-  }
-
-  const files = fs.readdirSync(pendingDir).filter(f => CHICK_ALBUM_RE.test(f));
-  for (const f of files) {
-    fs.renameSync(path.join(pendingDir, f), path.join(albumDir, f));
-  }
-  res.json({ success: true, count: files.length });
-});
-
-router.post('/admin/chick-album/reject-all', requireAdmin, (req, res) => {
-  const pendingDir = path.join(__dirname, '../../public/chick-album/pending');
-
-  if (!fs.existsSync(pendingDir)) {
-    return res.json({ success: true, count: 0 });
-  }
-
-  const files = fs.readdirSync(pendingDir).filter(f => f.endsWith('.jpg'));
-  for (const f of files) {
-    fs.unlinkSync(path.join(pendingDir, f));
-  }
-  res.json({ success: true, count: files.length });
-});
-
-router.delete('/admin/chick-album/:filename', requireAdmin, (req, res) => {
-  const filename = path.basename(req.params.filename);
-  const filepath = path.join(__dirname, '../../public/chick-album', filename);
-
-  if (!fs.existsSync(filepath)) {
-    return res.status(404).json({ error: 'File not found' });
+    return res.status(404).json({ error: 'Frame not found' });
   }
 
   fs.unlinkSync(filepath);

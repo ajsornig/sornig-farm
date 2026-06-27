@@ -138,6 +138,7 @@ function setupAdminTabs() {
     stats: 'dashboard',
     motion: 'media',
     chicks: 'media',
+    growth: 'media',
     timelapse: 'media',
     chat: 'comms',
     broadcast: 'comms',
@@ -175,8 +176,6 @@ function setupAdminTabs() {
   // Wire up buttons
   document.getElementById('admin-clear-btn').onclick = clearChat;
   document.getElementById('reject-all-btn').onclick = rejectAllMotion;
-  document.getElementById('chick-approve-all-btn').onclick = approveAllChicks;
-  document.getElementById('chick-reject-all-btn').onclick = rejectAllChicks;
 
   // Media sub-tabs
   setupMediaSubTabs();
@@ -201,13 +200,13 @@ function setupMediaSubTabs() {
 
       const sub = tab.dataset.sub;
       localStorage.setItem('adminMediaSubTab', sub);
-      document.getElementById('media-chicks').classList.toggle('hidden', sub !== 'chicks');
+      document.getElementById('media-growth').classList.toggle('hidden', sub !== 'growth');
       document.getElementById('media-motion').classList.toggle('hidden', sub !== 'motion');
       document.getElementById('media-timelapse').classList.toggle('hidden', sub !== 'timelapse');
       document.getElementById('media-motion-frames').classList.toggle('hidden', sub !== 'motion-frames');
       document.getElementById('media-capture-stats').classList.toggle('hidden', sub !== 'capture-stats');
 
-      if (sub === 'chicks') loadChickAlbumAdmin();
+      if (sub === 'growth') loadGrowthPicksAdmin();
       if (sub === 'motion') loadMotionPending();
       if (sub === 'timelapse') loadTimelapseFrames();
       if (sub === 'motion-frames') loadMotionCaptureFrames();
@@ -217,7 +216,8 @@ function setupMediaSubTabs() {
 }
 
 function loadMediaTab() {
-  const saved = localStorage.getItem('adminMediaSubTab');
+  let saved = localStorage.getItem('adminMediaSubTab');
+  if (saved === 'chicks') saved = 'growth';
   const target = saved ? document.querySelector(`.media-sub-tab[data-sub="${saved}"]`) : null;
   const activeSub = target || document.querySelector('.media-sub-tab.active');
   if (activeSub) activeSub.click();
@@ -1201,153 +1201,119 @@ async function sendBroadcast() {
   }
 }
 
-// --- Chick Album ---
+// --- Chick Growth Timelapse ---
 
-async function loadChickAlbumAdmin() {
-  await Promise.all([loadChickPending(), loadChickAlbum()]);
+async function loadGrowthPicksAdmin() {
+  await Promise.all([loadGrowthPending(), loadGrowthChosen()]);
 }
 
-async function loadChickPending() {
+async function loadGrowthPending() {
   try {
-    const res = await fetch('/api/admin/chick-album/pending', {
+    const res = await fetch('/api/admin/chick-growth/pending', {
       headers: { 'x-auth-token': authToken }
     });
-    const captures = await res.json();
-    const list = document.getElementById('chick-pending-list');
+    const data = await res.json();
+    const list = document.getElementById('growth-pending-list');
+    const dates = Object.keys(data.dates || {}).sort((a, b) => b.localeCompare(a));
 
-    if (captures.length === 0) {
-      list.innerHTML = '<p class="no-pending">No pending chick captures</p>';
+    if (dates.length === 0) {
+      list.innerHTML = '<p class="no-pending">No pending growth picks</p>';
       return;
     }
 
-    list.innerHTML = captures.map(cap => {
-      const date = new Date(cap.created);
-      const label = date.toLocaleString();
-      return `
-        <div class="motion-pending-item" id="chick-${escapeHtml(cap.filename)}">
-          <img src="${cap.url}" alt="Chick capture" loading="lazy">
-          <div class="motion-pending-info">
-            <span>${label}</span>
-            <div class="motion-pending-actions">
-              <button class="approve-btn" onclick="approveChick(${jsArg(cap.filename)})">Approve</button>
-              <button class="deny-btn" onclick="rejectChick(${jsArg(cap.filename)})">Reject</button>
-            </div>
+    list.innerHTML = dates.map(date => {
+      const candidates = data.dates[date];
+      const chosen = candidates.chosen || 3;
+      const dateLabel = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+      const thumbs = candidates.filter(c => c.filename).map(c => {
+        const isChosen = c.number === chosen;
+        return `
+          <div class="growth-candidate ${isChosen ? 'growth-chosen' : ''}" onclick="chooseGrowthFrame(${jsArg(date)}, ${c.number})">
+            <img src="${c.url}" alt="Candidate ${c.number}" loading="lazy">
+            <span>${isChosen ? '★ Chosen' : '#' + c.number}</span>
           </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="growth-date-group" id="growth-pending-${escapeHtml(date)}">
+          <div class="growth-date-header">
+            <strong>${dateLabel}</strong>
+            <button class="approve-btn" onclick="confirmGrowthPick(${jsArg(date)})">Confirm</button>
+          </div>
+          <div class="growth-candidates">${thumbs}</div>
         </div>
       `;
     }).join('');
   } catch (err) {
-    console.error('Failed to load chick pending:', err);
+    console.error('Failed to load growth pending:', err);
   }
 }
 
-async function loadChickAlbum() {
+async function loadGrowthChosen() {
   try {
-    const res = await fetch('/api/chick-album');
-    const captures = await res.json();
-    const list = document.getElementById('chick-album-list');
-    document.getElementById('chick-album-count').textContent = captures.length;
+    const res = await fetch('/api/chick-growth');
+    const data = await res.json();
+    const list = document.getElementById('growth-chosen-list');
+    document.getElementById('growth-chosen-count').textContent = data.frames.length;
 
-    if (captures.length === 0) {
-      list.innerHTML = '<p class="no-pending">No approved photos yet</p>';
+    if (data.frames.length === 0) {
+      list.innerHTML = '<p class="no-pending">No chosen frames yet</p>';
       return;
     }
 
-    list.innerHTML = '<div class="timelapse-grid">' + captures.map(cap => {
-      const date = new Date(cap.created);
-      const label = date.toLocaleString();
+    list.innerHTML = '<div class="timelapse-grid">' + data.frames.map(frame => {
+      const dateLabel = new Date(frame.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       return `
-        <div class="timelapse-frame-card" id="album-${escapeHtml(cap.filename)}">
-          <img src="${cap.url}" alt="Chick ${label}" loading="lazy" onclick="window.open('${cap.url}','_blank')">
+        <div class="timelapse-frame-card">
+          <img src="${frame.url}" alt="Growth ${dateLabel}" loading="lazy" onclick="window.open('${frame.url}','_blank')">
           <div class="timelapse-frame-info">
-            <span>${label}</span>
-            <button class="deny-btn" onclick="deleteChickAlbum(${jsArg(cap.filename)})">Delete</button>
+            <span>${dateLabel}</span>
+            <button class="deny-btn" onclick="deleteGrowthFrame(${jsArg(frame.filename)})">Delete</button>
           </div>
         </div>
       `;
     }).join('') + '</div>';
   } catch (err) {
-    console.error('Failed to load chick album:', err);
+    console.error('Failed to load growth chosen:', err);
   }
 }
 
-async function approveChick(filename) {
+async function chooseGrowthFrame(date, number) {
   try {
-    const res = await fetch(`/api/admin/chick-album/pending/${filename}/approve`, {
+    await fetch(`/api/admin/chick-growth/pending/${date}/choose/${number}`, {
       method: 'POST',
       headers: { 'x-auth-token': authToken }
     });
-    if ((await res.json()).success) {
-      const el = document.getElementById(`chick-${filename}`);
-      if (el) el.remove();
-      loadChickAlbum();
-    }
+    loadGrowthPicksAdmin();
   } catch (err) {
-    console.error('Failed to approve chick:', err);
+    console.error('Failed to choose growth frame:', err);
   }
 }
 
-async function rejectChick(filename) {
+async function confirmGrowthPick(date) {
   try {
-    const res = await fetch(`/api/admin/chick-album/pending/${filename}/reject`, {
+    await fetch(`/api/admin/chick-growth/pending/${date}/confirm`, {
       method: 'POST',
       headers: { 'x-auth-token': authToken }
     });
-    if ((await res.json()).success) {
-      const el = document.getElementById(`chick-${filename}`);
-      if (el) el.remove();
-    }
+    loadGrowthPicksAdmin();
   } catch (err) {
-    console.error('Failed to reject chick:', err);
+    console.error('Failed to confirm growth pick:', err);
   }
 }
 
-async function approveAllChicks() {
-  if (!confirm('Approve all pending chick captures into the album?')) return;
+async function deleteGrowthFrame(filename) {
+  if (!confirm('Delete this growth frame?')) return;
   try {
-    const res = await fetch('/api/admin/chick-album/approve-all', {
-      method: 'POST',
-      headers: { 'x-auth-token': authToken }
-    });
-    const data = await res.json();
-    if (data.success) {
-      loadChickAlbumAdmin();
-    }
-  } catch (err) {
-    console.error('Failed to approve all chicks:', err);
-  }
-}
-
-async function rejectAllChicks() {
-  if (!confirm('Reject all pending chick captures?')) return;
-  try {
-    const res = await fetch('/api/admin/chick-album/reject-all', {
-      method: 'POST',
-      headers: { 'x-auth-token': authToken }
-    });
-    const data = await res.json();
-    if (data.success) {
-      loadChickPending();
-    }
-  } catch (err) {
-    console.error('Failed to reject all chicks:', err);
-  }
-}
-
-async function deleteChickAlbum(filename) {
-  try {
-    const res = await fetch(`/api/admin/chick-album/${filename}`, {
+    await fetch(`/api/admin/chick-growth/${filename}`, {
       method: 'DELETE',
       headers: { 'x-auth-token': authToken }
     });
-    if ((await res.json()).success) {
-      const el = document.getElementById(`album-${filename}`);
-      if (el) el.remove();
-      const count = document.getElementById('chick-album-count');
-      count.textContent = Math.max(0, parseInt(count.textContent) - 1);
-    }
+    loadGrowthPicksAdmin();
   } catch (err) {
-    console.error('Failed to delete chick album photo:', err);
+    console.error('Failed to delete growth frame:', err);
   }
 }
 

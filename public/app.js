@@ -21,7 +21,7 @@ async function init() {
     loadTimelapse();
     loadMotionTimelapse();
     loadMotionCaptures();
-    loadChickAlbum();
+    loadChickGrowth();
     loadVisitorStats();
   }
   loadWeather();
@@ -61,7 +61,7 @@ async function checkStatus() {
 function updateContentVisibility() {
   const protectedSections = [
     'video-container', 'chat-messages', 'timelapse-section',
-    'motion-timelapse-section', 'chick-album-section', 'motion-section', 'recordings-section', 'visitors-section'
+    'motion-timelapse-section', 'chick-growth-section', 'motion-section', 'recordings-section', 'visitors-section'
   ];
 
   if (requireApproval && !isApproved) {
@@ -159,7 +159,7 @@ function showLoggedInState(skipContentLoad = false) {
     loadRecordings();
     loadTimelapse();
     loadMotionCaptures();
-    loadChickAlbum();
+    loadChickGrowth();
     loadVisitorStats();
   }
 }
@@ -960,49 +960,67 @@ async function deleteMotionCapture(filename, event) {
   }
 }
 
-async function loadChickAlbum() {
+async function loadChickGrowth() {
   try {
-    const res = await fetch('/api/chick-album');
-    const captures = await res.json();
-    const gallery = document.getElementById('chick-album-gallery');
+    const res = await fetch('/api/chick-growth');
+    const data = await res.json();
+    const container = document.getElementById('chick-growth-content');
 
-    if (captures.length === 0) {
-      gallery.innerHTML = '<p class="no-recordings">No chick photos yet — the motion detector is watching!</p>';
+    if (data.frames.length === 0 && !data.video) {
+      container.innerHTML = '<p class="no-recordings">Growth timelapse starting soon — one photo saved each day</p>';
       return;
     }
 
-    gallery.innerHTML = captures.map(cap => {
-      const date = new Date(cap.created);
-      const label = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-      const deleteBtn = isAdmin ? `<button class="motion-delete-btn" onclick="deleteChickPhoto(${jsArg(cap.filename)}, event)" title="Delete">x</button>` : '';
-      return `
-        <div class="motion-thumb" id="chick-${escapeHtml(cap.filename)}">
-          <a href="${cap.url}" target="_blank">
-            <img src="${cap.url}" alt="Chick ${label}" loading="lazy">
-          </a>
-          <span class="motion-time">${label}${deleteBtn}</span>
+    let html = '';
+
+    if (data.video) {
+      html += `
+        <div class="timelapse-card">
+          <h3>Growth Video</h3>
+          <video controls preload="metadata" playsinline>
+            <source src="${data.video.url}" type="video/mp4">
+          </video>
         </div>
       `;
-    }).join('');
+    }
+
+    if (data.frames.length > 0) {
+      html += '<div class="motion-gallery">';
+      html += data.frames.map(frame => {
+        const dateLabel = new Date(frame.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const deleteBtn = isAdmin ? `<button class="motion-delete-btn" onclick="deleteGrowthFrame(${jsArg(frame.filename)}, event)" title="Delete">x</button>` : '';
+        return `
+          <div class="motion-thumb">
+            <a href="${frame.url}" target="_blank">
+              <img src="${frame.url}" alt="Growth ${dateLabel}" loading="lazy">
+            </a>
+            <span class="motion-time">${dateLabel}${deleteBtn}</span>
+          </div>
+        `;
+      }).join('');
+      html += '</div>';
+    }
+
+    container.innerHTML = html;
   } catch (err) {
-    console.error('Failed to load chick album:', err);
+    console.error('Failed to load chick growth:', err);
   }
 }
 
-async function deleteChickPhoto(filename, event) {
+async function deleteGrowthFrame(filename, event) {
   event.preventDefault();
   event.stopPropagation();
+  if (!confirm('Delete this growth frame?')) return;
   try {
-    const res = await fetch(`/api/admin/chick-album/${filename}`, {
+    const res = await fetch(`/api/admin/chick-growth/${filename}`, {
       method: 'DELETE',
       headers: { 'x-auth-token': authToken }
     });
     if ((await res.json()).success) {
-      const el = document.getElementById(`chick-${filename}`);
-      if (el) el.remove();
+      event.target.closest('.motion-thumb').remove();
     }
   } catch (err) {
-    console.error('Failed to delete chick photo:', err);
+    console.error('Failed to delete growth frame:', err);
   }
 }
 

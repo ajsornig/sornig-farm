@@ -14,6 +14,9 @@
 # Weekly timelapse montage - compile last 7 days at 1 AM
 0 1 * * * /home/ajsornig/chicken-stream/scripts/timelapse.sh --weekly
 
+# Chick growth timelapse — pick best frame from yesterday before stitch deletes them
+5 0 * * * /home/ajsornig/chicken-stream/scripts/chick-growth-pick.sh
+
 # Motion-timelapse stitch (10 min offset to avoid contention with existing)
 # Capture is now via systemd services (motion-capture-run/coop/chick), not cron
 10 0 * * * /home/ajsornig/chicken-stream/scripts/motion-timelapse-stitch.sh --stitch

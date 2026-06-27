@@ -1218,14 +1218,14 @@ main {
   background: #000;
 }
 
-/* Chick Album */
-#chick-album-section {
+/* Chick Growth Timelapse */
+#chick-growth-section {
   max-width: 1400px;
   margin: 2rem auto;
   padding: 0 1.5rem;
 }
 
-#chick-album-section h2 {
+#chick-growth-section h2 {
   margin-bottom: 0.25rem;
   color: var(--wood-dark);
   font-size: 1.5rem;
@@ -1234,14 +1234,11 @@ main {
   gap: 0.5rem;
 }
 
-#chick-album-section h2::before {
+#chick-growth-section h2::before {
   content: "🐥";
 }
 
-#chick-album-gallery {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 0.75rem;
+#chick-growth-content {
   margin-top: 0.5rem;
 }
 
@@ -1941,6 +1938,50 @@ details.collapsible-section:not([open]) summary h2::after {
   cursor: pointer;
 }
 
+.growth-date-group {
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--wood-brown);
+  border-radius: 8px;
+  padding: 1rem;
+  background: rgba(139, 90, 43, 0.05);
+}
+.growth-date-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+.growth-candidates {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.growth-candidate {
+  cursor: pointer;
+  border: 3px solid transparent;
+  border-radius: 6px;
+  overflow: hidden;
+  text-align: center;
+  transition: border-color 0.2s;
+  width: 120px;
+}
+.growth-candidate:hover {
+  border-color: var(--wood-brown);
+}
+.growth-candidate.growth-chosen {
+  border-color: var(--forest-green);
+}
+.growth-candidate img {
+  width: 100%;
+  display: block;
+}
+.growth-candidate span {
+  display: block;
+  font-size: 0.75rem;
+  padding: 2px;
+  color: var(--text-primary);
+}
+
 #timelapse-lightbox {
   display: none;
   position: fixed;
@@ -2240,7 +2281,7 @@ footer {
 
   #timelapse-section,
   #motion-timelapse-section,
-  #chick-album-section,
+  #chick-growth-section,
   #motion-section,
   #admin-panel,
   #recordings-section,
@@ -2251,7 +2292,7 @@ footer {
 
   #timelapse-section h2,
   #motion-timelapse-section h2,
-  #chick-album-section h2,
+  #chick-growth-section h2,
   #motion-section h2,
   #admin-panel h2,
   #recordings-section h2,
