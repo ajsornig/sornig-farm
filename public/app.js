@@ -773,6 +773,16 @@ function formatSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
+let lightboxInstance = null;
+function refreshLightbox() {
+  if (lightboxInstance) lightboxInstance.destroy();
+  lightboxInstance = GLightbox({
+    touchNavigation: true,
+    loop: true,
+    closeOnOutsideClick: true
+  });
+}
+
 async function loadTimelapse() {
   try {
     const [videosRes, analyticsRes] = await Promise.all([
@@ -945,7 +955,7 @@ async function loadChickGrowth() {
         const deleteBtn = isAdmin ? `<button class="motion-delete-btn" onclick="deleteGrowthFrame(${jsArg(frame.filename)}, event)" title="Delete">x</button>` : '';
         return `
           <div class="motion-thumb">
-            <a href="${frame.url}" target="_blank">
+            <a href="${frame.url}" class="glightbox" data-gallery="growth" data-description="${dateLabel}">
               <img src="${frame.url}" alt="Growth ${dateLabel}" loading="lazy">
             </a>
             <span class="motion-time">${dateLabel}${deleteBtn}</span>
@@ -956,6 +966,7 @@ async function loadChickGrowth() {
     }
 
     container.innerHTML = html;
+    refreshLightbox();
   } catch (err) {
     console.error('Failed to load chick growth:', err);
   }
@@ -1000,13 +1011,14 @@ async function loadFavorites() {
       const deleteBtn = isAdmin ? `<button class="motion-delete-btn" onclick="deleteFavorite(${jsArg(fav.filename)}, event)" title="Remove">x</button>` : '';
       return `
         <div class="favorites-thumb" id="fav-${escapeHtml(fav.filename)}">
-          <a href="${fav.url}" target="_blank">
+          <a href="${fav.url}" class="glightbox" data-gallery="favorites" data-description="${escapeHtml(cam)} — ${label}">
             <img src="${fav.url}" alt="${label}" loading="lazy">
           </a>
           <span class="favorites-label">${escapeHtml(cam)} — ${label}${deleteBtn}</span>
         </div>
       `;
     }).join('') + '</div>';
+    refreshLightbox();
   } catch (err) {
     console.error('Failed to load favorites:', err);
   }
