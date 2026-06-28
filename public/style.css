@@ -2610,6 +2610,30 @@ footer {
   opacity: 0.6;
 }
 
+.infra-legend {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--wood-brown);
+}
+
+.infra-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.infra-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.infra-legend-dot.healthy { background: var(--forest-green); }
+.infra-legend-dot.warning { background: var(--golden); }
+.infra-legend-dot.critical { background: var(--barn-red); }
+
 .infra-offline-badge {
   background: #999;
   color: #fff;

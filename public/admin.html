@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Panel - Sornig Farm</title>
-  <link rel="stylesheet" href="style.css?v=14">
+  <link rel="stylesheet" href="style.css?v=15">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐔</text></svg>">
 </head>
@@ -97,6 +97,11 @@
         <p class="admin-note">Toggle cameras on/off for public visitors. Hidden cameras are still visible to you.</p>
         <div id="camera-toggle-list"></div>
         <h3 style="margin-top:1.5rem;color:var(--wood-brown);">System Health</h3>
+        <div class="infra-legend">
+          <span class="infra-legend-item"><span class="infra-legend-dot healthy"></span>Healthy</span>
+          <span class="infra-legend-item"><span class="infra-legend-dot warning"></span>Warning</span>
+          <span class="infra-legend-item"><span class="infra-legend-dot critical"></span>Critical</span>
+        </div>
         <div id="infra-cards" class="infra-cards"></div>
         <h3 style="margin-top:1.5rem;color:var(--wood-brown);">Trends (Last Hour)</h3>
         <div id="infra-sparklines" class="infra-sparklines"></div>
@@ -143,6 +148,6 @@
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="admin.js?v=23"></script>
+  <script src="admin.js?v=24"></script>
 </body>
 </html>

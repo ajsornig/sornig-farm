@@ -953,6 +953,7 @@ function infraCardStatus(metric, value) {
     case 'ffmpeg': return value >= 2 ? 'healthy' : (value >= 1 ? 'warning' : 'critical');
     case 'cpu': return value === null ? 'healthy' : (value > 80 ? 'critical' : (value > 50 ? 'warning' : 'healthy'));
     case 'temp': return value === null ? 'healthy' : (value > 82 ? 'critical' : (value > 75 ? 'warning' : 'healthy'));
+    case 'disk': return value === null ? 'healthy' : (value > 90 ? 'critical' : (value > 80 ? 'warning' : 'healthy'));
     case 'network': return 'healthy';
     default: return 'healthy';
   }
@@ -1038,9 +1039,11 @@ async function loadInfraData() {
     const streamStatus = infraCardStatus('ffmpeg', d.ffmpegCount >= expectedFfmpeg ? expectedFfmpeg : d.ffmpegCount);
 
     const sys = d.system || {};
+    const diskPct = sys.diskUsed && sys.diskTotal ? ((sys.diskUsed / sys.diskTotal) * 100).toFixed(0) : null;
     const sysStatus = worstStatus(
       infraCardStatus('cpu', sys.cpu),
-      infraCardStatus('temp', sys.temp)
+      infraCardStatus('temp', sys.temp),
+      infraCardStatus('disk', diskPct !== null ? Number(diskPct) : null)
     );
     const memPct = sys.memUsed && sys.memTotal ? ((sys.memUsed / sys.memTotal) * 100).toFixed(0) : null;
 
@@ -1051,6 +1054,7 @@ async function loadInfraData() {
         <div class="infra-card-row"><span>Memory</span><span>${sys.memUsed !== null ? sys.memUsed + ' / ' + sys.memTotal + ' MB (' + memPct + '%)' : '?'}</span></div>
         <div class="infra-card-row"><span>Load (1 min)</span><span>${sys.load !== null ? sys.load.toFixed(2) : '?'}</span></div>
         <div class="infra-card-row"><span>CPU Temp</span><span>${sys.temp !== null ? sys.temp.toFixed(1) + '°C' : '?'}</span></div>
+        <div class="infra-card-row"><span>Storage</span><span>${sys.diskUsed !== null ? (sys.diskUsed / 1024).toFixed(1) + ' / ' + (sys.diskTotal / 1024).toFixed(1) + ' GB (' + diskPct + '%)' : '?'}</span></div>
       </div>
       <div class="infra-card ${networkStatus}">
         <div class="infra-card-title">Network</div>

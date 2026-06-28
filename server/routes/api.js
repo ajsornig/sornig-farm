@@ -818,19 +818,22 @@ function parseInfraLine(line) {
   const restartsMatch = parts[pingIdx + 2].match(/restarts=(\d+)\/(\d+)(?:\/(\d+))?/);
   const ffmpegMatch = parts[pingIdx + 3] && parts[pingIdx + 3].match(/ffmpeg=(\d+)/);
 
-  let system = { cpu: null, memUsed: null, memTotal: null, load: null, temp: null };
+  let system = { cpu: null, memUsed: null, memTotal: null, load: null, temp: null, diskUsed: null, diskTotal: null };
   const sysSection = parts[pingIdx + 4];
   if (sysSection) {
     const cpuM = sysSection.match(/cpu=([\d.]+|[?])%/);
     const memM = sysSection.match(/mem=(\d+)\/(\d+)MB/);
     const loadM = sysSection.match(/load=([\d.]+|[?])/);
     const tempM = sysSection.match(/temp=([\d.]+|[?])C/);
+    const diskM = sysSection.match(/disk=(\d+)\/(\d+)MB/);
     system = {
       cpu: cpuM && cpuM[1] !== '?' ? parseFloat(cpuM[1]) : null,
       memUsed: memM ? Number(memM[1]) : null,
       memTotal: memM ? Number(memM[2]) : null,
       load: loadM && loadM[1] !== '?' ? parseFloat(loadM[1]) : null,
-      temp: tempM && tempM[1] !== '?' ? parseFloat(tempM[1]) : null
+      temp: tempM && tempM[1] !== '?' ? parseFloat(tempM[1]) : null,
+      diskUsed: diskM ? Number(diskM[1]) : null,
+      diskTotal: diskM ? Number(diskM[2]) : null
     };
   }
 
