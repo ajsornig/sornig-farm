@@ -1013,10 +1013,11 @@ async function loadInfraData() {
     const d = data.latest;
 
     const networkSignals = [d.wlan1, d.wlan0].filter(w => w.signal !== null);
+    const wlan1Down = d.wlan1.signal === null;
     const networkStatus = worstStatus(
       d.eth0.state !== 'up' ? 'critical' : 'healthy',
-      d.wlan1.signal === null ? 'warning' : 'healthy',
-      d.wlan0.signal !== null && d.wlan0.signal < -70 ? 'warning' : 'healthy'
+      wlan1Down ? 'warning' : 'healthy',
+      wlan1Down && d.wlan0.signal !== null && d.wlan0.signal < -70 ? 'warning' : 'healthy'
     );
 
     const cam1Status = worstStatus(
@@ -1053,7 +1054,7 @@ async function loadInfraData() {
         <div class="infra-card-row"><span>CPU</span><span>${sys.cpu !== null ? sys.cpu.toFixed(1) + '%' : '?'}</span></div>
         <div class="infra-card-row"><span>Memory</span><span>${sys.memUsed !== null ? sys.memUsed + ' / ' + sys.memTotal + ' MB (' + memPct + '%)' : '?'}</span></div>
         <div class="infra-card-row"><span>Load (1 min)</span><span>${sys.load !== null ? sys.load.toFixed(2) : '?'}</span></div>
-        <div class="infra-card-row"><span>CPU Temp</span><span>${sys.temp !== null ? sys.temp.toFixed(1) + '°C' : '?'}</span></div>
+        <div class="infra-card-row"><span>CPU Temp</span><span>${sys.temp !== null ? (sys.temp * 9 / 5 + 32).toFixed(1) + '°F' : '?'}</span></div>
         <div class="infra-card-row"><span>Storage</span><span>${sys.diskUsed !== null ? (sys.diskUsed / 1024).toFixed(1) + ' / ' + (sys.diskTotal / 1024).toFixed(1) + ' GB (' + diskPct + '%)' : '?'}</span></div>
       </div>
       <div class="infra-card ${networkStatus}">
@@ -1098,7 +1099,7 @@ async function loadInfraData() {
 
     const sparklines = [
       { label: 'CPU Usage', values: h.map(e => e.system ? e.system.cpu : null), color: 'var(--forest-green)', unit: '%', threshold: 80, good: 'Under 80% is healthy' },
-      { label: 'CPU Temperature', values: h.map(e => e.system ? e.system.temp : null), color: '#c0392b', unit: '°C', threshold: 75, good: 'Under 75°C is healthy' },
+      { label: 'CPU Temperature', values: h.map(e => e.system && e.system.temp !== null ? e.system.temp * 9 / 5 + 32 : null), color: '#c0392b', unit: '°F', threshold: 167, good: 'Under 167°F is healthy' },
       { label: 'Load Average', values: h.map(e => e.system ? e.system.load : null), color: 'var(--wood-brown)', unit: '', threshold: 4, good: 'Under 4 is healthy (4 cores)' },
       { label: 'Run Camera Latency', values: h.map(e => e.pings.cam1.ms), color: 'var(--forest-green)', unit: 'ms', threshold: 10, good: 'Under 10ms is healthy' },
       { label: 'Coop Camera Latency', values: h.map(e => e.pings.cam2.ms), color: 'var(--forest-green)', unit: 'ms', threshold: 10, good: 'Under 10ms is healthy' },
