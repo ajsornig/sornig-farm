@@ -11,6 +11,7 @@ SUN_SCRIPT="$BASE_DIR/scripts/sun-times.py"
 
 CHECK_INTERVAL=30
 COOLDOWN=300
+NIGHT_FALLBACK=1800
 
 CAM="${1:-run}"
 
@@ -159,6 +160,19 @@ while true; do
   else
     stat_log "skipped" "$rmse"
 
+    # Coop nighttime fallback: grab one frame per 30 min when birds are sleeping
+    if [ "$CAM" = "coop" ] && [ $(( $(date +%s) - last_capture )) -ge "$NIGHT_FALLBACK" ]; then
+      if python3 "$SUN_SCRIPT" check-coop 2>/dev/null; then
+        filename="$(date '+%Y-%m-%d_%H%M%S').jpg"
+        ffmpeg -y -i "$STREAM" -frames:v 1 -q:v 3 "$FRAMES_DIR/$filename" 2>/dev/null
+
+        if [ $? -eq 0 ] && [ -f "$FRAMES_DIR/$filename" ]; then
+          log "CAPTURE: Night fallback (no motion for ${NIGHT_FALLBACK}s) - $filename"
+          stat_log "captured_night" "$rmse"
+          last_capture=$(date +%s)
+        fi
+      fi
+    fi
   fi
 
   cp "$WORK_DIR/current_blur.jpg" "$WORK_DIR/previous.jpg"
