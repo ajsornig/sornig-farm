@@ -470,29 +470,6 @@ router.get('/admin/highlights', requireAdmin, (req, res) => {
   res.json({ dates });
 });
 
-router.get('/timelapse', (req, res) => {
-  const timelapseDir = path.join(__dirname, '../../public/timelapse');
-
-  if (!fs.existsSync(timelapseDir)) {
-    return res.json([]);
-  }
-
-  const files = fs.readdirSync(timelapseDir)
-    .filter(f => f.endsWith('.mp4'))
-    .map(filename => {
-      const stats = fs.statSync(path.join(timelapseDir, filename));
-      return {
-        filename,
-        url: `/timelapse/${filename}`,
-        size: stats.size,
-        created: stats.birthtime.toISOString()
-      };
-    })
-    .sort((a, b) => new Date(b.created) - new Date(a.created));
-
-  res.json(files);
-});
-
 router.get('/motion-timelapse', (req, res) => {
   const motionTimelapseDir = path.join(__dirname, '../../public/motion-timelapse');
 
@@ -514,66 +491,6 @@ router.get('/motion-timelapse', (req, res) => {
     .sort((a, b) => new Date(b.created) - new Date(a.created));
 
   res.json(files);
-});
-
-router.get('/admin/timelapse-frames', requireAdmin, (req, res) => {
-  const now = new Date();
-  const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-  const cams = [
-    { dir: path.join(__dirname, '../../timelapse/frames'), label: 'run' },
-    { dir: path.join(__dirname, '../../timelapse/frames-coop'), label: 'coop' }
-  ];
-
-  const files = cams.flatMap(cam => {
-    if (!fs.existsSync(cam.dir)) return [];
-    return fs.readdirSync(cam.dir)
-      .filter(f => f.endsWith('.jpg') && f.startsWith(today))
-      .sort()
-      .map(filename => ({
-        filename,
-        cam: cam.label,
-        url: `/api/admin/timelapse-frames/${cam.label}/${filename}`,
-        time: filename.replace(today + '_', '').replace('.jpg', '').replace(/(\d{2})(\d{2})/, '$1:$2')
-      }));
-  });
-
-  res.json(files);
-});
-
-router.get('/admin/timelapse-frames/:cam/:filename', (req, res) => {
-  const filename = path.basename(req.params.filename);
-  const cam = req.params.cam;
-  if (!/^\d{4}-\d{2}-\d{2}_\d{4}\.jpg$/.test(filename)) {
-    return res.status(400).json({ error: 'Invalid filename' });
-  }
-  if (cam !== 'run' && cam !== 'coop') {
-    return res.status(400).json({ error: 'Invalid camera' });
-  }
-  const dir = cam === 'coop' ? 'frames-coop' : 'frames';
-  const filepath = path.join(__dirname, '../../timelapse', dir, filename);
-
-  if (!fs.existsSync(filepath)) {
-    return res.status(404).json({ error: 'Frame not found' });
-  }
-
-  res.sendFile(filepath);
-});
-
-router.delete('/admin/timelapse-frames/:cam/:filename', requireAdmin, (req, res) => {
-  const filename = path.basename(req.params.filename);
-  const cam = req.params.cam;
-  if (cam !== 'run' && cam !== 'coop') {
-    return res.status(400).json({ error: 'Invalid camera' });
-  }
-  const dir = cam === 'coop' ? 'frames-coop' : 'frames';
-  const filepath = path.join(__dirname, '../../timelapse', dir, filename);
-
-  if (!fs.existsSync(filepath)) {
-    return res.status(404).json({ error: 'Frame not found' });
-  }
-
-  fs.unlinkSync(filepath);
-  res.json({ success: true });
 });
 
 router.get('/admin/motion-capture-frames', requireAdmin, (req, res) => {
@@ -828,90 +745,6 @@ function getWeatherDescription(code) {
 }
 
 // --- Timelapse Analytics ---
-
-const ANALYTICS_FILE = path.join(__dirname, '../../data/timelapse-analytics.json');
-
-function loadAnalytics() {
-  try {
-    if (fs.existsSync(ANALYTICS_FILE)) {
-      return JSON.parse(fs.readFileSync(ANALYTICS_FILE, 'utf8'));
-    }
-  } catch (err) {
-    console.error('Failed to load analytics:', err);
-  }
-  return { events: [], summary: {} };
-}
-
-function saveAnalytics(data) {
-  atomicWriteJSON(ANALYTICS_FILE, data);
-}
-
-const VIDEO_RE = /^[A-Za-z0-9._-]{1,100}$/;
-const MAX_SUMMARY_VIDEOS = 500;
-
-router.post('/timelapse/analytics', (req, res) => {
-  const { video, event, duration, watchedSeconds } = req.body;
-  if (!video || !event) return res.status(400).json({ error: 'Missing fields' });
-
-  // Validate the video key: it becomes an object key in the summary map, so an
-  // attacker-controlled value could otherwise grow the file/map without bound.
-  if (typeof video !== 'string' || !VIDEO_RE.test(video)) {
-    return res.status(400).json({ error: 'Invalid video' });
-  }
-
-  const allowed = ['play', 'pause', 'ended', 'timeupdate'];
-  if (!allowed.includes(event)) return res.status(400).json({ error: 'Invalid event' });
-
-  const analytics = loadAnalytics();
-
-  const entry = {
-    video,
-    event,
-    duration: Number(duration) || 0,
-    watchedSeconds: Number(watchedSeconds) || 0,
-    timestamp: new Date().toISOString(),
-    ip: getClientIp(req)
-  };
-
-  analytics.events.push(entry);
-
-  // Update summary, but cap the number of distinct video keys so a flood of
-  // bogus video names can't grow the summary map indefinitely.
-  const known = Object.prototype.hasOwnProperty.call(analytics.summary, video);
-  if (known || Object.keys(analytics.summary).length < MAX_SUMMARY_VIDEOS) {
-    if (!known) {
-      analytics.summary[video] = { plays: 0, completions: 0, totalWatchSeconds: 0 };
-    }
-    const s = analytics.summary[video];
-    if (event === 'play') s.plays++;
-    if (event === 'ended') s.completions++;
-    if (event === 'pause' || event === 'ended') {
-      s.totalWatchSeconds += entry.watchedSeconds;
-    }
-  }
-
-  // Keep last 1000 events to avoid unbounded growth
-  if (analytics.events.length > 1000) {
-    analytics.events = analytics.events.slice(-500);
-  }
-
-  saveAnalytics(analytics);
-  res.json({ ok: true });
-});
-
-router.get('/timelapse/stats', (req, res) => {
-  const analytics = loadAnalytics();
-  const publicStats = {};
-  for (const [video, data] of Object.entries(analytics.summary)) {
-    publicStats[video] = { plays: data.plays, completions: data.completions };
-  }
-  res.json(publicStats);
-});
-
-router.get('/admin/timelapse-analytics', requireAdmin, (req, res) => {
-  const analytics = loadAnalytics();
-  res.json(analytics);
-});
 
 router.get('/admin/motion-capture-stats', requireAdmin, (req, res) => {
   const statsLog = path.join(__dirname, '../../logs/motion-capture-stats.log');

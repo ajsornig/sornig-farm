@@ -18,7 +18,6 @@ async function init() {
   if (isApproved || !requireApproval) {
     await loadCameras();
     loadFavorites();
-    loadTimelapse();
     loadMotionTimelapse();
     loadChickGrowth();
     loadVisitorStats();
@@ -59,7 +58,7 @@ async function checkStatus() {
 
 function updateContentVisibility() {
   const protectedSections = [
-    'video-container', 'chat-messages', 'timelapse-section',
+    'video-container', 'chat-messages',
     'motion-timelapse-section', 'chick-growth-section', 'favorites-section', 'visitors-section'
   ];
 
@@ -152,7 +151,6 @@ function showLoggedInState(skipContentLoad = false) {
   if (!skipContentLoad && (isApproved || !requireApproval)) {
     loadCameras();
     loadFavorites();
-    loadTimelapse();
     loadChickGrowth();
     loadVisitorStats();
   }
@@ -783,62 +781,6 @@ function refreshLightbox() {
   });
 }
 
-async function loadTimelapse() {
-  try {
-    const [videosRes, analyticsRes] = await Promise.all([
-      fetch('/api/timelapse'),
-      fetch('/api/timelapse/stats').catch(() => null)
-    ]);
-    const videos = await videosRes.json();
-    const stats = analyticsRes && analyticsRes.ok ? await analyticsRes.json() : {};
-    const list = document.getElementById('timelapse-list');
-
-    if (videos.length === 0) {
-      list.innerHTML = '<p class="no-recordings">No timelapses yet — first one generates after midnight tonight</p>';
-      return;
-    }
-
-    const weekly = videos.find(v => v.filename === 'timelapse-weekly.mp4');
-    const daily = videos.filter(v => v.filename !== 'timelapse-weekly.mp4');
-
-    let html = '';
-
-    if (weekly) {
-      const wStats = stats[weekly.filename] || {};
-      const plays = wStats.plays || 0;
-      html += `
-        <div class="timelapse-weekly">
-          <h3>Last 7 Days${plays ? ` <span class="timelapse-views">${plays} view${plays !== 1 ? 's' : ''}</span>` : ''}</h3>
-          <video src="${weekly.url}" controls preload="none" data-video="${weekly.filename}"></video>
-        </div>
-      `;
-    }
-
-    if (daily.length > 0) {
-      html += daily.map(vid => {
-        const date = vid.filename.replace('timelapse-', '').replace('.mp4', '');
-        const size = formatSize(vid.size);
-        const vStats = stats[vid.filename] || {};
-        const plays = vStats.plays || 0;
-        return `
-          <div class="timelapse-card">
-            <video src="${vid.url}" controls preload="none" poster="" data-video="${vid.filename}"></video>
-            <div class="timelapse-info">
-              <span class="timelapse-date">${date}</span>
-              <span class="timelapse-meta">${plays ? `${plays} view${plays !== 1 ? 's' : ''} · ` : ''}${size}</span>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    list.innerHTML = html;
-    setupTimelapseTracking();
-  } catch (err) {
-    console.error('Failed to load timelapse:', err);
-  }
-}
-
 async function loadMotionTimelapse() {
   try {
     const res = await fetch('/api/motion-timelapse');
@@ -884,44 +826,6 @@ async function loadMotionTimelapse() {
   } catch (err) {
     console.error('Failed to load motion timelapse:', err);
   }
-}
-
-function setupTimelapseTracking() {
-  const videos = document.querySelectorAll('#timelapse-list video[data-video]');
-  videos.forEach(video => {
-    let tracked = false;
-
-    video.addEventListener('play', () => {
-      trackTimelapse(video, 'play');
-    });
-
-    video.addEventListener('pause', () => {
-      if (!video.ended) {
-        trackTimelapse(video, 'pause');
-      }
-    });
-
-    video.addEventListener('ended', () => {
-      if (!tracked) {
-        trackTimelapse(video, 'ended');
-        tracked = true;
-      }
-    });
-  });
-}
-
-function trackTimelapse(video, event) {
-  const filename = video.dataset.video;
-  fetch('/api/timelapse/analytics', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      video: filename,
-      event,
-      duration: Math.round(video.duration || 0),
-      watchedSeconds: Math.round(video.currentTime || 0)
-    })
-  }).catch(() => {});
 }
 
 async function loadChickGrowth() {

@@ -56,9 +56,6 @@ const authLimiter = createRateLimiter({
 });
 app.use(['/api/login', '/api/register', '/api/forgot-password', '/api/reset-password'], authLimiter);
 
-const analyticsLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 60 });
-app.use('/api/timelapse/analytics', analyticsLimiter);
-
 app.use('/api', apiRoutes);
 
 app.get('/api/admin/privacy-mode', (req, res) => {

@@ -24,7 +24,8 @@ case "$CAM" in
     ;;
   chick)
     STREAM="$BASE_DIR/public/hls3/stream.m3u8"
-    THRESHOLD="0.03"
+    THRESHOLD="0.04"
+    COOLDOWN=600
     FRAMES_DIR="$BASE_DIR/motion-timelapse/frames-chick"
     ;;
   *)

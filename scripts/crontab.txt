@@ -4,16 +4,6 @@
 */5 * * * * ~/duckdns/duck.sh >/dev/null 2>&1
 0 */6 * * * /home/ajsornig/chicken-stream/backup.sh >> /home/ajsornig/chicken-stream/backups/backup.log 2>&1
 
-# Timelapse - grab frames every 5min (script checks sun position)
-*/5 * * * * /home/ajsornig/chicken-stream/scripts/timelapse.sh run
-*/5 * * * * /home/ajsornig/chicken-stream/scripts/timelapse.sh coop
-
-# Timelapse - stitch combined video at midnight
-0 0 * * * /home/ajsornig/chicken-stream/scripts/timelapse.sh --stitch
-
-# Weekly timelapse montage - compile last 7 days at 1 AM
-0 1 * * * /home/ajsornig/chicken-stream/scripts/timelapse.sh --weekly
-
 # Chick growth timelapse — pick best frame from yesterday before stitch deletes them
 5 0 * * * /home/ajsornig/chicken-stream/scripts/chick-growth-pick.sh
 
