@@ -880,7 +880,9 @@ async function loadCaptureStats() {
 
     const fmtCam = (camStats) => {
       if (!camStats) return '-';
-      const parts = [`${camStats.captured} saved`];
+      const total = camStats.captured + (camStats.night || 0);
+      const parts = [`${total} saved`];
+      if (camStats.night > 0) parts.push(`${camStats.night} night`);
       if (camStats.cooldown > 0) parts.push(`${camStats.cooldown} during cooldown`);
       if (camStats.exposure > 0) parts.push(`${camStats.exposure} bad exposure`);
       return parts.join(', ');
