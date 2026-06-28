@@ -1319,7 +1319,7 @@ async function loadGrowthPending() {
       const thumbs = candidates.filter(c => c.filename).map(c => {
         const isChosen = c.number === chosen;
         return `
-          <div class="growth-candidate ${isChosen ? 'growth-chosen' : ''}" onclick="chooseGrowthFrame(${jsArg(date)}, ${c.number})">
+          <div class="growth-candidate ${isChosen ? 'growth-chosen' : ''}" data-num="${c.number}" onclick="chooseGrowthFrame(${jsArg(date)}, ${c.number})">
             <img src="${c.url}" alt="Candidate ${c.number}" loading="lazy">
             <span>${isChosen ? '★ Chosen' : '#' + c.number}</span>
           </div>
@@ -1376,7 +1376,15 @@ async function chooseGrowthFrame(date, number) {
       method: 'POST',
       headers: { 'x-auth-token': authToken }
     });
-    loadGrowthPicksAdmin();
+    const group = document.getElementById(`growth-pending-${date}`);
+    if (group) {
+      group.querySelectorAll('.growth-candidate').forEach(el => {
+        const num = parseInt(el.dataset.num);
+        const isChosen = num === number;
+        el.classList.toggle('growth-chosen', isChosen);
+        el.querySelector('span').textContent = isChosen ? '★ Chosen' : '#' + num;
+      });
+    }
   } catch (err) {
     console.error('Failed to choose growth frame:', err);
   }

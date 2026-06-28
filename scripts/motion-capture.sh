@@ -17,7 +17,8 @@ CAM="${1:-run}"
 case "$CAM" in
   coop)
     STREAM="$BASE_DIR/public/hls2/stream.m3u8"
-    THRESHOLD="0.06"
+    THRESHOLD="0.04"
+    COOLDOWN=180
     FRAMES_DIR="$BASE_DIR/motion-timelapse/frames-coop"
     ;;
   chick)
@@ -108,13 +109,16 @@ while true; do
     continue
   fi
 
-  # Skip washed-out or pitch-black frames (IR switching, overexposure)
-  brightness=$(convert "$WORK_DIR/current_blur.jpg" -format "%[fx:mean]" info: 2>/dev/null)
-  if [ -n "$brightness" ]; then
-    too_bright=$(echo "$brightness > 0.90" | bc -l 2>/dev/null)
-    too_dark=$(echo "$brightness < 0.05" | bc -l 2>/dev/null)
-    if [ "$too_bright" = "1" ] || [ "$too_dark" = "1" ]; then
-      stat_log "skipped_exposure" "$brightness"
+  # Skip washed-out, pitch-black, or half-exposed frames
+  exposure=$(convert "$WORK_DIR/current_blur.jpg" -format "%[fx:mean]|%[fx:standard_deviation]" info: 2>/dev/null)
+  if [ -n "$exposure" ]; then
+    brightness=$(echo "$exposure" | cut -d'|' -f1)
+    stddev=$(echo "$exposure" | cut -d'|' -f2)
+    too_bright=$(echo "$brightness > 0.85" | bc -l 2>/dev/null)
+    too_dark=$(echo "$brightness < 0.10" | bc -l 2>/dev/null)
+    too_contrasty=$(echo "$stddev > 0.35" | bc -l 2>/dev/null)
+    if [ "$too_bright" = "1" ] || [ "$too_dark" = "1" ] || [ "$too_contrasty" = "1" ]; then
+      stat_log "skipped_exposure" "$brightness:$stddev"
       sleep "$CHECK_INTERVAL"
       continue
     fi
