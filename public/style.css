@@ -1317,6 +1317,38 @@ main {
   text-align: center;
 }
 
+.motion-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.motion-thumb {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid var(--wood-brown);
+  background: var(--cream-dark);
+}
+
+.motion-thumb img {
+  width: 100%;
+  display: block;
+  aspect-ratio: 4/3;
+  object-fit: cover;
+}
+
+.motion-time {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  background: var(--cream-dark);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
 .motion-delete-btn {
   background: var(--barn-red);
   color: var(--cream);
@@ -2398,6 +2430,11 @@ footer {
   .favorites-grid {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 0.75rem;
+  }
+
+  .motion-gallery {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 0.5rem;
   }
 
   .recording-card {

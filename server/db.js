@@ -35,11 +35,12 @@ function initDb() {
         messages: loaded.messages || [],
         users: loaded.users || {},
         sessions: loaded.sessions || {},
-        stats: loaded.stats || { totalViews: 0, visitors: [] }
+        stats: loaded.stats || { totalViews: 0, visitors: [] },
+        favorites: loaded.favorites || []
       };
     } catch (err) {
       console.error('Failed to load data file, starting fresh:', err.message);
-      data = { messages: [], users: {}, sessions: {}, stats: { totalViews: 0, visitors: [] } };
+      data = { messages: [], users: {}, sessions: {}, stats: { totalViews: 0, visitors: [] }, favorites: [] };
     }
   }
   pruneExpiredSessions();
