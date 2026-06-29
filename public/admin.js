@@ -8,6 +8,16 @@ let userSortCol = 'created';
 let userSortAsc = false;
 let activityData = [];
 let adminVisitorMap = null;
+let adminLightbox = null;
+
+function refreshAdminLightbox() {
+  if (adminLightbox) adminLightbox.destroy();
+  adminLightbox = GLightbox({
+    touchNavigation: true,
+    loop: true,
+    closeOnOutsideClick: true
+  });
+}
 
 // Escape for safe interpolation into HTML TEXT or attribute VALUES (quotes
 // included). NOTE: this is NOT sufficient for a value placed inside an inline
@@ -724,14 +734,16 @@ async function loadMotionCaptureFrames() {
 
     let html = `<p style="margin-bottom:0.5rem;color:var(--wood-brown);">${frames.length} frames (${runFrames.length} run, ${coopFrames.length} coop, ${chickFrames.length} chick)</p>`;
 
-    const renderCamFrames = (camFrames, label) => {
+    const renderCamFrames = (camFrames, label, galleryName) => {
       if (camFrames.length === 0) return '';
       let s = `<h4 style="margin:0.75rem 0 0.5rem;color:var(--forest-green);">${label}</h4>`;
       s += '<div class="timelapse-grid">' + camFrames.map(frame => {
         const starred = isFavorited(frame.cam, frame.filename);
         return `
         <div class="timelapse-frame-card" id="mframe-${escapeHtml(frame.cam)}-${escapeHtml(frame.filename)}">
-          <img src="${frame.url}" alt="${frame.time}" loading="lazy" onclick="openLightbox('${frame.url}','m-${escapeHtml(frame.cam)}','${escapeHtml(frame.filename)}')">
+          <a href="${frame.url}" class="glightbox" data-gallery="${galleryName}" data-description="${escapeHtml(frame.cam)} — ${frame.time}">
+            <img src="${frame.url}" alt="${frame.time}" loading="lazy">
+          </a>
           <div class="timelapse-frame-info">
             <span>${frame.time}</span>
             <button class="star-btn ${starred ? 'starred' : ''}" onclick="starFrame(${jsArg(frame.cam)},${jsArg(frame.filename)},'frames')" title="${starred ? 'Favorited' : 'Add to favorites'}">${starred ? '★' : '☆'}</button>
@@ -742,9 +754,9 @@ async function loadMotionCaptureFrames() {
       return s;
     };
 
-    html += renderCamFrames(runFrames, 'Chicken Run');
-    html += renderCamFrames(coopFrames, 'Chicken Coop');
-    html += renderCamFrames(chickFrames, 'Chick Cam');
+    html += renderCamFrames(runFrames, 'Chicken Run', 'motion-run');
+    html += renderCamFrames(coopFrames, 'Chicken Coop', 'motion-coop');
+    html += renderCamFrames(chickFrames, 'Chick Cam', 'motion-chick');
 
     list.innerHTML = html;
     loadHighlights();
@@ -784,7 +796,9 @@ async function loadHighlights() {
         const origFilename = item.filename.replace(/^(run|coop|chick)_/, '');
         return `
         <div class="timelapse-frame-card">
-          <img src="${item.url}" alt="${item.cam} ${item.time}" loading="lazy" onclick="openLightbox('${item.url}','hl-${escapeHtml(item.cam)}','${escapeHtml(item.filename)}')">
+          <a href="${item.url}" class="glightbox" data-gallery="highlights-${escapeHtml(date)}" data-description="${escapeHtml(item.cam)} — ${item.time}">
+            <img src="${item.url}" alt="${item.cam} ${item.time}" loading="lazy">
+          </a>
           <div class="timelapse-frame-info">
             <span>${item.cam} ${item.time}</span>
             <button class="star-btn ${starred ? 'starred' : ''}" onclick="starFrame(${jsArg(item.cam)},${jsArg(origFilename)},'highlights')" title="${starred ? 'Favorited' : 'Add to favorites'}">${starred ? '★' : '☆'}</button>
@@ -794,6 +808,7 @@ async function loadHighlights() {
     });
 
     container.innerHTML = html;
+    refreshAdminLightbox();
   } catch (err) {
     console.error('Failed to load highlights:', err);
   }
@@ -883,36 +898,6 @@ async function deleteActivityEntry(index) {
   }
 }
 
-function openLightbox(url, cam, filename) {
-  let lb = document.getElementById('timelapse-lightbox');
-  if (!lb) {
-    lb = document.createElement('div');
-    lb.id = 'timelapse-lightbox';
-    lb.innerHTML = `
-      <div class="lightbox-backdrop" onclick="closeLightbox()"></div>
-      <div class="lightbox-content">
-        <img id="lightbox-img" src="" alt="Frame">
-        <div class="lightbox-actions">
-          <button class="approve-btn" onclick="closeLightbox()">Close</button>
-          <button class="deny-btn" id="lightbox-delete-btn">Delete Frame</button>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(lb);
-  }
-  document.getElementById('lightbox-img').src = url;
-  document.getElementById('lightbox-delete-btn').onclick = () => {
-    const realCam = cam.replace(/^m-/, '').replace(/^hl-/, '');
-    deleteMotionCaptureFrame(realCam, filename);
-    closeLightbox();
-  };
-  lb.classList.add('active');
-}
-
-function closeLightbox() {
-  const lb = document.getElementById('timelapse-lightbox');
-  if (lb) lb.classList.remove('active');
-}
 
 function renderSparkline(values, width, height, color, opts) {
   const nums = values.filter(v => v !== null);
@@ -1262,9 +1247,11 @@ async function loadGrowthPending() {
       const thumbs = candidates.filter(c => c.filename).map(c => {
         const isChosen = c.number === chosen;
         return `
-          <div class="growth-candidate ${isChosen ? 'growth-chosen' : ''}" data-num="${c.number}" onclick="chooseGrowthFrame(${jsArg(date)}, ${c.number})">
-            <img src="${c.url}" alt="Candidate ${c.number}" loading="lazy">
-            <span>${isChosen ? '★ Chosen' : '#' + c.number}</span>
+          <div class="growth-candidate ${isChosen ? 'growth-chosen' : ''}" data-num="${c.number}">
+            <a href="${c.url}" class="glightbox" data-gallery="growth-pending-${escapeHtml(date)}" data-description="Candidate #${c.number}${isChosen ? ' (chosen)' : ''}">
+              <img src="${c.url}" alt="Candidate ${c.number}" loading="lazy">
+            </a>
+            <span class="growth-pick-label" onclick="chooseGrowthFrame(${jsArg(date)}, ${c.number})">${isChosen ? '★ Chosen' : '#' + c.number}</span>
           </div>
         `;
       }).join('');
@@ -1279,6 +1266,7 @@ async function loadGrowthPending() {
         </div>
       `;
     }).join('');
+    refreshAdminLightbox();
   } catch (err) {
     console.error('Failed to load growth pending:', err);
   }
@@ -1300,7 +1288,9 @@ async function loadGrowthChosen() {
       const dateLabel = new Date(frame.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       return `
         <div class="timelapse-frame-card">
-          <img src="${frame.url}" alt="Growth ${dateLabel}" loading="lazy" onclick="window.open('${frame.url}','_blank')">
+          <a href="${frame.url}" class="glightbox" data-gallery="growth-chosen" data-description="${dateLabel}">
+            <img src="${frame.url}" alt="Growth ${dateLabel}" loading="lazy">
+          </a>
           <div class="timelapse-frame-info">
             <span>${dateLabel}</span>
             <button class="deny-btn" onclick="deleteGrowthFrame(${jsArg(frame.filename)})">Delete</button>
@@ -1308,6 +1298,7 @@ async function loadGrowthChosen() {
         </div>
       `;
     }).join('') + '</div>';
+    refreshAdminLightbox();
   } catch (err) {
     console.error('Failed to load growth chosen:', err);
   }

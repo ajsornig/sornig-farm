@@ -20,18 +20,21 @@ case "$CAM" in
     STREAM="$BASE_DIR/public/hls2/stream.m3u8"
     THRESHOLD="0.04"
     COOLDOWN=180
+    MIN_BRIGHTNESS="0.10"
     FRAMES_DIR="$BASE_DIR/motion-timelapse/frames-coop"
     ;;
   chick)
     STREAM="$BASE_DIR/public/hls3/stream.m3u8"
     THRESHOLD="0.04"
     COOLDOWN=600
+    MIN_BRIGHTNESS="0.10"
     FRAMES_DIR="$BASE_DIR/motion-timelapse/frames-chick"
     ;;
   *)
     CAM="run"
     STREAM="$BASE_DIR/public/hls/stream.m3u8"
     THRESHOLD="0.04"
+    MIN_BRIGHTNESS="0.30"
     FRAMES_DIR="$BASE_DIR/motion-timelapse/frames-run"
     ;;
 esac
@@ -117,7 +120,7 @@ while true; do
     brightness=$(echo "$exposure" | cut -d'|' -f1)
     stddev=$(echo "$exposure" | cut -d'|' -f2)
     too_bright=$(echo "$brightness > 0.85" | bc -l 2>/dev/null)
-    too_dark=$(echo "$brightness < 0.10" | bc -l 2>/dev/null)
+    too_dark=$(echo "$brightness < $MIN_BRIGHTNESS" | bc -l 2>/dev/null)
     too_contrasty=$(echo "$stddev > 0.35" | bc -l 2>/dev/null)
     if [ "$too_bright" = "1" ] || [ "$too_dark" = "1" ] || [ "$too_contrasty" = "1" ]; then
       stat_log "skipped_exposure" "$brightness:$stddev"
