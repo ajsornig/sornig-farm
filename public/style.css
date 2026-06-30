@@ -2379,6 +2379,23 @@ footer {
     padding: 0 0.75rem;
     margin: 1rem auto;
   }
+
+  #ptz-extended {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .ptz-section {
+    min-width: unset;
+  }
+
+  #track-targets {
+    flex-wrap: wrap;
+  }
+
+  #track-back-times .ptz-toggle-row {
+    flex-wrap: wrap;
+  }
 }
 
 @media (max-width: 480px) {
