@@ -1140,7 +1140,7 @@ async function loadInfraData() {
         <div class="infra-card-row"><span>Restarts (Coop)</span><span>${d.restarts.cam2}</span></div>
         ${data.cam3Enabled ? `<div class="infra-card-row"><span>Restarts (Chick Cam)</span><span>${d.restarts.cam3}</span></div>` : ''}
         <div class="infra-card-row infra-reset-row">
-          <span>${data.restartsResetAt ? 'Since ' + new Date(data.restartsResetAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Since boot'}</span>
+          <span>${data.restartsResetAt ? 'Since ' + new Date(data.restartsResetAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + new Date(data.restartsResetAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'Since boot'}</span>
           <button class="admin-btn infra-reset-btn" onclick="resetRestartCounters()">Reset</button>
         </div>
       </div>
