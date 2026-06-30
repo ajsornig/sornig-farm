@@ -14,6 +14,19 @@ const { execSync } = require('child_process');
 
 const router = express.Router();
 
+const BANNED_WORDS = [
+  'fuck', 'shit', 'ass', 'dick', 'cock', 'pussy', 'bitch', 'whore',
+  'slut', 'cunt', 'fag', 'nigger', 'nigga', 'retard', 'rape',
+  'penis', 'vagina', 'tits', 'boob', 'porn', 'sex', 'anal',
+  'nazi', 'hitler', 'kkk', 'jihad',
+  'fiend', 'pedo', 'molest', 'kill', 'murder'
+];
+
+function isUsernameClean(username) {
+  const lower = username.toLowerCase().replace(/[^a-z]/g, '');
+  return !BANNED_WORDS.some(word => lower.includes(word));
+}
+
 const MIN_PASSWORD_LENGTH = 8;
 
 function escapeHtml(str) {
@@ -29,6 +42,12 @@ router.post('/register', async (req, res) => {
   const { username, password, email } = req.body;
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password required' });
+  }
+  if (!/^[a-zA-Z0-9_-]{3,20}$/.test(username)) {
+    return res.status(400).json({ error: 'Username must be 3-20 characters: letters, numbers, hyphens, underscores only' });
+  }
+  if (!isUsernameClean(username)) {
+    return res.status(400).json({ error: 'That username is not allowed' });
   }
   const result = db.createUser(username, password, false, email);
   if (result.error) {
