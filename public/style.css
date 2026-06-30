@@ -366,7 +366,7 @@ main {
 .preset-pill-delete {
   background: none;
   border: none;
-  color: white;
+  color: #333;
   font-size: 1.1rem;
   font-weight: bold;
   cursor: pointer;
@@ -375,7 +375,7 @@ main {
 }
 
 .preset-pill-delete:hover {
-  color: #fcc;
+  color: #a33;
 }
 
 #preset-save {
