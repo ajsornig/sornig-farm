@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sornig Farm - Live Chicken Cam</title>
-  <link rel="stylesheet" href="style.css?v=23">
+  <link rel="stylesheet" href="style.css?v=24">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="/vendor/glightbox.min.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐔</text></svg>">
@@ -64,6 +64,19 @@
             <label><input type="checkbox" id="track-people" checked> People</label>
             <label><input type="checkbox" id="track-animals"> Animals</label>
             <label><input type="checkbox" id="track-vehicles"> Vehicles</label>
+          </div>
+          <div id="track-back-times" class="hidden">
+            <div class="ptz-toggle-row">
+              <span>Return after stop</span>
+              <input type="number" id="track-stop-back" value="0" min="0" max="300" class="ptz-number-input">
+              <span>sec</span>
+            </div>
+            <div class="ptz-toggle-row">
+              <span>Return after lost</span>
+              <input type="number" id="track-disappear-back" value="0" min="0" max="300" class="ptz-number-input">
+              <span>sec</span>
+            </div>
+            <p class="ptz-hint">0 = stay where it tracked to</p>
           </div>
         </div>
         <div class="ptz-section admin-only hidden">
@@ -148,6 +161,6 @@
   </footer>
 
   <script src="/vendor/glightbox.min.js"></script>
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>

@@ -480,6 +480,12 @@ main {
   text-align: center;
 }
 
+.ptz-hint {
+  font-size: 0.7rem;
+  color: #888;
+  margin: 0.25rem 0 0;
+}
+
 #chat-container {
   width: 350px;
   background: var(--cream-dark);

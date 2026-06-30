@@ -56,6 +56,13 @@ async function setTrackTypes(cameraConfig, types) {
   });
 }
 
+async function setTrackBackTimes(cameraConfig, { stopBack, disappearBack }) {
+  const params = { channel: 0 };
+  if (stopBack !== undefined) params.aiStopBackTime = stopBack;
+  if (disappearBack !== undefined) params.aiDisappearBackTime = disappearBack;
+  return reolinkRequest(cameraConfig, 'SetAiCfg', params);
+}
+
 async function getPtzGuard(cameraConfig) {
   const result = await reolinkRequest(cameraConfig, 'GetPtzGuard', { channel: 0 });
   return result.PtzGuard;
@@ -67,4 +74,4 @@ async function setPtzGuard(cameraConfig, { enable, timeout }) {
   });
 }
 
-module.exports = { getAiConfig, setAiTrack, setTrackTypes, getPtzGuard, setPtzGuard };
+module.exports = { getAiConfig, setAiTrack, setTrackTypes, setTrackBackTimes, getPtzGuard, setPtzGuard };

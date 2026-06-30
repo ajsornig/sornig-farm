@@ -8,7 +8,7 @@ const { atomicWriteJSON } = require('../atomic-write');
 const { getClientIp } = require('../security');
 const { geolocateIP } = require('../geo');
 const { sendPtzCommand, getPresets, gotoPreset, setPreset, removePreset, VALID_OPS } = require('../ptz');
-const { getAiConfig, setAiTrack, setTrackTypes, getPtzGuard, setPtzGuard } = require('../reolink-api');
+const { getAiConfig, setAiTrack, setTrackTypes, setTrackBackTimes, getPtzGuard, setPtzGuard } = require('../reolink-api');
 const { createRateLimiter } = require('../security');
 const { execSync } = require('child_process');
 
@@ -1185,14 +1185,17 @@ router.post('/camera/:id/tracking', requireAuth, requireAdmin, async (req, res) 
   if (!cam) return res.status(404).json({ error: 'Camera not found or does not support PTZ' });
 
   try {
-    const { aiTrack, trackType } = req.body;
+    const { aiTrack, trackType, aiStopBackTime, aiDisappearBackTime } = req.body;
     if (aiTrack !== undefined) {
       await setAiTrack(cam, aiTrack);
     }
     if (trackType) {
       await setTrackTypes(cam, trackType);
     }
-    db.logActivity(req.session.username, 'ptz_autotrack', { camera: req.params.id, aiTrack });
+    if (aiStopBackTime !== undefined || aiDisappearBackTime !== undefined) {
+      await setTrackBackTimes(cam, { stopBack: aiStopBackTime, disappearBack: aiDisappearBackTime });
+    }
+    db.logActivity(req.session.username, 'ptz_autotrack', { camera: req.params.id, aiTrack, aiStopBackTime, aiDisappearBackTime });
     res.json({ success: true });
   } catch (err) {
     console.error('Set tracking config failed:', err.message);

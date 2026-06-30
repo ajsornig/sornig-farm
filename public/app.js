@@ -1328,10 +1328,13 @@ async function loadTracking() {
     toggle.checked = data.aiTrack;
     label.textContent = data.aiTrack ? 'On' : 'Off';
     targets.classList.toggle('hidden', !data.aiTrack);
+    document.getElementById('track-back-times').classList.toggle('hidden', !data.aiTrack);
 
     document.getElementById('track-people').checked = data.trackType.people;
     document.getElementById('track-animals').checked = data.trackType.dogCat;
     document.getElementById('track-vehicles').checked = data.trackType.vehicle;
+    document.getElementById('track-stop-back').value = data.aiStopBackTime || 0;
+    document.getElementById('track-disappear-back').value = data.aiDisappearBackTime || 0;
   } catch (err) {
     console.error('Failed to load tracking config:', err);
   }
@@ -1347,6 +1350,7 @@ async function toggleAutotrack() {
 
   label.textContent = enabled ? 'On' : 'Off';
   targets.classList.toggle('hidden', !enabled);
+  document.getElementById('track-back-times').classList.toggle('hidden', !enabled);
 
   try {
     const resp = await fetch(`/api/camera/${encodeURIComponent(camId)}/tracking`, {
@@ -1385,6 +1389,23 @@ async function updateTrackTypes() {
     });
   } catch (err) {
     console.error('Update track types failed:', err);
+  }
+}
+
+async function updateTrackBackTimes() {
+  const container = document.getElementById('ptz-extended');
+  const camId = container.dataset.camId;
+  const aiStopBackTime = parseInt(document.getElementById('track-stop-back').value) || 0;
+  const aiDisappearBackTime = parseInt(document.getElementById('track-disappear-back').value) || 0;
+
+  try {
+    await fetch(`/api/camera/${encodeURIComponent(camId)}/tracking`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      body: JSON.stringify({ aiStopBackTime, aiDisappearBackTime })
+    });
+  } catch (err) {
+    console.error('Update track back times failed:', err);
   }
 }
 
@@ -1431,6 +1452,8 @@ function setupPtzExtended() {
   document.getElementById('preset-name-input')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') savePreset();
   });
+  document.getElementById('track-stop-back')?.addEventListener('change', updateTrackBackTimes);
+  document.getElementById('track-disappear-back')?.addEventListener('change', updateTrackBackTimes);
   document.getElementById('guard-toggle')?.addEventListener('change', toggleGuard);
   document.getElementById('guard-timeout')?.addEventListener('change', toggleGuard);
 }
