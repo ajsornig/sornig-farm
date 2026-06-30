@@ -1139,6 +1139,10 @@ async function loadInfraData() {
         <div class="infra-card-row"><span>Restarts (Run)</span><span>${d.restarts.cam1}</span></div>
         <div class="infra-card-row"><span>Restarts (Coop)</span><span>${d.restarts.cam2}</span></div>
         ${data.cam3Enabled ? `<div class="infra-card-row"><span>Restarts (Chick Cam)</span><span>${d.restarts.cam3}</span></div>` : ''}
+        <div class="infra-card-row infra-reset-row">
+          <span>${data.restartsResetAt ? 'Since ' + new Date(data.restartsResetAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Since boot'}</span>
+          <button class="admin-btn infra-reset-btn" onclick="resetRestartCounters()">Reset</button>
+        </div>
       </div>
     `;
 
@@ -1492,6 +1496,21 @@ async function loadChickCamIp() {
     }
   } catch (err) {
     console.error('Failed to load chick cam IP:', err);
+  }
+}
+
+async function resetRestartCounters() {
+  if (!confirm('Reset all restart counters to zero?')) return;
+  try {
+    const res = await fetch('/api/admin/restart-reset', {
+      method: 'POST',
+      headers: { 'x-auth-token': authToken }
+    });
+    if ((await res.json()).success) {
+      loadInfraData();
+    }
+  } catch (err) {
+    console.error('Failed to reset restart counters:', err);
   }
 }
 

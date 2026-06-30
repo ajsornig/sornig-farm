@@ -14,3 +14,4 @@ SornigReadMe.txt
 .*.tmp
 # data.json backups — contain password hashes + session tokens, never commit
 backups/
+restart-baseline.json

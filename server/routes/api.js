@@ -805,7 +805,19 @@ router.get('/admin/motion-capture-stats', requireAdmin, (req, res) => {
 // --- Infrastructure Dashboard ---
 
 const WIFI_LOG = path.join(__dirname, '../../logs/wifi-monitor.log');
+const RESTART_BASELINE_FILE = path.join(__dirname, '../../restart-baseline.json');
 const INFRA_HISTORY_COUNT = 60;
+
+function readRestartBaseline() {
+  try {
+    if (fs.existsSync(RESTART_BASELINE_FILE)) {
+      return JSON.parse(fs.readFileSync(RESTART_BASELINE_FILE, 'utf8'));
+    }
+  } catch (err) {
+    console.error('Failed to read restart baseline:', err.message);
+  }
+  return null;
+}
 
 function parseInfraLine(line) {
   const parts = line.split(' | ');
@@ -932,10 +944,39 @@ router.get('/admin/infra', requireAdmin, (req, res) => {
     const alerts = generateInfraAlerts(latest);
 
     const cam3Enabled = (config.cameras || []).some(c => c.id === 'cam3' && c.enabled);
-    res.json({ success: true, latest, history, alerts, cam3Enabled });
+
+    const baseline = readRestartBaseline();
+    if (latest && baseline) {
+      latest.restarts = {
+        cam1: Math.max(0, latest.restarts.cam1 - (baseline.cam1 || 0)),
+        cam2: Math.max(0, latest.restarts.cam2 - (baseline.cam2 || 0)),
+        cam3: Math.max(0, latest.restarts.cam3 - (baseline.cam3 || 0))
+      };
+    }
+
+    res.json({
+      success: true, latest, history, alerts, cam3Enabled,
+      restartsResetAt: baseline ? baseline.resetAt : null
+    });
   } catch (err) {
     console.error('Infra endpoint error:', err);
     res.status(500).json({ error: 'Failed to read infrastructure data' });
+  }
+});
+
+router.post('/admin/restart-reset', requireAdmin, (req, res) => {
+  try {
+    const { execSync } = require('child_process');
+    const cam1 = parseInt(execSync('sudo systemctl show camera-hls --property=NRestarts', { encoding: 'utf8' }).split('=')[1]) || 0;
+    const cam2 = parseInt(execSync('sudo systemctl show camera-hls-2 --property=NRestarts', { encoding: 'utf8' }).split('=')[1]) || 0;
+    const cam3 = parseInt(execSync('sudo systemctl show camera-hls-3 --property=NRestarts', { encoding: 'utf8' }).split('=')[1]) || 0;
+
+    const baseline = { cam1, cam2, cam3, resetAt: new Date().toISOString() };
+    fs.writeFileSync(RESTART_BASELINE_FILE, JSON.stringify(baseline, null, 2));
+    res.json({ success: true, resetAt: baseline.resetAt });
+  } catch (err) {
+    console.error('Restart reset failed:', err.message);
+    res.status(500).json({ error: 'Failed to reset restart counters' });
   }
 });
 
