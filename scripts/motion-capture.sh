@@ -21,6 +21,7 @@ case "$CAM" in
     THRESHOLD="0.04"
     COOLDOWN=180
     MIN_BRIGHTNESS="0.10"
+    BLUR_SIGMA=12
     FRAMES_DIR="$BASE_DIR/motion-timelapse/frames-coop"
     ;;
   chick)
@@ -28,6 +29,7 @@ case "$CAM" in
     THRESHOLD="0.04"
     COOLDOWN=600
     MIN_BRIGHTNESS="0.10"
+    BLUR_SIGMA=5
     FRAMES_DIR="$BASE_DIR/motion-timelapse/frames-chick"
     ;;
   *)
@@ -35,6 +37,7 @@ case "$CAM" in
     STREAM="$BASE_DIR/public/hls/stream.m3u8"
     THRESHOLD="0.04"
     MIN_BRIGHTNESS="0.30"
+    BLUR_SIGMA=5
     FRAMES_DIR="$BASE_DIR/motion-timelapse/frames-run"
     ;;
 esac
@@ -109,7 +112,7 @@ while true; do
   fi
 
   # Grab blurred frame for comparison
-  if ! ffmpeg -y -i "$STREAM" -frames:v 1 -vf "scale=160:120,gblur=sigma=5" -q:v 5 "$WORK_DIR/current_blur.jpg" 2>/dev/null; then
+  if ! ffmpeg -y -i "$STREAM" -frames:v 1 -vf "scale=160:120,gblur=sigma=${BLUR_SIGMA}" -q:v 5 "$WORK_DIR/current_blur.jpg" 2>/dev/null; then
     sleep "$CHECK_INTERVAL"
     continue
   fi
