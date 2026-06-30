@@ -1250,6 +1250,10 @@ main {
   margin-top: 0.5rem;
 }
 
+#chick-growth-content > .timelapse-card {
+  max-width: 480px;
+}
+
 .section-subtitle {
   color: var(--text-muted);
   font-size: 0.9rem;
