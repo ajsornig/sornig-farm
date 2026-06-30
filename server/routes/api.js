@@ -746,20 +746,20 @@ router.get('/weather', async (req, res) => {
   }
 
   try {
-    // Lapeer, MI coordinates
-    const lat = 43.05;
-    const lng = -83.32;
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America%2FDetroit`;
-    const response = await fetch(url);
+    // NWS station KD95 = Lapeer Dupont-Lapeer (nearest to farm)
+    const response = await fetch('https://api.weather.gov/stations/KD95/observations/latest', {
+      headers: { 'User-Agent': 'SornigFarm/1.0 (ajsornig@gmail.com)' }
+    });
     const data = await response.json();
+    const obs = data.properties;
 
-    const current = data.current;
+    const tempC = obs.temperature.value;
+    const windKmh = obs.windSpeed.value;
     const weather = {
-      temp: Math.round(current.temperature_2m),
-      humidity: current.relative_humidity_2m,
-      windSpeed: Math.round(current.wind_speed_10m),
-      code: current.weather_code,
-      description: getWeatherDescription(current.weather_code)
+      temp: tempC !== null ? Math.round(tempC * 9 / 5 + 32) : null,
+      humidity: obs.relativeHumidity.value !== null ? Math.round(obs.relativeHumidity.value) : null,
+      windSpeed: windKmh !== null ? Math.round(windKmh * 0.621371) : null,
+      description: obs.textDescription || 'Unknown'
     };
 
     weatherCache = { data: weather, fetchedAt: now };
@@ -772,19 +772,6 @@ router.get('/weather', async (req, res) => {
     res.status(503).json({ error: 'Weather unavailable' });
   }
 });
-
-function getWeatherDescription(code) {
-  const descriptions = {
-    0: 'Clear', 1: 'Mostly Clear', 2: 'Partly Cloudy', 3: 'Overcast',
-    45: 'Foggy', 48: 'Icy Fog', 51: 'Light Drizzle', 53: 'Drizzle',
-    55: 'Heavy Drizzle', 61: 'Light Rain', 63: 'Rain', 65: 'Heavy Rain',
-    71: 'Light Snow', 73: 'Snow', 75: 'Heavy Snow', 77: 'Snow Grains',
-    80: 'Light Showers', 81: 'Showers', 82: 'Heavy Showers',
-    85: 'Light Snow Showers', 86: 'Snow Showers',
-    95: 'Thunderstorm', 96: 'Hail Thunderstorm', 99: 'Heavy Hail Storm'
-  };
-  return descriptions[code] || 'Unknown';
-}
 
 // --- Timelapse Analytics ---
 

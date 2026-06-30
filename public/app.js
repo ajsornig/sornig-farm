@@ -1019,7 +1019,7 @@ async function loadWeather() {
     const el = document.getElementById('weather-widget');
     if (!el) return;
 
-    const icon = getWeatherIcon(weather.code);
+    const icon = getWeatherIcon(weather.description);
     el.innerHTML = `
       <span class="weather-icon">${icon}</span>
       <span class="weather-temp">${weather.temp}°F</span>
@@ -1032,17 +1032,16 @@ async function loadWeather() {
   }
 }
 
-function getWeatherIcon(code) {
-  if (code === 0) return '☀️';
-  if (code <= 2) return '⛅';
-  if (code === 3) return '☁️';
-  if (code >= 45 && code <= 48) return '🌫️';
-  if (code >= 51 && code <= 55) return '🌦️';
-  if (code >= 61 && code <= 65) return '🌧️';
-  if (code >= 71 && code <= 77) return '🌨️';
-  if (code >= 80 && code <= 82) return '🌧️';
-  if (code >= 85 && code <= 86) return '🌨️';
-  if (code >= 95) return '⛈️';
+function getWeatherIcon(desc) {
+  if (!desc) return '🌡️';
+  const d = desc.toLowerCase();
+  if (d.includes('thunder') || d.includes('storm')) return '⛈️';
+  if (d.includes('snow') || d.includes('blizzard') || d.includes('sleet')) return '🌨️';
+  if (d.includes('rain') || d.includes('drizzle') || d.includes('shower')) return '🌧️';
+  if (d.includes('fog') || d.includes('haze') || d.includes('mist')) return '🌫️';
+  if (d.includes('cloud') || d.includes('overcast')) return '☁️';
+  if (d.includes('partly') || d.includes('mostly clear')) return '⛅';
+  if (d.includes('clear') || d.includes('sunny') || d.includes('fair')) return '☀️';
   return '🌡️';
 }
 
