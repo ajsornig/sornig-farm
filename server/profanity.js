@@ -3,7 +3,9 @@
 const badWords = [
   'fuck', 'shit', 'ass', 'bitch', 'damn', 'crap', 'piss',
   'dick', 'cock', 'pussy', 'cunt', 'fag', 'slut', 'whore',
-  'bastard', 'nigger', 'nigga', 'retard', 'homo'
+  'bastard', 'nigger', 'nigga', 'retard', 'homo',
+  'rape', 'penis', 'vagina', 'tits', 'boob', 'porn', 'sex', 'anal',
+  'nazi', 'hitler', 'kkk', 'jihad', 'pedo', 'molest', 'kill', 'murder'
 ];
 
 // Create regex patterns that match whole words and common variations
@@ -39,7 +41,13 @@ function filterProfanity(text) {
   return filtered;
 }
 
+function isUsernameClean(username) {
+  const lower = username.toLowerCase().replace(/[^a-z]/g, '');
+  return !badWords.some(word => lower.includes(word));
+}
+
 module.exports = {
   containsProfanity,
-  filterProfanity
+  filterProfanity,
+  isUsernameClean
 };

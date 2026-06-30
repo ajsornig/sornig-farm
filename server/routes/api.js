@@ -12,20 +12,9 @@ const { getAiConfig, setAiTrack, setTrackTypes, setTrackBackTimes, getPtzGuard, 
 const { createRateLimiter } = require('../security');
 const { execSync } = require('child_process');
 
+const { isUsernameClean } = require('../profanity');
+
 const router = express.Router();
-
-const BANNED_WORDS = [
-  'fuck', 'shit', 'ass', 'dick', 'cock', 'pussy', 'bitch', 'whore',
-  'slut', 'cunt', 'fag', 'nigger', 'nigga', 'retard', 'rape',
-  'penis', 'vagina', 'tits', 'boob', 'porn', 'sex', 'anal',
-  'nazi', 'hitler', 'kkk', 'jihad',
-  'fiend', 'pedo', 'molest', 'kill', 'murder'
-];
-
-function isUsernameClean(username) {
-  const lower = username.toLowerCase().replace(/[^a-z]/g, '');
-  return !BANNED_WORDS.some(word => lower.includes(word));
-}
 
 const MIN_PASSWORD_LENGTH = 8;
 
