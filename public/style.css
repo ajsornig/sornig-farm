@@ -2634,6 +2634,36 @@ footer {
 .infra-legend-dot.warning { background: var(--golden); }
 .infra-legend-dot.critical { background: var(--barn-red); }
 
+.lb-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 0.75rem;
+}
+
+.lb-star-btn, .lb-delete-btn {
+  padding: 0.4rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.lb-star-btn {
+  background: var(--golden);
+  color: #fff;
+}
+
+.lb-star-btn.starred {
+  background: var(--forest-green);
+}
+
+.lb-delete-btn {
+  background: var(--barn-red);
+  color: #fff;
+}
+
 .infra-offline-badge {
   background: #999;
   color: #fff;

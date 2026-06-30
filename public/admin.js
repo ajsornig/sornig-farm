@@ -15,8 +15,56 @@ function refreshAdminLightbox() {
   adminLightbox = GLightbox({
     touchNavigation: true,
     loop: true,
-    closeOnOutsideClick: true
+    closeOnOutsideClick: true,
+    onOpen: () => updateLbActions(),
+    afterSlideChange: () => updateLbActions()
   });
+}
+
+function updateLbActions() {
+  if (!adminLightbox) return;
+  const slide = adminLightbox.activeSlide;
+  if (!slide) return;
+  const desc = slide.querySelector('.gslide-desc');
+  if (!desc) return;
+
+  const existing = desc.querySelector('.lb-actions');
+  if (existing) existing.remove();
+
+  const el = adminLightbox.elements[adminLightbox.index];
+  if (!el || !el.node) return;
+  const link = el.node.closest ? el.node : el.node.querySelector('a');
+  if (!link) return;
+
+  const cam = link.dataset.cam;
+  const filename = link.dataset.filename;
+  const source = link.dataset.source;
+  if (!cam || !filename) return;
+
+  const starred = isFavorited(cam, filename);
+  const bar = document.createElement('div');
+  bar.className = 'lb-actions';
+
+  const starBtn = document.createElement('button');
+  starBtn.className = 'lb-star-btn' + (starred ? ' starred' : '');
+  starBtn.textContent = starred ? '★ Starred' : '☆ Star';
+  starBtn.onclick = () => {
+    starFrame(cam, filename, source || 'frames');
+    starBtn.classList.toggle('starred');
+    starBtn.textContent = starBtn.classList.contains('starred') ? '★ Starred' : '☆ Star';
+  };
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'lb-delete-btn';
+  delBtn.textContent = 'Delete';
+  delBtn.onclick = () => {
+    deleteMotionCaptureFrame(cam, filename);
+    adminLightbox.close();
+  };
+
+  bar.appendChild(starBtn);
+  bar.appendChild(delBtn);
+  desc.appendChild(bar);
 }
 
 // Escape for safe interpolation into HTML TEXT or attribute VALUES (quotes
@@ -739,15 +787,17 @@ async function loadMotionCaptureFrames() {
       let s = `<h4 style="margin:0.75rem 0 0.5rem;color:var(--forest-green);">${label}</h4>`;
       s += '<div class="timelapse-grid">' + camFrames.map(frame => {
         const starred = isFavorited(frame.cam, frame.filename);
+        const cam = frame.cam;
+        const fn = frame.filename;
         return `
-        <div class="timelapse-frame-card" id="mframe-${escapeHtml(frame.cam)}-${escapeHtml(frame.filename)}">
-          <a href="${frame.url}" class="glightbox" data-gallery="${galleryName}" data-description="${escapeHtml(frame.cam)} — ${frame.time}">
+        <div class="timelapse-frame-card" id="mframe-${escapeHtml(cam)}-${escapeHtml(fn)}">
+          <a href="${frame.url}" class="glightbox" data-gallery="${galleryName}" data-cam="${escapeHtml(cam)}" data-filename="${escapeHtml(fn)}" data-source="frames" data-description="${escapeHtml(cam)} — ${frame.time}">
             <img src="${frame.url}" alt="${frame.time}" loading="lazy">
           </a>
           <div class="timelapse-frame-info">
             <span>${frame.time}</span>
-            <button class="star-btn ${starred ? 'starred' : ''}" onclick="starFrame(${jsArg(frame.cam)},${jsArg(frame.filename)},'frames')" title="${starred ? 'Favorited' : 'Add to favorites'}">${starred ? '★' : '☆'}</button>
-            <button class="deny-btn" onclick="deleteMotionCaptureFrame(${jsArg(frame.cam)},${jsArg(frame.filename)})">Delete</button>
+            <button class="star-btn ${starred ? 'starred' : ''}" onclick="starFrame(${jsArg(cam)},${jsArg(fn)},'frames')" title="${starred ? 'Favorited' : 'Add to favorites'}">${starred ? '★' : '☆'}</button>
+            <button class="deny-btn" onclick="deleteMotionCaptureFrame(${jsArg(cam)},${jsArg(fn)})">Delete</button>
           </div>
         </div>
       `}).join('') + '</div>';
@@ -796,7 +846,7 @@ async function loadHighlights() {
         const origFilename = item.filename.replace(/^(run|coop|chick)_/, '');
         return `
         <div class="timelapse-frame-card">
-          <a href="${item.url}" class="glightbox" data-gallery="highlights-${escapeHtml(date)}" data-description="${escapeHtml(item.cam)} — ${item.time}">
+          <a href="${item.url}" class="glightbox" data-gallery="highlights-${escapeHtml(date)}" data-cam="${escapeHtml(item.cam)}" data-filename="${escapeHtml(origFilename)}" data-source="highlights" data-description="${escapeHtml(item.cam)} — ${item.time}">
             <img src="${item.url}" alt="${item.cam} ${item.time}" loading="lazy">
           </a>
           <div class="timelapse-frame-info">
