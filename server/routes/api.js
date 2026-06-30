@@ -611,7 +611,18 @@ router.get('/admin/chick-growth/pending', requireAdmin, (req, res) => {
     }
   });
 
-  res.json({ dates });
+  const backupDir = path.join(pendingDir, 'backup');
+  const backupDates = [];
+  if (fs.existsSync(backupDir)) {
+    const backupFiles = fs.readdirSync(backupDir).filter(f => f.endsWith('.jpg'));
+    const seen = new Set();
+    backupFiles.forEach(f => {
+      const m = f.match(/^(\d{4}-\d{2}-\d{2})_\d\.jpg$/);
+      if (m && !seen.has(m[1])) { seen.add(m[1]); backupDates.push(m[1]); }
+    });
+  }
+
+  res.json({ dates, backupDates });
 });
 
 router.post('/admin/chick-growth/pending/:date/choose/:number', requireAdmin, (req, res) => {
@@ -648,14 +659,41 @@ router.post('/admin/chick-growth/pending/:date/confirm', requireAdmin, (req, res
   }
 
   const pendingDir = path.join(__dirname, '../../public/chick-growth/pending');
+  const backupDir = path.join(pendingDir, 'backup');
 
-  // Delete all pending candidates for this date
+  if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+
   for (let i = 1; i <= 5; i++) {
     const candidatePath = path.join(pendingDir, `${date}_${i}.jpg`);
-    if (fs.existsSync(candidatePath)) fs.unlinkSync(candidatePath);
+    if (fs.existsSync(candidatePath)) {
+      fs.renameSync(candidatePath, path.join(backupDir, `${date}_${i}.jpg`));
+    }
   }
 
   res.json({ success: true });
+});
+
+router.post('/admin/chick-growth/pending/:date/undo', requireAdmin, (req, res) => {
+  const { date } = req.params;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ error: 'Invalid date' });
+  }
+
+  const pendingDir = path.join(__dirname, '../../public/chick-growth/pending');
+  const backupDir = path.join(pendingDir, 'backup');
+  let restored = 0;
+
+  for (let i = 1; i <= 5; i++) {
+    const backupPath = path.join(backupDir, `${date}_${i}.jpg`);
+    const pendingPath = path.join(pendingDir, `${date}_${i}.jpg`);
+    if (fs.existsSync(backupPath)) {
+      fs.renameSync(backupPath, pendingPath);
+      restored++;
+    }
+  }
+
+  if (restored === 0) return res.status(404).json({ error: 'No backup found for this date' });
+  res.json({ success: true, restored });
 });
 
 router.delete('/admin/chick-growth/:filename', requireAdmin, (req, res) => {

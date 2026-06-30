@@ -13,7 +13,8 @@ FRAMES_DIR="$BASE_DIR/motion-timelapse/frames-chick"
 GROWTH_DIR="$BASE_DIR/public/chick-growth"
 PENDING_DIR="$GROWTH_DIR/pending"
 
-mkdir -p "$GROWTH_DIR" "$PENDING_DIR"
+BACKUP_DIR="$PENDING_DIR/backup"
+mkdir -p "$GROWTH_DIR" "$PENDING_DIR" "$BACKUP_DIR"
 
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] [chick-growth] $1" >> "$LOG"
@@ -21,6 +22,10 @@ log() {
 
 pick_frames() {
   local yesterday=$(date -d "yesterday" '+%Y-%m-%d')
+
+  # Clear old backups before writing new candidates
+  rm -f "$BACKUP_DIR"/*.jpg 2>/dev/null
+  log "cleared backup dir"
 
   local frames=($(ls "$FRAMES_DIR/${yesterday}_"*.jpg 2>/dev/null | sort))
   local count=${#frames[@]}

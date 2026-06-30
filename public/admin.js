@@ -1301,7 +1301,16 @@ async function loadGrowthPending() {
     const dates = Object.keys(data.dates || {}).sort((a, b) => b.localeCompare(a));
 
     if (dates.length === 0) {
-      list.innerHTML = '<p class="no-pending">No pending growth picks</p>';
+      const backups = (data.backupDates || []);
+      if (backups.length > 0) {
+        list.innerHTML = '<p class="no-pending">No pending growth picks</p>' +
+          backups.map(d => {
+            const label = new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            return `<button class="admin-btn" style="margin-top:0.5rem" onclick="undoGrowthConfirm(${jsArg(d)})">Undo ${label} confirm (restore candidates)</button>`;
+          }).join('');
+      } else {
+        list.innerHTML = '<p class="no-pending">No pending growth picks</p>';
+      }
       return;
     }
 
@@ -1399,6 +1408,23 @@ async function confirmGrowthPick(date) {
     loadGrowthPicksAdmin();
   } catch (err) {
     console.error('Failed to confirm growth pick:', err);
+  }
+}
+
+async function undoGrowthConfirm(date) {
+  try {
+    const res = await fetch(`/api/admin/chick-growth/pending/${date}/undo`, {
+      method: 'POST',
+      headers: { 'x-auth-token': authToken }
+    });
+    const data = await res.json();
+    if (data.success) {
+      loadGrowthPicksAdmin();
+    } else {
+      alert(data.error || 'Undo failed');
+    }
+  } catch (err) {
+    console.error('Failed to undo growth confirm:', err);
   }
 }
 
