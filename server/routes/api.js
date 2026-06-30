@@ -562,15 +562,19 @@ router.get('/chick-growth', (req, res) => {
   const frames = fs.readdirSync(growthDir)
     .filter(f => f.endsWith('.jpg') && !f.includes('_'))  // YYYY-MM-DD.jpg only, not pending _1 _2 etc
     .sort()
-    .map(filename => ({
-      filename,
-      url: `/chick-growth/${filename}`,
-      date: filename.replace('.jpg', '')
-    }));
+    .map(filename => {
+      const mtime = fs.statSync(path.join(growthDir, filename)).mtimeMs;
+      return {
+        filename,
+        url: `/chick-growth/${filename}?v=${Math.floor(mtime)}`,
+        date: filename.replace('.jpg', '')
+      };
+    });
 
   const videoFile = 'chick-growth.mp4';
   const videoPath = path.join(growthDir, videoFile);
-  const video = fs.existsSync(videoPath) ? { url: `/chick-growth/${videoFile}`, size: fs.statSync(videoPath).size } : null;
+  const videoMtime = fs.existsSync(videoPath) ? Math.floor(fs.statSync(videoPath).mtimeMs) : 0;
+  const video = fs.existsSync(videoPath) ? { url: `/chick-growth/${videoFile}?v=${videoMtime}`, size: fs.statSync(videoPath).size } : null;
 
   res.json({ frames, video });
 });
