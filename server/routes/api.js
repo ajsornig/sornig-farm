@@ -1161,4 +1161,28 @@ router.post('/camera/:id/guard', requireAuth, requireAdmin, async (req, res) => 
   }
 });
 
+router.get('/admin/chick-cam-ip', requireAuth, requireAdmin, (req, res) => {
+  const cam3 = (config.cameras || []).find(c => c.id === 'cam3');
+  if (!cam3) return res.status(404).json({ error: 'cam3 not found in config' });
+  res.json({ success: true, ip: cam3.ptz.ip });
+});
+
+router.post('/admin/chick-cam-ip', requireAuth, requireAdmin, (req, res) => {
+  const { ip } = req.body;
+  if (!ip || !/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip)) {
+    return res.status(400).json({ error: 'Invalid IP address' });
+  }
+
+  try {
+    const scriptPath = path.join(__dirname, '../../scripts/swap-chick-cam-ip.sh');
+    const output = execSync(`sudo ${scriptPath} ${ip}`, { timeout: 15000, encoding: 'utf8' });
+    const cam3 = config.cameras.find(c => c.id === 'cam3');
+    if (cam3) cam3.ptz.ip = ip;
+    res.json({ success: true, ip, output });
+  } catch (err) {
+    console.error('Chick cam IP swap failed:', err.message);
+    res.status(500).json({ error: 'Failed to swap IP', details: err.stderr || err.message });
+  }
+});
+
 module.exports = router;

@@ -22,7 +22,8 @@ while true; do
   # Ping cameras
   ping1_ms=$(ping -c 1 -W 2 10.0.0.10 2>/dev/null | grep 'time=' | sed 's/.*time=\([^ ]*\).*/\1/' || echo "FAIL")
   ping2_ms=$(ping -c 1 -W 2 10.0.0.11 2>/dev/null | grep 'time=' | sed 's/.*time=\([^ ]*\).*/\1/' || echo "FAIL")
-  ping3_ms=$(ping -c 1 -W 2 192.168.4.75 2>/dev/null | grep 'time=' | sed 's/.*time=\([^ ]*\).*/\1/' || echo "FAIL")
+  cam3_ip=$(python3 -c "import json; d=json.load(open('/home/ajsornig/chicken-stream/config.json')); print([c['ptz']['ip'] for c in d['cameras'] if c['id']=='cam3'][0])" 2>/dev/null || echo "192.168.4.75")
+  ping3_ms=$(ping -c 1 -W 2 "$cam3_ip" 2>/dev/null | grep 'time=' | sed 's/.*time=\([^ ]*\).*/\1/' || echo "FAIL")
 
   # Ping Wavlink AP
   wavlink_ms=$(ping -c 1 -W 2 10.0.0.49 2>/dev/null | grep 'time=' | sed 's/.*time=\([^ ]*\).*/\1/' || echo "FAIL")

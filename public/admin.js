@@ -226,6 +226,7 @@ function setupAdminTabs() {
 
       if (panel === 'cameras') {
         loadCameraToggles();
+        loadChickCamIp();
         loadInfraData();
         infraRefreshInterval = setInterval(loadInfraData, 60000);
       } else if (infraRefreshInterval) {
@@ -1434,6 +1435,55 @@ async function loadCameraToggles() {
     `).join('');
   } catch (err) {
     console.error('Failed to load camera toggles:', err);
+  }
+}
+
+async function loadChickCamIp() {
+  try {
+    const res = await fetch('/api/admin/chick-cam-ip', {
+      headers: { 'x-auth-token': authToken }
+    });
+    const data = await res.json();
+    const el = document.getElementById('chick-cam-current-ip');
+    if (el && data.ip) {
+      el.textContent = data.ip;
+      el.className = data.ip.startsWith('10.0.0.') ? 'ip-camera-net' : 'ip-home-net';
+    }
+  } catch (err) {
+    console.error('Failed to load chick cam IP:', err);
+  }
+}
+
+async function applyChickCamIp(overrideIp) {
+  const ip = overrideIp || document.getElementById('chick-cam-new-ip').value.trim();
+  if (!ip || !/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip)) {
+    alert('Enter a valid IP address');
+    return;
+  }
+  const resultEl = document.getElementById('chick-cam-ip-result');
+  resultEl.className = 'chick-cam-ip-result pending';
+  resultEl.textContent = 'Switching...';
+
+  try {
+    const res = await fetch('/api/admin/chick-cam-ip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      body: JSON.stringify({ ip })
+    });
+    const data = await res.json();
+    if (data.success) {
+      resultEl.className = 'chick-cam-ip-result success';
+      resultEl.textContent = 'Switched to ' + ip;
+      document.getElementById('chick-cam-current-ip').textContent = ip;
+      document.getElementById('chick-cam-current-ip').className = ip.startsWith('10.0.0.') ? 'ip-camera-net' : 'ip-home-net';
+      document.getElementById('chick-cam-new-ip').value = '';
+    } else {
+      resultEl.className = 'chick-cam-ip-result error';
+      resultEl.textContent = data.error || 'Failed';
+    }
+  } catch (err) {
+    resultEl.className = 'chick-cam-ip-result error';
+    resultEl.textContent = 'Network error';
   }
 }
 
