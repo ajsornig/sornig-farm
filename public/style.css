@@ -375,14 +375,10 @@ main {
   border-radius: 50%;
   font-size: 0.6rem;
   cursor: pointer;
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
-}
-
-.preset-pill:hover .preset-pill-delete {
-  display: flex;
 }
 
 #preset-save {
