@@ -1298,11 +1298,9 @@ async function loadGrowthPending() {
       const thumbs = candidates.filter(c => c.filename).map(c => {
         const isChosen = c.number === chosen;
         return `
-          <div class="growth-candidate ${isChosen ? 'growth-chosen' : ''}" data-num="${c.number}">
-            <a href="${c.url}" class="glightbox" data-gallery="growth-pending-${escapeHtml(date)}" data-description="Candidate #${c.number}${isChosen ? ' (chosen)' : ''}">
-              <img src="${c.url}" alt="Candidate ${c.number}" loading="lazy">
-            </a>
-            <span class="growth-pick-label" onclick="chooseGrowthFrame(${jsArg(date)}, ${c.number})">${isChosen ? '★ Chosen' : '#' + c.number}</span>
+          <div class="growth-candidate ${isChosen ? 'growth-chosen' : ''}" data-num="${c.number}" onclick="chooseGrowthFrame(${jsArg(date)}, ${c.number})">
+            <img src="${c.url}" alt="Candidate ${c.number}" loading="lazy">
+            <span class="growth-pick-label">${isChosen ? '★ Chosen' : '#' + c.number}</span>
           </div>
         `;
       }).join('');
