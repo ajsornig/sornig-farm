@@ -41,7 +41,7 @@ async function getAiConfig(cameraConfig) {
 }
 
 async function setAiTrack(cameraConfig, enabled) {
-  return reolinkRequest(cameraConfig, 'SetAiCfg', { channel: 0, aiTrack: enabled ? 1 : 0 });
+  return reolinkRequest(cameraConfig, 'SetAiCfg', { channel: 0, aiTrack: enabled ? 1 : 0, bSmartTrack: enabled ? 1 : 0 });
 }
 
 async function setTrackTypes(cameraConfig, types) {
