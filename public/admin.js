@@ -39,31 +39,46 @@ function updateLbActions() {
   const cam = link.dataset.cam;
   const filename = link.dataset.filename;
   const source = link.dataset.source;
+  const growthDate = link.dataset.growthDate;
+  const growthNum = link.dataset.growthNum;
   if (!cam || !filename) return;
 
-  const starred = isFavorited(cam, filename);
   const bar = document.createElement('div');
   bar.className = 'lb-actions';
 
-  const starBtn = document.createElement('button');
-  starBtn.className = 'lb-star-btn' + (starred ? ' starred' : '');
-  starBtn.textContent = starred ? '★ Starred' : '☆ Star';
-  starBtn.onclick = () => {
-    starFrame(cam, filename, source || 'frames');
-    starBtn.classList.toggle('starred');
-    starBtn.textContent = starBtn.classList.contains('starred') ? '★ Starred' : '☆ Star';
-  };
+  if (growthDate && growthNum) {
+    const chooseBtn = document.createElement('button');
+    chooseBtn.className = 'lb-star-btn';
+    chooseBtn.textContent = '★ Choose This Pic';
+    chooseBtn.onclick = async () => {
+      await chooseGrowthFrame(growthDate, parseInt(growthNum));
+      chooseBtn.classList.add('starred');
+      chooseBtn.textContent = '★ Chosen!';
+    };
+    bar.appendChild(chooseBtn);
+  } else {
+    const starred = isFavorited(cam, filename);
+    const starBtn = document.createElement('button');
+    starBtn.className = 'lb-star-btn' + (starred ? ' starred' : '');
+    starBtn.textContent = starred ? '★ Starred' : '☆ Star';
+    starBtn.onclick = () => {
+      starFrame(cam, filename, source || 'frames');
+      starBtn.classList.toggle('starred');
+      starBtn.textContent = starBtn.classList.contains('starred') ? '★ Starred' : '☆ Star';
+    };
 
-  const delBtn = document.createElement('button');
-  delBtn.className = 'lb-delete-btn';
-  delBtn.textContent = 'Delete';
-  delBtn.onclick = () => {
-    deleteMotionCaptureFrame(cam, filename);
-    adminLightbox.close();
-  };
+    const delBtn = document.createElement('button');
+    delBtn.className = 'lb-delete-btn';
+    delBtn.textContent = 'Delete';
+    delBtn.onclick = () => {
+      deleteMotionCaptureFrame(cam, filename);
+      adminLightbox.close();
+    };
 
-  bar.appendChild(starBtn);
-  bar.appendChild(delBtn);
+    bar.appendChild(starBtn);
+    bar.appendChild(delBtn);
+  }
+
   desc.appendChild(bar);
 }
 
@@ -1298,9 +1313,11 @@ async function loadGrowthPending() {
       const thumbs = candidates.filter(c => c.filename).map(c => {
         const isChosen = c.number === chosen;
         return `
-          <div class="growth-candidate ${isChosen ? 'growth-chosen' : ''}" data-num="${c.number}" onclick="chooseGrowthFrame(${jsArg(date)}, ${c.number})">
-            <img src="${c.url}" alt="Candidate ${c.number}" loading="lazy">
-            <span class="growth-pick-label">${isChosen ? '★ Chosen' : '#' + c.number}</span>
+          <div class="growth-candidate ${isChosen ? 'growth-chosen' : ''}" data-num="${c.number}">
+            <a href="${c.url}" class="glightbox" data-gallery="growth-pending-${escapeHtml(date)}" data-cam="growth" data-filename="${escapeHtml(date)}_${c.number}" data-growth-date="${escapeHtml(date)}" data-growth-num="${c.number}" data-description="Candidate #${c.number}${isChosen ? ' (chosen)' : ''}">
+              <img src="${c.url}" alt="Candidate ${c.number}" loading="lazy">
+            </a>
+            <span class="growth-pick-label" onclick="chooseGrowthFrame(${jsArg(date)}, ${c.number})">${isChosen ? '★ Chosen' : '#' + c.number}</span>
           </div>
         `;
       }).join('');
