@@ -156,6 +156,7 @@ stitch_growth() {
     "$tmp_output" 2>/dev/null
 
   if [ $? -eq 0 ] && [ -f "$tmp_output" ]; then
+    chmod 644 "$tmp_output"
     mv "$tmp_output" "$output"
     log "[stitch] OK: Stitched $idx frames (${fps}fps) into chick-growth.mp4"
   else
