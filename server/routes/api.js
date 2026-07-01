@@ -18,6 +18,42 @@ const router = express.Router();
 
 const MIN_PASSWORD_LENGTH = 8;
 
+// httpOnly session cookie — the credential used to gate private media (streams,
+// saved frames/videos) that <video>/<img> requests can't attach a header to.
+// Secure so it is only ever sent over the Cloudflare HTTPS edge; SameSite=Lax so
+// same-origin media/page loads carry it. Mirrors the 7-day server session TTL.
+const SESSION_COOKIE = 'sf_session';
+const SESSION_COOKIE_OPTS = {
+  httpOnly: true,
+  secure: true,
+  sameSite: 'lax',
+  path: '/',
+  maxAge: 7 * 24 * 60 * 60 * 1000
+};
+function setSessionCookie(res, token) {
+  res.cookie(SESSION_COOKIE, token, SESSION_COOKIE_OPTS);
+}
+function clearSessionCookie(res) {
+  res.clearCookie(SESSION_COOKIE, { path: '/' });
+}
+
+function sessionFromRequest(req) {
+  const token = (req.cookies && req.cookies[SESSION_COOKIE]) ||
+    req.headers['x-auth-token'] || req.query.token;
+  return token ? db.getSession(token) : null;
+}
+
+// Gate for private viewer content: any logged-in, approved account (or admin).
+function requireApprovedViewer(req, res, next) {
+  const session = sessionFromRequest(req);
+  if (!session) return res.status(401).json({ error: 'Not authenticated' });
+  if (config.requireApproval && !db.isUserApproved(session.username)) {
+    return res.status(403).json({ error: 'Account not approved' });
+  }
+  req.session = session;
+  next();
+}
+
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -32,8 +68,8 @@ router.post('/register', async (req, res) => {
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password required' });
   }
-  if (!/^[a-zA-Z0-9_-]{3,20}$/.test(username)) {
-    return res.status(400).json({ error: 'Username must be 3-20 characters: letters, numbers, hyphens, underscores only' });
+  if (!db.USERNAME_RE.test(username)) {
+    return res.status(400).json({ error: 'Username must be 3-20 characters: letters, numbers, and . _ - only' });
   }
   if (!isUsernameClean(username)) {
     return res.status(400).json({ error: 'That username is not allowed' });
@@ -54,6 +90,7 @@ router.post('/register', async (req, res) => {
   }
 
   const loginResult = db.loginUser(username, password);
+  if (loginResult.token) setSessionCookie(res, loginResult.token);
   res.json(loginResult);
 });
 
@@ -80,14 +117,16 @@ router.post('/login', (req, res) => {
       db.logActivity(result.username, 'login', { ip, ...(geo || {}) });
     });
   }
+  if (result.token) setSessionCookie(res, result.token);
   res.json({ ...result, approved: true, requireApproval: config.requireApproval || false });
 });
 
 router.post('/logout', (req, res) => {
-  const token = req.headers['x-auth-token'];
+  const token = req.headers['x-auth-token'] || (req.cookies && req.cookies[SESSION_COOKIE]);
   if (token) {
     db.logoutUser(token);
   }
+  clearSessionCookie(res);
   res.json({ success: true });
 });
 
@@ -123,7 +162,7 @@ router.get('/reset-password/:token', (req, res) => {
     <button type="submit">Reset Password</button><p class="err" id="err"></p></form>
     <script>document.getElementById('f').onsubmit=async(e)=>{e.preventDefault();const p1=document.getElementById('p1').value;const p2=document.getElementById('p2').value;
     if(p1!==p2){document.getElementById('err').textContent='Passwords do not match';return;}
-    const r=await fetch('/api/reset-password/${req.params.token}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({newPassword:p1})});
+    const r=await fetch(location.pathname,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({newPassword:p1})});
     const d=await r.json();if(d.success){document.querySelector('.box').innerHTML='<h1>Password Reset!</h1><p>Your password has been changed. You can now <a href="/">log in</a>.</p>';}
     else{document.getElementById('err').textContent=d.error||'Reset failed';}}</script></div></body></html>
   `);
@@ -166,7 +205,7 @@ router.post('/change-password', (req, res) => {
 });
 
 router.get('/me', (req, res) => {
-  const token = req.headers['x-auth-token'];
+  const token = req.headers['x-auth-token'] || (req.cookies && req.cookies[SESSION_COOKIE]);
   if (!token) {
     return res.json({ loggedIn: false });
   }
@@ -174,6 +213,9 @@ router.get('/me', (req, res) => {
   if (!session) {
     return res.json({ loggedIn: false });
   }
+  // Upgrade path: existing clients that only hold the token in localStorage get
+  // the httpOnly media cookie (re)issued here on their normal page-load /me call.
+  setSessionCookie(res, token);
   const approved = db.isUserApproved(session.username);
   const user = db.getUser(session.username);
   const ip = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.ip;
@@ -252,12 +294,13 @@ router.delete('/account', (req, res) => {
 });
 
 function requireAdmin(req, res, next) {
-  const token = req.headers['x-auth-token'] || req.query.token;
-  if (!token) {
+  // Accept the httpOnly cookie as well as the header/query token, so admin-only
+  // <img>/<video> resources (which can't set a header) still authenticate.
+  const session = sessionFromRequest(req);
+  if (!session) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  const session = db.getSession(token);
-  if (!session || !session.isAdmin) {
+  if (!session.isAdmin) {
     return res.status(403).json({ error: 'Admin access required' });
   }
   req.session = session;
@@ -412,7 +455,7 @@ router.get('/deny/:token', async (req, res) => {
 
 // --- Favorites ---
 
-router.get('/favorites', (req, res) => {
+router.get('/favorites', requireApprovedViewer, (req, res) => {
   const favorites = db.getFavorites();
   const favDir = path.join(__dirname, '../../public/favorites');
   const result = favorites.filter(f => fs.existsSync(path.join(favDir, f.filename))).map(f => ({
@@ -478,7 +521,7 @@ router.get('/admin/highlights', requireAdmin, (req, res) => {
   res.json({ dates });
 });
 
-router.get('/motion-timelapse', (req, res) => {
+router.get('/motion-timelapse', requireApprovedViewer, (req, res) => {
   const motionTimelapseDir = path.join(__dirname, '../../public/motion-timelapse');
 
   if (!fs.existsSync(motionTimelapseDir)) {
@@ -527,7 +570,7 @@ router.get('/admin/motion-capture-frames', requireAdmin, (req, res) => {
   res.json(files);
 });
 
-router.get('/admin/motion-capture-frames/:cam/:filename', (req, res) => {
+router.get('/admin/motion-capture-frames/:cam/:filename', requireAdmin, (req, res) => {
   const filename = path.basename(req.params.filename);
   const cam = req.params.cam;
   if (!/^\d{4}-\d{2}-\d{2}_\d{4,6}\.jpg$/.test(filename)) {
@@ -563,7 +606,7 @@ router.delete('/admin/motion-capture-frames/:cam/:filename', requireAdmin, (req,
 
 // --- Chick Growth Timelapse ---
 
-router.get('/chick-growth', (req, res) => {
+router.get('/chick-growth', requireApprovedViewer, (req, res) => {
   const growthDir = path.join(__dirname, '../../public/chick-growth');
   if (!fs.existsSync(growthDir)) return res.json({ frames: [], video: null });
 
@@ -816,6 +859,27 @@ const WIFI_LOG = path.join(__dirname, '../../logs/wifi-monitor.log');
 const RESTART_BASELINE_FILE = path.join(__dirname, '../../restart-baseline.json');
 const INFRA_HISTORY_COUNT = 60;
 
+// Read only the tail of a (potentially large, unrotated) log so admin polls don't
+// load an ever-growing file in full. Returns whole lines (drops a leading partial).
+function readLogTail(filePath, maxBytes = 256 * 1024) {
+  const stat = fs.statSync(filePath);
+  const start = Math.max(0, stat.size - maxBytes);
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    const len = stat.size - start;
+    const buf = Buffer.alloc(len);
+    fs.readSync(fd, buf, 0, len, start);
+    let text = buf.toString('utf8');
+    if (start > 0) {
+      const nl = text.indexOf('\n');
+      if (nl !== -1) text = text.slice(nl + 1);
+    }
+    return text;
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 function readRestartBaseline() {
   try {
     if (fs.existsSync(RESTART_BASELINE_FILE)) {
@@ -945,7 +1009,7 @@ router.get('/admin/infra', requireAdmin, (req, res) => {
       return res.json({ success: true, latest: null, history: [], alerts: [{ level: 'warning', message: 'No monitoring data available' }] });
     }
 
-    const raw = fs.readFileSync(WIFI_LOG, 'utf8');
+    const raw = readLogTail(WIFI_LOG);
     const lines = raw.split('\n').filter(Boolean).slice(-INFRA_HISTORY_COUNT);
     const history = lines.map(parseInfraLine).filter(Boolean);
     const latest = history.length > 0 ? history[history.length - 1] : null;

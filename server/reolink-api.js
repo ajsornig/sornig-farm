@@ -5,11 +5,19 @@ function reolinkRequest(cameraConfig, cmd, params) {
   const port = httpPort || 80;
   const body = JSON.stringify([{ cmd, action: 0, param: params }]);
 
+  // Credentials are URL-encoded so a password containing &, +, #, or a space
+  // can't corrupt the query or silently break auth. NOTE: the Reolink CGI still
+  // takes user/password as query params (its documented scheme), so they can
+  // appear in the camera's own access log. This traffic is LAN-only over the
+  // camera network; moving to the token-login flow (cmd=Login → token) is the
+  // full fix but must be validated against the camera firmware before shipping.
+  const auth = `user=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+
   return new Promise((resolve, reject) => {
     const req = http.request({
       hostname: ip,
       port,
-      path: `/api.cgi?cmd=${cmd}&user=${username}&password=${password}`,
+      path: `/api.cgi?cmd=${encodeURIComponent(cmd)}&${auth}`,
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
       timeout: 5000

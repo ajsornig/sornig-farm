@@ -6,7 +6,7 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 const { WebSocketServer } = require('ws');
 const config = require('../config.json');
-const { initDb, getSession, hasPtzAccess, hasPtzDriving } = require('./db');
+const { initDb, getSession, hasPtzAccess, hasPtzDriving, isUserApproved } = require('./db');
 const { setupChat } = require('./chat');
 const apiRoutes = require('./routes/api');
 const { initMailer } = require('./mailer');
@@ -81,17 +81,49 @@ app.post('/api/admin/privacy-mode', (req, res) => {
   }
 });
 
-// Block HLS streams when privacy mode is active (looks like signal loss)
-app.use('/hls', (req, res, next) => {
-  if (isPrivacyMode()) return res.status(404).end();
-  next();
-});
-app.use('/hls2', (req, res, next) => {
-  if (isPrivacyMode()) return res.status(404).end();
-  next();
-});
-app.use('/hls3', (req, res, next) => {
-  if (isPrivacyMode()) return res.status(404).end();
+// Camera streams and all saved footage are private: every media byte requires a
+// valid, approved session. The browser sends the httpOnly `sf_session` cookie
+// automatically on <video>/<img>/fetch, so this gate covers content that can't
+// carry the x-auth-token header. Header/query token also accepted (API clients).
+const PROTECTED_MEDIA_PREFIXES = [
+  '/hls', '/hls2', '/hls3',
+  '/favorites', '/highlights', '/motion-timelapse', '/chick-growth',
+  '/motion-captures' // predator/motion snapshots from motion-detect.sh
+];
+
+function sessionFromRequest(req) {
+  const token = (req.cookies && req.cookies.sf_session) ||
+    req.headers['x-auth-token'] || req.query.token;
+  return token ? getSession(token) : null;
+}
+
+// Normalize a request path the SAME way express.static/send will resolve it, so
+// the prefix check can't be slipped with //hls, /hls%2ffile (encoded slash),
+// /foo/../hls, backslashes, or mixed case. Match on this, never the raw req.path.
+function normalizeForGate(rawPath) {
+  let p = rawPath || '/';
+  try { p = decodeURIComponent(p); } catch (e) { /* malformed %-escape: match on raw */ }
+  p = p.replace(/\\/g, '/');           // backslash → slash (Windows-style separators)
+  p = path.posix.normalize(p);         // resolves '.', '..', collapses '//'
+  if (!p.startsWith('/')) p = '/' + p; // normalize() can drop the leading slash
+  return p.toLowerCase();
+}
+
+app.use((req, res, next) => {
+  const p = normalizeForGate(req.path);
+  const isProtected = PROTECTED_MEDIA_PREFIXES.some(
+    prefix => p === prefix || p.startsWith(prefix + '/')
+  );
+  if (!isProtected) return next();
+
+  // Privacy mode blacks out the LIVE streams for everyone (looks like signal loss).
+  if (isPrivacyMode() && p.startsWith('/hls')) return res.status(404).end();
+
+  const session = sessionFromRequest(req);
+  if (!session) return res.status(401).json({ error: 'Not authenticated' });
+  if (config.requireApproval && !isUserApproved(session.username)) {
+    return res.status(403).json({ error: 'Account not approved' });
+  }
   next();
 });
 

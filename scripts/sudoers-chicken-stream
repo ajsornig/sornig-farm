@@ -1,0 +1,24 @@
+# Scoped passwordless sudo for the chicken-stream web app.
+#
+# Replaces any blanket "ajsornig ALL=(ALL) NOPASSWD: ALL" or wide systemctl grant.
+# The Node web process is the internet-facing surface; if it is ever compromised,
+# it should be able to run ONLY these exact commands — nothing else as root.
+#
+# Install:
+#   # First confirm the real path to systemctl on this box:
+#   which systemctl        # usually /usr/bin/systemctl on Raspberry Pi OS
+#   sudo cp scripts/sudoers-chicken-stream /etc/sudoers.d/chicken-stream
+#   sudo chmod 440 /etc/sudoers.d/chicken-stream
+#   sudo visudo -cf /etc/sudoers.d/chicken-stream     # must print "parsed OK"
+#
+# If `which systemctl` prints /bin/systemctl, change the paths below to match.
+
+# Restart-counter baseline reset (server/routes/api.js -> /api/admin/restart-reset)
+ajsornig ALL=(root) NOPASSWD: /usr/bin/systemctl show camera-hls --property=NRestarts
+ajsornig ALL=(root) NOPASSWD: /usr/bin/systemctl show camera-hls-2 --property=NRestarts
+ajsornig ALL=(root) NOPASSWD: /usr/bin/systemctl show camera-hls-3 --property=NRestarts
+
+# Chick-cam IP swap (server/routes/api.js -> /api/admin/chick-cam-ip).
+# The script validates its own IP argument and only rewrites cam3 config +
+# restarts camera-hls-3 / wifi-monitor.
+ajsornig ALL=(root) NOPASSWD: /home/ajsornig/chicken-stream/scripts/swap-chick-cam-ip.sh

@@ -110,7 +110,7 @@ while true; do
     continue
   fi
 
-  local age=$(( $(date +%s) - $(stat -c %Y "$STREAM") ))
+  age=$(( $(date +%s) - $(stat -c %Y "$STREAM") ))
   if [ "$age" -gt 30 ]; then
     sleep "$CHECK_INTERVAL"
     continue

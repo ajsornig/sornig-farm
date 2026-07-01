@@ -1,0 +1,22 @@
+# Log rotation for chicken-stream. Without this, logs/*.log grow forever:
+# wifi-monitor appends one line/minute indefinitely, and the admin dashboard
+# reads these files on a 60s poll. Rotation keeps them bounded on the SD card.
+#
+# Install:
+#   sudo cp scripts/logrotate-chicken-stream /etc/logrotate.d/chicken-stream
+#   sudo chmod 644 /etc/logrotate.d/chicken-stream
+#   sudo logrotate --debug /etc/logrotate.d/chicken-stream   # dry-run, check config
+#
+# copytruncate is used because the long-running appenders (wifi-monitor.sh,
+# motion-capture.sh) hold the file open with >>; truncating in place lets them
+# keep writing without a restart.
+
+/home/ajsornig/chicken-stream/logs/*.log {
+    weekly
+    rotate 4
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}

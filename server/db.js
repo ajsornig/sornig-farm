@@ -10,8 +10,9 @@ const ACTIVITY_MAX_ENTRIES = 200;
 const MIN_PASSWORD_LENGTH = 8;
 // Usernames are interpolated into HTML/JS on the admin panel, so restrict them
 // to a safe character set at creation time (defense in depth on top of output
-// escaping). Email is validated wherever it can be set.
-const USERNAME_RE = /^[A-Za-z0-9_.-]{2,20}$/;
+// escaping). Email is validated wherever it can be set. This is the single
+// source of truth for the rule — the register route imports it too.
+const USERNAME_RE = /^[A-Za-z0-9_.-]{3,20}$/;
 // Restrictive on purpose: forbids quotes/backticks/angle brackets so an email can
 // never carry an HTML/JS payload even before output escaping.
 const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
@@ -69,14 +70,25 @@ function hashPassword(password) {
   return `scrypt:${salt}:${hash}`;
 }
 
+// Constant-time compare of two hex-encoded digests (equal length required).
+function timingSafeEqualHex(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length || a.length === 0) {
+    return false;
+  }
+  return crypto.timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex'));
+}
+
 function verifyPassword(password, stored) {
+  if (typeof stored !== 'string') return false;
   if (stored.startsWith('scrypt:')) {
     const [, salt, hash] = stored.split(':');
+    if (!salt || !hash) return false;
     const derived = crypto.scryptSync(password, salt, 64).toString('hex');
-    return derived === hash;
+    return timingSafeEqualHex(derived, hash);
   }
   // Legacy SHA-256 (no salt, 64-char hex)
-  return crypto.createHash('sha256').update(password).digest('hex') === stored;
+  const derived = crypto.createHash('sha256').update(password).digest('hex');
+  return timingSafeEqualHex(derived, stored);
 }
 
 function isLegacyHash(stored) {
@@ -486,6 +498,7 @@ function removeFavorite(filename) {
 }
 
 module.exports = {
+  USERNAME_RE,
   initDb,
   createUser,
   loginUser,

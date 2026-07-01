@@ -5,12 +5,15 @@
 // Content-Security-Policy. 'unsafe-inline' is required for scripts because the
 // app attaches behaviour via generated inline onclick handlers and a few inline
 // <script> blocks; the primary XSS defense is output escaping + input validation.
+// All JS/CSS (hls.js, Leaflet, GLightbox) is self-hosted under /vendor, so no
+// third-party script/style origins are allowed — removes the CDN supply-chain
+// path to token theft. img-src still allows https: for OpenStreetMap map tiles.
 // The remaining directives (frame-ancestors, object-src, base-uri, form-action)
 // still provide real protection (clickjacking, base-tag hijack, form exfil).
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com",
-  "style-src 'self' 'unsafe-inline' https://unpkg.com",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   // hls.js plays the live stream via Media Source Extensions, attaching a
   // blob: URL to the <video> element, and (enableWorker) spawns a blob: worker.
