@@ -65,8 +65,53 @@ function broadcastViewerCount() {
   broadcast({ type: 'viewer_count', count: verifiedCount });
 }
 
+function parseCookies(cookieHeader) {
+  const out = {};
+  if (!cookieHeader) return out;
+  for (const part of cookieHeader.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx === -1) continue;
+    const key = part.slice(0, idx).trim();
+    if (key) out[key] = decodeURIComponent(part.slice(idx + 1).trim());
+  }
+  return out;
+}
+
+// Apply an authenticated session to a connected client (identity, human-verified
+// state, visit recording, viewer count) and tell the client. Shared by the
+// cookie-on-connect path and the legacy {type:'auth'} message path.
+function applyAuthenticatedSession(clientId, ws, session) {
+  const client = clients.get(clientId);
+  if (!client) return;
+  client.nickname = session.username;
+  client.isRegistered = true;
+  client.isAdmin = session.isAdmin;
+  if (!client.humanVerified) {
+    client.humanVerified = true;
+    broadcastViewerCount();
+    const pending = pendingVisits.get(clientId);
+    if (pending && !pending.verified) {
+      pending.verified = true;
+      if (!session.isAdmin) {
+        geolocateIP(pending.ip).then(location => { recordVisit(location); });
+      }
+    }
+  }
+  ws.send(JSON.stringify({ type: 'auth_success', nickname: session.username, isAdmin: session.isAdmin }));
+}
+
 function setupChat(wss) {
   wss.on('connection', async (ws, req) => {
+    // Reject cross-origin WebSocket handshakes (defense in depth; the session
+    // cookie is SameSite=Lax so a cross-site page can't authenticate as the user
+    // anyway). Non-browser clients that send no Origin are allowed through.
+    const wsOrigin = req.headers.origin;
+    if (wsOrigin) {
+      let ok = false;
+      try { ok = new URL(wsOrigin).host === req.headers.host; } catch (e) { ok = false; }
+      if (!ok) { ws.close(1008, 'Bad origin'); return; }
+    }
+
     // Get client IP (check Cloudflare header first, then x-forwarded-for, then direct)
     const ip = getClientIp(req);
     const clientId = Math.random().toString(36).substring(2);
@@ -103,39 +148,25 @@ function setupChat(wss) {
     // Broadcast updated viewer count
     broadcastViewerCount();
 
+    // Authenticate from the httpOnly session cookie sent on the handshake — the
+    // client no longer holds a token in JS to send in an auth message.
+    const cookies = parseCookies(req.headers.cookie);
+    if (cookies.sf_session) {
+      const cookieSession = getSession(cookies.sf_session);
+      if (cookieSession) applyAuthenticatedSession(clientId, ws, cookieSession);
+    }
+
     ws.on('message', (data) => {
       try {
         const msg = JSON.parse(data.toString());
         const client = clients.get(clientId);
 
         if (msg.type === 'auth') {
+          // Legacy path for any client still sending a token; the cookie handled
+          // on connect is the primary route now.
           const session = getSession(msg.token);
           if (session) {
-            client.nickname = session.username;
-            client.isRegistered = true;
-            client.isAdmin = session.isAdmin;
-            // Logged-in users are automatically verified as human
-            if (!client.humanVerified) {
-              client.humanVerified = true;
-              broadcastViewerCount();
-
-              // Record visit for map (skip admins)
-              const pending = pendingVisits.get(clientId);
-              if (pending && !pending.verified) {
-                pending.verified = true;
-                if (!session.isAdmin) {
-                  geolocateIP(pending.ip).then(location => {
-                    recordVisit(location);
-                    console.log(`Verified logged-in visitor from ${location?.city || 'unknown'}`);
-                  });
-                }
-              }
-            }
-            ws.send(JSON.stringify({
-              type: 'auth_success',
-              nickname: session.username,
-              isAdmin: session.isAdmin
-            }));
+            applyAuthenticatedSession(clientId, ws, session);
           } else {
             ws.send(JSON.stringify({ type: 'auth_failed' }));
           }

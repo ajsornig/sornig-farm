@@ -1,23 +1,19 @@
 const http = require('http');
 
-function reolinkRequest(cameraConfig, cmd, params) {
-  const { ip, username, password, httpPort } = cameraConfig.ptz;
-  const port = httpPort || 80;
-  const body = JSON.stringify([{ cmd, action: 0, param: params }]);
+// Reolink HTTP API client using token authentication. Credentials are sent ONLY
+// in the Login request body (never in a URL/query string), so they can't leak
+// into the camera's access logs. Login returns a token with a lease; we cache it
+// per camera IP, reuse it until shortly before expiry, and re-login on demand.
+const tokenCache = new Map(); // ip -> { token, expiresAt }
 
-  // Credentials are URL-encoded so a password containing &, +, #, or a space
-  // can't corrupt the query or silently break auth. NOTE: the Reolink CGI still
-  // takes user/password as query params (its documented scheme), so they can
-  // appear in the camera's own access log. This traffic is LAN-only over the
-  // camera network; moving to the token-login flow (cmd=Login → token) is the
-  // full fix but must be validated against the camera firmware before shipping.
-  const auth = `user=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
-
+function rawRequest(ip, port, cmd, query, bodyObj) {
+  const body = JSON.stringify(bodyObj);
+  const qs = new URLSearchParams({ cmd, ...query }).toString();
   return new Promise((resolve, reject) => {
     const req = http.request({
       hostname: ip,
       port,
-      path: `/api.cgi?cmd=${encodeURIComponent(cmd)}&${auth}`,
+      path: `/api.cgi?${qs}`,
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
       timeout: 5000
@@ -27,11 +23,7 @@ function reolinkRequest(cameraConfig, cmd, params) {
       res.on('end', () => {
         try {
           const parsed = JSON.parse(data);
-          if (parsed[0].code !== 0) {
-            reject(new Error(parsed[0].error?.detail || 'Reolink API error'));
-          } else {
-            resolve(parsed[0].value);
-          }
+          resolve(parsed[0]);
         } catch (err) {
           reject(new Error('Invalid response from camera'));
         }
@@ -42,6 +34,48 @@ function reolinkRequest(cameraConfig, cmd, params) {
     req.write(body);
     req.end();
   });
+}
+
+async function login(cameraConfig) {
+  const { ip, username, password, httpPort } = cameraConfig.ptz;
+  const port = httpPort || 80;
+  const resp = await rawRequest(ip, port, 'Login', {}, [
+    { cmd: 'Login', action: 0, param: { User: { userName: username, password } } }
+  ]);
+  if (!resp || resp.code !== 0 || !resp.value || !resp.value.Token) {
+    throw new Error(resp && resp.error ? (resp.error.detail || 'Reolink login failed') : 'Reolink login failed');
+  }
+  const { name, leaseTime } = resp.value.Token;
+  // Renew a minute early to avoid using a token that expires mid-request.
+  const ttl = Math.max(60, (leaseTime || 3600) - 60) * 1000;
+  tokenCache.set(ip, { token: name, expiresAt: Date.now() + ttl });
+  return name;
+}
+
+async function getToken(cameraConfig) {
+  const ip = cameraConfig.ptz.ip;
+  const cached = tokenCache.get(ip);
+  if (cached && cached.expiresAt > Date.now()) return cached.token;
+  return login(cameraConfig);
+}
+
+async function reolinkRequest(cameraConfig, cmd, params, _retried = false) {
+  const { ip, httpPort } = cameraConfig.ptz;
+  const port = httpPort || 80;
+  const token = await getToken(cameraConfig);
+
+  const resp = await rawRequest(ip, port, cmd, { token }, [{ cmd, action: 0, param: params }]);
+
+  if (!resp || resp.code !== 0) {
+    // A stale/expired token surfaces as an API error — drop it and retry once
+    // with a fresh login before giving up.
+    if (!_retried) {
+      tokenCache.delete(ip);
+      return reolinkRequest(cameraConfig, cmd, params, true);
+    }
+    throw new Error((resp && resp.error && resp.error.detail) || 'Reolink API error');
+  }
+  return resp.value;
 }
 
 async function getAiConfig(cameraConfig) {

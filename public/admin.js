@@ -1,4 +1,6 @@
-let authToken = localStorage.getItem('authToken');
+// Auth is via the httpOnly session cookie; no token is kept in JS.
+let authToken = null;
+try { localStorage.removeItem('authToken'); } catch (e) {}
 let currentUser = null;
 let isAdmin = false;
 let ws = null;
@@ -114,14 +116,9 @@ async function checkAuth() {
   document.getElementById('admin-unauthorized').classList.add('hidden');
   document.getElementById('admin-panel').classList.add('hidden');
 
-  if (!authToken) {
-    showUnauthorized();
-    return;
-  }
-
   try {
     const res = await fetch('/api/me', {
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const data = await res.json();
 
@@ -163,7 +160,7 @@ async function approveUser(username) {
   try {
     const res = await fetch(`/api/admin/users/${username}/approve`, {
       method: 'POST',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const data = await res.json();
 
@@ -188,7 +185,7 @@ async function denyUser(username) {
   try {
     const res = await fetch(`/api/admin/users/${username}/deny`, {
       method: 'POST',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const data = await res.json();
 
@@ -303,9 +300,9 @@ async function loadDashboard() {
 
   try {
     const [pendingRes, statsRes, infraRes] = await Promise.all([
-      fetch('/api/admin/pending', { headers: { 'x-auth-token': authToken } }),
+      fetch('/api/admin/pending', { headers: {} }),
       fetch('/api/stats'),
-      fetch('/api/admin/infra', { headers: { 'x-auth-token': authToken } }).catch(() => null)
+      fetch('/api/admin/infra', { headers: {} }).catch(() => null)
     ]);
 
     const pending = await pendingRes.json();
@@ -473,7 +470,7 @@ function clearChat() {
 async function loadAdminData() {
   try {
     const usersRes = await fetch('/api/admin/users', {
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const users = await usersRes.json();
 
@@ -493,8 +490,7 @@ async function editEmail(username, currentEmail) {
     const res = await fetch(`/api/admin/users/${username}/email`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-auth-token': authToken
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ email: newEmail.trim() })
     });
@@ -525,8 +521,7 @@ async function resetPassword(username) {
     const res = await fetch(`/api/admin/users/${username}/reset-password`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-auth-token': authToken
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ newPassword })
     });
@@ -551,7 +546,7 @@ async function deleteUser(username) {
   try {
     const res = await fetch(`/api/admin/users/${username}`, {
       method: 'DELETE',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const data = await res.json();
 
@@ -571,7 +566,7 @@ async function clearActivityLog() {
   try {
     await fetch('/api/admin/activity', {
       method: 'DELETE',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     loadActivityLog();
   } catch (err) {
@@ -582,7 +577,7 @@ async function clearActivityLog() {
 async function loadActivityLog() {
   try {
     const res = await fetch('/api/admin/activity', {
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     activityData = await res.json();
 
@@ -625,7 +620,7 @@ let visitorMarkers = [];
 async function loadVisitorMapData() {
   try {
     const res = await fetch('/api/admin/visitor-map', {
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const visitors = await res.json();
 
@@ -727,7 +722,7 @@ async function doLogout() {
   try {
     await fetch('/api/logout', {
       method: 'POST',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
   } catch (err) {
     console.error('Logout failed:', err);
@@ -761,7 +756,7 @@ async function starFrame(cam, filename, source) {
   try {
     const res = await fetch('/api/admin/favorites', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cam, filename, source })
     });
     if ((await res.json()).success) {
@@ -781,7 +776,7 @@ async function loadMotionCaptureFrames() {
   try {
     await loadFavoritesList();
     const res = await fetch('/api/admin/motion-capture-frames', {
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const frames = await res.json();
     const list = document.getElementById('motion-capture-frames-list');
@@ -834,7 +829,7 @@ async function loadMotionCaptureFrames() {
 async function loadHighlights() {
   try {
     const res = await fetch('/api/admin/highlights', {
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const data = await res.json();
     let container = document.getElementById('highlights-list');
@@ -884,7 +879,7 @@ async function deleteMotionCaptureFrame(cam, filename) {
   try {
     const res = await fetch(`/api/admin/motion-capture-frames/${cam}/${filename}`, {
       method: 'DELETE',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     if ((await res.json()).success) {
       document.getElementById(`mframe-${cam}-${filename}`).remove();
@@ -897,7 +892,7 @@ async function deleteMotionCaptureFrame(cam, filename) {
 async function loadCaptureStats() {
   try {
     const res = await fetch('/api/admin/motion-capture-stats', {
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const data = await res.json();
     const table = document.getElementById('capture-stats-table');
@@ -954,7 +949,7 @@ async function deleteActivityEntry(index) {
   try {
     const res = await fetch(`/api/admin/activity/${index}`, {
       method: 'DELETE',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     if ((await res.json()).success) {
       document.getElementById(`activity-row-${index}`).remove();
@@ -1032,7 +1027,7 @@ function fmtSignal(signal) {
 async function loadInfraData() {
   try {
     const res = await fetch('/api/admin/infra', {
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const data = await res.json();
 
@@ -1200,7 +1195,7 @@ async function togglePtzAccess(username, enabled, driving) {
   try {
     const res = await fetch(`/api/admin/users/${encodeURIComponent(username)}/ptz`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled, driving: !!driving })
     });
     const data = await res.json();
@@ -1216,7 +1211,7 @@ async function togglePtzDriving(username, driving) {
   try {
     const res = await fetch(`/api/admin/users/${encodeURIComponent(username)}/ptz`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled: true, driving })
     });
     const data = await res.json();
@@ -1231,7 +1226,7 @@ async function togglePtzDriving(username, driving) {
 async function loadBroadcastRecipients() {
   try {
     const res = await fetch('/api/admin/broadcast/recipients', {
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const recipients = await res.json();
     const el = document.getElementById('broadcast-recipients');
@@ -1264,7 +1259,7 @@ async function sendBroadcast() {
   try {
     const res = await fetch('/api/admin/broadcast', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ subject, message })
     });
     const data = await res.json();
@@ -1298,7 +1293,7 @@ async function loadGrowthPicksAdmin() {
 async function loadGrowthPending() {
   try {
     const res = await fetch('/api/admin/chick-growth/pending', {
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const data = await res.json();
     const list = document.getElementById('growth-pending-list');
@@ -1387,7 +1382,7 @@ async function chooseGrowthFrame(date, number) {
   try {
     await fetch(`/api/admin/chick-growth/pending/${date}/choose/${number}`, {
       method: 'POST',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const group = document.getElementById(`growth-pending-${date}`);
     if (group) {
@@ -1407,7 +1402,7 @@ async function confirmGrowthPick(date) {
   try {
     await fetch(`/api/admin/chick-growth/pending/${date}/confirm`, {
       method: 'POST',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     loadGrowthPicksAdmin();
   } catch (err) {
@@ -1419,7 +1414,7 @@ async function undoGrowthConfirm(date) {
   try {
     const res = await fetch(`/api/admin/chick-growth/pending/${date}/undo`, {
       method: 'POST',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const data = await res.json();
     if (data.success) {
@@ -1437,7 +1432,7 @@ async function deleteGrowthFrame(filename) {
   try {
     await fetch(`/api/admin/chick-growth/${filename}`, {
       method: 'DELETE',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     loadGrowthPicksAdmin();
   } catch (err) {
@@ -1450,7 +1445,7 @@ async function deleteGrowthFrame(filename) {
 async function loadCameraToggles() {
   try {
     const res = await fetch('/api/admin/cameras', {
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const cameras = await res.json();
     const list = document.getElementById('camera-toggle-list');
@@ -1486,7 +1481,7 @@ async function loadCameraToggles() {
 async function loadChickCamIp() {
   try {
     const res = await fetch('/api/admin/chick-cam-ip', {
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const data = await res.json();
     const el = document.getElementById('chick-cam-current-ip');
@@ -1504,7 +1499,7 @@ async function resetRestartCounters() {
   try {
     const res = await fetch('/api/admin/restart-reset', {
       method: 'POST',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     if ((await res.json()).success) {
       loadInfraData();
@@ -1527,7 +1522,7 @@ async function applyChickCamIp(overrideIp) {
   try {
     const res = await fetch('/api/admin/chick-cam-ip', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ip })
     });
     const data = await res.json();
@@ -1551,7 +1546,7 @@ async function toggleCameraEnabled(camId) {
   try {
     const res = await fetch(`/api/admin/cameras/${encodeURIComponent(camId)}/enable`, {
       method: 'POST',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const data = await res.json();
     if (data.id) {
@@ -1566,7 +1561,7 @@ async function toggleCamera(camId) {
   try {
     const res = await fetch(`/api/admin/cameras/${encodeURIComponent(camId)}/toggle`, {
       method: 'POST',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const data = await res.json();
     if (data.id) {

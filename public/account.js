@@ -1,4 +1,6 @@
-let authToken = localStorage.getItem('authToken');
+// Auth is via the httpOnly session cookie; no token is kept in JS.
+let authToken = null;
+try { localStorage.removeItem('authToken'); } catch (e) {}
 let currentUser = null;
 
 async function init() {
@@ -10,14 +12,9 @@ async function checkAuth() {
   document.getElementById('account-unauthorized').classList.add('hidden');
   document.getElementById('account-panel').classList.add('hidden');
 
-  if (!authToken) {
-    showUnauthorized();
-    return;
-  }
-
   try {
     const res = await fetch('/api/me', {
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const data = await res.json();
 
@@ -68,8 +65,7 @@ async function editMyEmail() {
     const res = await fetch('/api/account/email', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-auth-token': authToken
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ email: newEmail.trim() })
     });
@@ -105,8 +101,7 @@ async function changePassword(e) {
     const res = await fetch('/api/change-password', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-auth-token': authToken
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ currentPassword, newPassword })
     });
@@ -142,7 +137,7 @@ async function deleteMyAccount() {
   try {
     const res = await fetch('/api/account', {
       method: 'DELETE',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const data = await res.json();
 
@@ -162,7 +157,7 @@ async function doLogout() {
   try {
     await fetch('/api/logout', {
       method: 'POST',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
   } catch (err) {
     console.error('Logout failed:', err);
@@ -179,7 +174,7 @@ async function updateEmailPreference() {
   try {
     const res = await fetch('/api/account/email-preferences', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ optOut })
     });
     const data = await res.json();

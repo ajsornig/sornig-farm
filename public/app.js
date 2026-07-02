@@ -2,7 +2,11 @@ let cameras = [];
 let currentCamera = null;
 let hls = null;
 let ws = null;
-let authToken = localStorage.getItem('authToken');
+// Session lives in the httpOnly `sf_session` cookie, not in JS. Clear any token a
+// previous version persisted so script can no longer read it. `authToken` stays as
+// a vestigial null; login state is tracked via currentUser.
+let authToken = null;
+try { localStorage.removeItem('authToken'); } catch (e) {}
 let currentUser = null;
 let isAdmin = false;
 let isApproved = false;
@@ -104,12 +108,9 @@ function hideLoginRequired() {
 }
 
 async function checkAuth() {
-  if (!authToken) return;
-
+  // Always ask the server — auth is via the session cookie now, not a JS token.
   try {
-    const res = await fetch('/api/me', {
-      headers: { 'x-auth-token': authToken }
-    });
+    const res = await fetch('/api/me');
     const data = await res.json();
 
     if (data.loggedIn) {
@@ -119,8 +120,7 @@ async function checkAuth() {
       requireApproval = data.requireApproval;
       showLoggedInState(true);
     } else {
-      localStorage.removeItem('authToken');
-      authToken = null;
+      currentUser = null;
     }
   } catch (err) {
     console.error('Auth check failed:', err);
@@ -254,14 +254,14 @@ async function doLogin() {
       return;
     }
 
-    authToken = data.token;
     currentUser = data.username;
     isAdmin = data.isAdmin;
     isApproved = data.approved || false;
     requireApproval = data.requireApproval || false;
-    localStorage.setItem('authToken', authToken);
 
-    ws.send(JSON.stringify({ type: 'auth', token: authToken }));
+    // The server set the httpOnly session cookie on this response. Reconnect the
+    // chat socket so its new handshake carries the cookie and authenticates.
+    setupChat();
     showLoggedInState();
     hideAuthError();
   } catch (err) {
@@ -297,12 +297,11 @@ async function doRegister() {
       return;
     }
 
-    authToken = data.token;
     currentUser = data.username;
     isAdmin = data.isAdmin;
-    localStorage.setItem('authToken', authToken);
 
-    ws.send(JSON.stringify({ type: 'auth', token: authToken }));
+    // Session cookie is set on this response; reconnect chat to authenticate it.
+    setupChat();
     showLoggedInState();
     hideAuthError();
   } catch (err) {
@@ -322,7 +321,7 @@ async function doLogout() {
   try {
     await fetch('/api/logout', {
       method: 'POST',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
   } catch (err) {
     console.error('Logout failed:', err);
@@ -379,7 +378,7 @@ let gridPlayers = [];
 
 async function loadCameras() {
   try {
-    const headers = authToken ? { 'x-auth-token': authToken } : {};
+    const headers = {};
     const res = await fetch('/config/cameras', { headers });
     cameras = await res.json();
 
@@ -883,7 +882,7 @@ async function deleteGrowthFrame(filename, event) {
   try {
     const res = await fetch(`/api/admin/chick-growth/${filename}`, {
       method: 'DELETE',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     if ((await res.json()).success) {
       event.target.closest('.motion-thumb').remove();
@@ -935,7 +934,7 @@ async function deleteFavorite(filename, event) {
   try {
     const res = await fetch(`/api/admin/favorites/${filename}`, {
       method: 'DELETE',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     if ((await res.json()).success) {
       const el = document.getElementById(`fav-${filename}`);
@@ -1063,7 +1062,7 @@ function updateNightMode() {
 async function loadPrivacyState() {
   try {
     const res = await fetch('/api/admin/privacy-mode', {
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const data = await res.json();
     const btn = document.getElementById('privacy-toggle');
@@ -1083,7 +1082,7 @@ async function togglePrivacyMode() {
   try {
     const res = await fetch('/api/admin/privacy-mode', {
       method: 'POST',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const data = await res.json();
     const btn = document.getElementById('privacy-toggle');
@@ -1110,7 +1109,7 @@ function updatePtzControls(cam) {
     container = createPtzControls();
   }
 
-  if (cam && cam.hasPtz && authToken && (cam.hasPtzDriving || isAdmin)) {
+  if (cam && cam.hasPtz && currentUser && (cam.hasPtzDriving || isAdmin)) {
     container.classList.remove('hidden');
     container.dataset.camId = cam.id;
     const zoomBtns = container.querySelector('.ptz-zoom');
@@ -1194,14 +1193,13 @@ async function sendPtz(op) {
   const container = document.getElementById('ptz-controls');
   if (!container) return;
   const camId = container.dataset.camId;
-  if (!camId || !authToken) return;
+  if (!camId || !currentUser) return;
 
   try {
     await fetch(`/api/camera/${encodeURIComponent(camId)}/ptz`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-auth-token': authToken
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ op })
     });
@@ -1216,7 +1214,7 @@ function updatePtzExtended(cam) {
   const el = document.getElementById('ptz-extended');
   if (!el) return;
 
-  if (cam && cam.hasPtz && authToken) {
+  if (cam && cam.hasPtz && currentUser) {
     el.classList.remove('hidden');
     el.dataset.camId = cam.id;
     document.querySelectorAll('#ptz-extended .admin-only').forEach(section => {
@@ -1238,7 +1236,7 @@ async function loadPresets() {
 
   try {
     const resp = await fetch(`/api/camera/${encodeURIComponent(camId)}/presets`, {
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const presets = await resp.json();
     pillsEl.innerHTML = presets.map(p => {
@@ -1264,7 +1262,7 @@ async function gotoPreset(token) {
   try {
     await fetch(`/api/camera/${encodeURIComponent(camId)}/preset/${encodeURIComponent(token)}/goto`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken }
+      headers: { 'Content-Type': 'application/json' }
     });
   } catch (err) {
     console.error('Goto preset failed:', err);
@@ -1283,7 +1281,7 @@ async function savePreset() {
   try {
     const resp = await fetch(`/api/camera/${encodeURIComponent(camId)}/preset`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name })
     });
     if (resp.ok) {
@@ -1302,7 +1300,7 @@ async function deletePreset(token) {
   try {
     const resp = await fetch(`/api/camera/${encodeURIComponent(camId)}/preset/${encodeURIComponent(token)}`, {
       method: 'DELETE',
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     if (resp.ok) loadPresets();
   } catch (err) {
@@ -1317,7 +1315,7 @@ async function loadTracking() {
 
   try {
     const resp = await fetch(`/api/camera/${encodeURIComponent(camId)}/tracking`, {
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     if (!resp.ok) return;
     const data = await resp.json();
@@ -1355,7 +1353,7 @@ async function toggleAutotrack() {
   try {
     const resp = await fetch(`/api/camera/${encodeURIComponent(camId)}/tracking`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ aiTrack: enabled })
     });
     if (!resp.ok) {
@@ -1384,7 +1382,7 @@ async function updateTrackTypes() {
   try {
     await fetch(`/api/camera/${encodeURIComponent(camId)}/tracking`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ trackType })
     });
   } catch (err) {
@@ -1401,7 +1399,7 @@ async function updateTrackBackTimes() {
   try {
     await fetch(`/api/camera/${encodeURIComponent(camId)}/tracking`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ aiStopBackTime, aiDisappearBackTime })
     });
   } catch (err) {
@@ -1416,7 +1414,7 @@ async function loadGuard() {
 
   try {
     const resp = await fetch(`/api/camera/${encodeURIComponent(camId)}/guard`, {
-      headers: { 'x-auth-token': authToken }
+      headers: {}
     });
     const data = await resp.json();
     document.getElementById('guard-toggle').checked = data.enable;
@@ -1435,7 +1433,7 @@ async function toggleGuard() {
   try {
     await fetch(`/api/camera/${encodeURIComponent(camId)}/guard`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enable, timeout })
     });
   } catch (err) {

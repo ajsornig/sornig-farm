@@ -48,6 +48,28 @@ app.use(securityHeaders);
 app.use(express.json({ limit: '64kb' }));
 app.use(cookieParser());
 
+// CSRF defense for cookie-authenticated state changes. The session cookie is
+// SameSite=Lax (so cross-site POST/DELETE don't even send it) — this is the
+// belt-and-suspenders second layer: any cookie-authenticated mutating request
+// must carry an Origin header whose host matches ours. Requests authenticated by
+// header/query token (no cookie) are not ambient-auth and are exempt, as are
+// safe methods and token-in-URL flows (login, password reset) that carry no cookie.
+const STATE_CHANGING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+app.use((req, res, next) => {
+  if (!STATE_CHANGING_METHODS.has(req.method)) return next();
+  if (!(req.cookies && req.cookies.sf_session)) return next();
+  const origin = req.headers.origin;
+  if (!origin) return res.status(403).json({ error: 'Missing Origin header' });
+  let originHost;
+  try { originHost = new URL(origin).host; } catch (e) {
+    return res.status(403).json({ error: 'Invalid Origin header' });
+  }
+  if (originHost !== req.headers.host) {
+    return res.status(403).json({ error: 'Cross-origin request blocked' });
+  }
+  next();
+});
+
 // Throttle auth + write-heavy endpoints to stop brute force / abuse.
 const authLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
@@ -59,17 +81,13 @@ app.use(['/api/login', '/api/register', '/api/forgot-password', '/api/reset-pass
 app.use('/api', apiRoutes);
 
 app.get('/api/admin/privacy-mode', (req, res) => {
-  const token = req.headers['x-auth-token'];
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-  const session = getSession(token);
+  const session = sessionFromRequest(req);
   if (!session || !session.isAdmin) return res.status(403).json({ error: 'Admin required' });
   res.json({ enabled: isPrivacyMode() });
 });
 
 app.post('/api/admin/privacy-mode', (req, res) => {
-  const token = req.headers['x-auth-token'];
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-  const session = getSession(token);
+  const session = sessionFromRequest(req);
   if (!session || !session.isAdmin) return res.status(403).json({ error: 'Admin required' });
 
   if (isPrivacyMode()) {
@@ -130,8 +148,7 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.get('/config/cameras', (req, res) => {
-  const token = req.headers['x-auth-token'];
-  const session = token ? getSession(token) : null;
+  const session = sessionFromRequest(req);
   const isAdminUser = session && session.isAdmin;
   const canPtz = session && hasPtzAccess(session.username);
   const canDrive = session && hasPtzDriving(session.username);
@@ -154,9 +171,7 @@ app.get('/config/cameras', (req, res) => {
 });
 
 app.get('/api/admin/cameras', (req, res) => {
-  const token = req.headers['x-auth-token'];
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-  const session = getSession(token);
+  const session = sessionFromRequest(req);
   if (!session || !session.isAdmin) return res.status(403).json({ error: 'Admin required' });
 
   const cameras = config.cameras
@@ -165,9 +180,7 @@ app.get('/api/admin/cameras', (req, res) => {
 });
 
 app.post('/api/admin/cameras/:id/toggle', (req, res) => {
-  const token = req.headers['x-auth-token'];
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-  const session = getSession(token);
+  const session = sessionFromRequest(req);
   if (!session || !session.isAdmin) return res.status(403).json({ error: 'Admin required' });
 
   const cam = config.cameras.find(c => c.id === req.params.id && c.enabled);
@@ -181,9 +194,7 @@ app.post('/api/admin/cameras/:id/toggle', (req, res) => {
 const CONFIG_PATH = path.join(__dirname, '../config.json');
 
 app.post('/api/admin/cameras/:id/enable', (req, res) => {
-  const token = req.headers['x-auth-token'];
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-  const session = getSession(token);
+  const session = sessionFromRequest(req);
   if (!session || !session.isAdmin) return res.status(403).json({ error: 'Admin required' });
 
   const cam = config.cameras.find(c => c.id === req.params.id);

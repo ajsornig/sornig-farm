@@ -23,15 +23,18 @@ const MIN_PASSWORD_LENGTH = 8;
 // Secure so it is only ever sent over the Cloudflare HTTPS edge; SameSite=Lax so
 // same-origin media/page loads carry it. Mirrors the 7-day server session TTL.
 const SESSION_COOKIE = 'sf_session';
-const SESSION_COOKIE_OPTS = {
-  httpOnly: true,
-  secure: true,
-  sameSite: 'lax',
-  path: '/',
-  maxAge: 7 * 24 * 60 * 60 * 1000
-};
-function setSessionCookie(res, token) {
-  res.cookie(SESSION_COOKIE, token, SESSION_COOKIE_OPTS);
+const SESSION_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+function setSessionCookie(req, res, token) {
+  res.cookie(SESSION_COOKIE, token, {
+    httpOnly: true,
+    // Secure only when the request actually arrived over HTTPS (true in prod
+    // behind the Cloudflare tunnel via X-Forwarded-Proto; false on plain-http
+    // localhost so local testing still works).
+    secure: !!req.secure,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: SESSION_COOKIE_MAX_AGE
+  });
 }
 function clearSessionCookie(res) {
   res.clearCookie(SESSION_COOKIE, { path: '/' });
@@ -90,7 +93,7 @@ router.post('/register', async (req, res) => {
   }
 
   const loginResult = db.loginUser(username, password);
-  if (loginResult.token) setSessionCookie(res, loginResult.token);
+  if (loginResult.token) setSessionCookie(req, res, loginResult.token);
   res.json(loginResult);
 });
 
@@ -117,7 +120,7 @@ router.post('/login', (req, res) => {
       db.logActivity(result.username, 'login', { ip, ...(geo || {}) });
     });
   }
-  if (result.token) setSessionCookie(res, result.token);
+  if (result.token) setSessionCookie(req, res, result.token);
   res.json({ ...result, approved: true, requireApproval: config.requireApproval || false });
 });
 
@@ -185,11 +188,7 @@ router.post('/reset-password/:token', (req, res) => {
 });
 
 router.post('/change-password', (req, res) => {
-  const token = req.headers['x-auth-token'];
-  if (!token) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
-  const session = db.getSession(token);
+  const session = sessionFromRequest(req);
   if (!session) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
@@ -213,9 +212,9 @@ router.get('/me', (req, res) => {
   if (!session) {
     return res.json({ loggedIn: false });
   }
-  // Upgrade path: existing clients that only hold the token in localStorage get
-  // the httpOnly media cookie (re)issued here on their normal page-load /me call.
-  setSessionCookie(res, token);
+  // (Re)issue the cookie on every /me so it stays fresh and any client still
+  // holding only a header token is upgraded to the httpOnly cookie.
+  setSessionCookie(req, res, token);
   const approved = db.isUserApproved(session.username);
   const user = db.getUser(session.username);
   const ip = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.ip;
@@ -237,11 +236,7 @@ router.get('/me', (req, res) => {
 });
 
 router.post('/account/email', (req, res) => {
-  const token = req.headers['x-auth-token'];
-  if (!token) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
-  const session = db.getSession(token);
+  const session = sessionFromRequest(req);
   if (!session) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
@@ -254,9 +249,7 @@ router.post('/account/email', (req, res) => {
 });
 
 router.post('/account/email-preferences', (req, res) => {
-  const token = req.headers['x-auth-token'];
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-  const session = db.getSession(token);
+  const session = sessionFromRequest(req);
   if (!session) return res.status(401).json({ error: 'Not authenticated' });
 
   const { optOut } = req.body;
@@ -275,11 +268,7 @@ router.get('/unsubscribe/:token', (req, res) => {
 });
 
 router.delete('/account', (req, res) => {
-  const token = req.headers['x-auth-token'];
-  if (!token) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
-  const session = db.getSession(token);
+  const session = sessionFromRequest(req);
   if (!session) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
@@ -1055,9 +1044,7 @@ router.post('/admin/restart-reset', requireAdmin, (req, res) => {
 // --- Email Broadcast ---
 
 router.get('/admin/broadcast/recipients', (req, res) => {
-  const token = req.headers['x-auth-token'];
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-  const session = db.getSession(token);
+  const session = sessionFromRequest(req);
   if (!session || !session.isAdmin) return res.status(403).json({ error: 'Admin only' });
 
   const users = db.getAllUsers().filter(u => u.email && u.approved);
@@ -1065,9 +1052,7 @@ router.get('/admin/broadcast/recipients', (req, res) => {
 });
 
 router.post('/admin/broadcast', async (req, res) => {
-  const token = req.headers['x-auth-token'];
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-  const session = db.getSession(token);
+  const session = sessionFromRequest(req);
   if (!session || !session.isAdmin) return res.status(403).json({ error: 'Admin only' });
 
   const { subject, message } = req.body;
@@ -1088,9 +1073,7 @@ router.post('/admin/broadcast', async (req, res) => {
 // --- PTZ Access Management ---
 
 router.post('/admin/users/:username/ptz', (req, res) => {
-  const token = req.headers['x-auth-token'];
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-  const session = db.getSession(token);
+  const session = sessionFromRequest(req);
   if (!session || !session.isAdmin) return res.status(403).json({ error: 'Admin only' });
 
   const { enabled, driving } = req.body;
@@ -1102,9 +1085,7 @@ router.post('/admin/users/:username/ptz', (req, res) => {
 // --- PTZ Camera Control ---
 
 function requireAuth(req, res, next) {
-  const token = req.headers['x-auth-token'];
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-  const session = db.getSession(token);
+  const session = sessionFromRequest(req);
   if (!session) return res.status(401).json({ error: 'Not authenticated' });
   req.session = session;
   next();
