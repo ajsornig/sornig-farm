@@ -45,10 +45,25 @@ fi
 ls -t "$BACKUP_DIR"/sornig_*.tar.gz 2>/dev/null | tail -n +$((MAX_BACKUPS + 1)) | xargs -r rm
 
 # Off-box copy (survives SD-card death). Inert until BACKUP_REMOTE is set.
+#   - Remote target ("user@host:/path")  -> rsync.
+#   - Local target (a mounted USB/NAS path) -> cp (works on FAT32/exFAT/ext4),
+#     guarded by a .backup-ok marker file so we NEVER write into a bare mountpoint
+#     on the SD card if the drive isn't mounted. Old off-box archives are pruned
+#     to MAX_BACKUPS just like the local ones.
 if [ -n "${BACKUP_REMOTE:-}" ]; then
-  if rsync -a "$ARCHIVE" "$BACKUP_REMOTE"; then
-    echo "Off-box copy -> $BACKUP_REMOTE"
+  DEST="${BACKUP_REMOTE%/}"
+  if [[ "$BACKUP_REMOTE" == *:* ]]; then
+    if rsync -a "$ARCHIVE" "$BACKUP_REMOTE"; then
+      echo "Off-box copy -> $BACKUP_REMOTE"
+    else
+      echo "WARNING: off-box copy to $BACKUP_REMOTE FAILED"
+    fi
+  elif [ ! -e "$DEST/.backup-ok" ]; then
+    echo "WARNING: off-box target $DEST not ready (.backup-ok missing; drive unmounted?) — skipped"
+  elif cp "$ARCHIVE" "$DEST/"; then
+    echo "Off-box copy -> $DEST"
+    ls -t "$DEST"/sornig_*.tar.gz 2>/dev/null | tail -n +$((MAX_BACKUPS + 1)) | xargs -r rm -f
   else
-    echo "WARNING: off-box copy to $BACKUP_REMOTE FAILED"
+    echo "WARNING: off-box copy to $DEST FAILED"
   fi
 fi
