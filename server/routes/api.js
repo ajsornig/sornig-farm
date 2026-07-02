@@ -197,7 +197,8 @@ router.post('/change-password', (req, res) => {
   if (!currentPassword || !newPassword) {
     return res.status(400).json({ error: 'Current and new password required' });
   }
-  const result = db.changePassword(session.username, currentPassword, newPassword);
+  const currentToken = (req.cookies && req.cookies[SESSION_COOKIE]) || req.headers['x-auth-token'];
+  const result = db.changePassword(session.username, currentPassword, newPassword, currentToken);
   if (result.error) {
     return res.status(400).json(result);
   }

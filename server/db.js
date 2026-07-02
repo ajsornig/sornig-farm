@@ -258,7 +258,7 @@ function resetPassword(username, newPassword) {
   return { success: true };
 }
 
-function changePassword(username, currentPassword, newPassword) {
+function changePassword(username, currentPassword, newPassword, keepToken = null) {
   const usernameLower = username.toLowerCase();
   const user = data.users[usernameLower];
   if (!user) {
@@ -271,6 +271,13 @@ function changePassword(username, currentPassword, newPassword) {
     return { error: `New password must be at least ${MIN_PASSWORD_LENGTH} characters` };
   }
   user.passwordHash = hashPassword(newPassword);
+  // A password change revokes the user's OTHER sessions (log out any other
+  // devices), but keeps the caller's current session so they stay logged in here.
+  Object.keys(data.sessions).forEach(token => {
+    if (token !== keepToken && data.sessions[token].username.toLowerCase() === usernameLower) {
+      delete data.sessions[token];
+    }
+  });
   saveData();
   return { success: true };
 }

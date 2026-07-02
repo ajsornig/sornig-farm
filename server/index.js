@@ -164,7 +164,13 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.get('/config/cameras', (req, res) => {
+  // Require login (and approval when enabled), same policy as the media gate —
+  // don't leak camera names / stream paths pre-auth.
   const session = sessionFromRequest(req);
+  if (!session) return res.status(401).json({ error: 'Not authenticated' });
+  if (config.requireApproval && !isUserApproved(session.username)) {
+    return res.status(403).json({ error: 'Account not approved' });
+  }
   const isAdminUser = session && session.isAdmin;
   const canPtz = session && hasPtzAccess(session.username);
   const canDrive = session && hasPtzDriving(session.username);
