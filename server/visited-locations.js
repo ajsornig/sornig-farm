@@ -8,6 +8,12 @@ const { atomicWriteJSON } = require('./atomic-write');
 // key = round each coord to 0.1 deg so nearby visitors from the same
 // city/region collapse onto one pin instead of stacking duplicates.
 const STORE_FILE = path.join(__dirname, '../data/visited-locations.json');
+// Written once after the first backfill so we never re-seed an intentionally
+// empty store (e.g. after an admin deletes pins) — deleted pins must stay gone.
+const SEEDED_FLAG = path.join(__dirname, '../data/.visited-seeded');
+// Don't re-record the same user at the same cell within this window: avoids a
+// full-store disk rewrite on every /me poll and stops the count inflating.
+const VISIT_DEDUP_MS = 30 * 60 * 1000;
 
 function cellKey(lat, lng) {
   return `${Math.round(lat * 10) / 10}_${Math.round(lng * 10) / 10}`;
@@ -39,15 +45,21 @@ function recordVisitedLocation(username, geo) {
   if (!geo || geo.lat == null || geo.lng == null) return;
   getStore();
   const key = cellKey(geo.lat, geo.lng);
-  const entry = store[key] || { firstSeen: Date.now(), count: 0, visitors: {} };
+  const now = Date.now();
+  const entry = store[key] || { firstSeen: now, count: 0, visitors: {} };
+  // Throttle repeat visits from the same user at the same cell (e.g. rapid /me
+  // polls) so we don't rewrite the whole store to disk on every request.
+  if (username && entry.visitors[username] && (now - entry.visitors[username]) < VISIT_DEDUP_MS) {
+    return;
+  }
   entry.lat = geo.lat;
   entry.lng = geo.lng;
   entry.city = geo.city || 'Unknown';
   entry.country = geo.country || 'Unknown';
   entry.count = (entry.count || 0) + 1;
-  entry.lastSeen = Date.now();
+  entry.lastSeen = now;
   if (username) {
-    entry.visitors[username] = Date.now();
+    entry.visitors[username] = now;
   }
   store[key] = entry;
   saveStore();
@@ -65,11 +77,15 @@ function removeVisitedLocation(key) {
   return true;
 }
 
-// Best-effort one-time seed from the existing activity log, so the permanent
-// map isn't empty on first deploy. No-op if the store already has data (i.e.
-// this has already run, or pins have been recorded/removed since).
+// One-time seed from the existing activity log, so the permanent map isn't empty
+// on first deploy. Guarded by a persistent sentinel (not by emptiness) so that an
+// intentionally-empty store — e.g. after an admin deletes pins — is never
+// re-seeded, and purged locations/usernames don't come back on restart.
 function backfillFromActivityLog(entries) {
+  if (fs.existsSync(SEEDED_FLAG)) return;
   getStore();
+  // Mark seeded up front so this can't run twice even if seeding is skipped.
+  try { fs.writeFileSync(SEEDED_FLAG, new Date().toISOString()); } catch (err) { /* best-effort */ }
   if (Object.keys(store).length > 0) return;
   if (!Array.isArray(entries)) return;
 

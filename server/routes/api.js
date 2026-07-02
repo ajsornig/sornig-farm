@@ -116,7 +116,7 @@ router.post('/login', (req, res) => {
       message: 'Your account is pending admin approval.'
     });
   }
-  const ip = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.ip;
+  const ip = getClientIp(req);
   if (!result.isAdmin) {
     geolocateIP(ip).then(geo => {
       db.logActivity(result.username, 'login', { ip, ...(geo || {}) });
@@ -221,7 +221,7 @@ router.get('/me', (req, res) => {
   setSessionCookie(req, res, token);
   const approved = db.isUserApproved(session.username);
   const user = db.getUser(session.username);
-  const ip = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.ip;
+  const ip = getClientIp(req);
   if (!session.isAdmin) {
     geolocateIP(ip).then(geo => {
       db.logActivity(session.username, 'page_visit', { ip, ...(geo || {}) });
