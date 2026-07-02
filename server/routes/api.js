@@ -458,9 +458,14 @@ router.get('/favorites', requireApprovedViewer, (req, res) => {
 });
 
 router.post('/admin/favorites', requireAdmin, (req, res) => {
-  const { cam, filename, source } = req.body;
+  const { cam, source } = req.body;
+  // Strip any path components and validate the frame-name shape, matching the
+  // sibling frame endpoints — otherwise a name like ../../etc/passwd traverses
+  // out of the frames dir on both the read and the write.
+  const filename = req.body.filename ? path.basename(req.body.filename) : '';
   if (!cam || !filename) return res.status(400).json({ error: 'Missing cam or filename' });
   if (!['run', 'coop', 'chick'].includes(cam)) return res.status(400).json({ error: 'Invalid cam' });
+  if (!/^\d{4}-\d{2}-\d{2}_\d{4,6}\.jpg$/.test(filename)) return res.status(400).json({ error: 'Invalid filename' });
 
   const favFilename = `${cam}_${filename}`;
   const favDir = path.join(__dirname, '../../public/favorites');

@@ -1241,9 +1241,9 @@ async function loadPresets() {
     const presets = await resp.json();
     pillsEl.innerHTML = presets.map(p => {
       const deleteBtn = isAdmin
-        ? `<button class="preset-pill-delete" onclick="event.stopPropagation();deletePreset('${p.token}')">&times;</button>`
+        ? `<button class="preset-pill-delete" onclick="event.stopPropagation();deletePreset(${jsArg(p.token)})">&times;</button>`
         : '';
-      return `<button class="preset-pill" onclick="gotoPreset('${p.token}')">${p.name}${deleteBtn}</button>`;
+      return `<button class="preset-pill" onclick="gotoPreset(${jsArg(p.token)})">${escapeHtml(p.name)}${deleteBtn}</button>`;
     }).join('');
     if (presets.length === 0) {
       pillsEl.innerHTML = '<span style="font-size:0.8rem;color:#888;">No presets saved</span>';

@@ -28,12 +28,23 @@ const CSP = [
 ].join('; ');
 
 // Behind the Cloudflare Tunnel the real visitor IP is in cf-connecting-ip.
-// Fall back to x-forwarded-for, then the socket address.
+// Only trust that (and x-forwarded-for) when the request actually arrived via the
+// trusted loopback hop (cloudflared connects from ::1). A client hitting :3000
+// directly on the LAN could otherwise spoof these headers to rotate rate-limit
+// buckets (brute force) or poison the geo/activity log — so for a non-loopback
+// peer we ignore the headers and use the real socket address.
+function isTrustedPeer(req) {
+  const peer = req.socket && req.socket.remoteAddress;
+  return peer === '::1' || peer === '127.0.0.1' || peer === '::ffff:127.0.0.1';
+}
+
 function getClientIp(req) {
-  const cf = req.headers['cf-connecting-ip'];
-  if (cf) return cf;
-  const xff = req.headers['x-forwarded-for'];
-  if (xff) return xff.split(',')[0].trim();
+  if (isTrustedPeer(req)) {
+    const cf = req.headers['cf-connecting-ip'];
+    if (cf) return cf;
+    const xff = req.headers['x-forwarded-for'];
+    if (xff) return xff.split(',')[0].trim();
+  }
   return req.ip || (req.socket && req.socket.remoteAddress) || 'unknown';
 }
 
