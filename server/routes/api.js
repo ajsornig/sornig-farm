@@ -350,10 +350,12 @@ router.get('/admin/activity', requireAdmin, (req, res) => {
   res.json(db.getActivityLog());
 });
 
-router.get('/admin/visitor-map', requireAdmin, (req, res) => {
+// One entry per user (latest known location) from the activity log. Shared by
+// the admin visitor map and the public /stats map so their pins correspond 1:1 —
+// the public route rounds these coords and drops the username for privacy.
+function latestVisitorsByUser() {
   const log = db.getActivityLog();
   const userMap = {};
-
   log.forEach(entry => {
     if (!entry.details || !entry.details.lat) return;
     const existing = userMap[entry.username];
@@ -369,8 +371,11 @@ router.get('/admin/visitor-map', requireAdmin, (req, res) => {
       };
     }
   });
+  return Object.values(userMap);
+}
 
-  res.json(Object.values(userMap));
+router.get('/admin/visitor-map', requireAdmin, (req, res) => {
+  res.json(latestVisitorsByUser());
 });
 
 router.delete('/admin/activity', requireAdmin, (req, res) => {
@@ -773,9 +778,10 @@ router.get('/status', (req, res) => {
 
 router.get('/stats', (req, res) => {
   const stats = db.getStats();
-  // Round visitor coordinates (~11km) so the public map can't be used to
-  // pinpoint individual visitors.
-  const visitors = stats.visitors.map(v => ({
+  // Same per-user dedup as the admin visitor map, so the public map's pins
+  // correspond 1:1 with it — but round coordinates to ~0.1 deg (~11km) and drop
+  // usernames so the public map can't pinpoint or identify individual visitors.
+  const visitors = latestVisitorsByUser().map(v => ({
     lat: Math.round(v.lat * 10) / 10,
     lng: Math.round(v.lng * 10) / 10,
     city: v.city,

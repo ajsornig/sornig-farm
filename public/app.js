@@ -13,6 +13,7 @@ let isApproved = false;
 let requireApproval = false;
 let chatHistory = [];
 let visitorMap = null;
+let visitorMarkers = [];
 let humanVerified = false;
 
 async function init() {
@@ -46,6 +47,11 @@ function setupCollapsibleSections() {
     }
     details.addEventListener('toggle', () => {
       localStorage.setItem(storageKey, details.open);
+      // Leaflet renders blank/off-center if it was created in a collapsed (zero-
+      // size) section; re-measure when the visitor map's section is opened.
+      if (details.open && details.id === 'visitors-section' && visitorMap) {
+        visitorMap.invalidateSize();
+      }
     });
   });
 }
@@ -954,19 +960,24 @@ async function loadVisitorStats() {
     document.getElementById('total-views').innerHTML =
       `Total views: <strong>${stats.totalViews.toLocaleString()}</strong>`;
 
-    // Initialize map with bounds to prevent world duplication
-    visitorMap = L.map('visitor-map', {
-      maxBounds: [[-90, -180], [90, 180]],
-      maxBoundsViscosity: 1.0,
-      minZoom: 2
-    }).setView([39, -98], 3);
+    // Create the map once; on subsequent calls just refresh the markers (avoids
+    // "Map container is already initialized" if loadVisitorStats runs twice).
+    if (!visitorMap) {
+      visitorMap = L.map('visitor-map', {
+        maxBounds: [[-90, -180], [90, 180]],
+        maxBoundsViscosity: 1.0,
+        minZoom: 2
+      }).setView([39, -98], 3);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors',
-      noWrap: true
-    }).addTo(visitorMap);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        noWrap: true
+      }).addTo(visitorMap);
+    } else {
+      visitorMarkers.forEach(m => visitorMap.removeLayer(m));
+    }
+    visitorMarkers = [];
 
-    // Add visitor markers
     const chickenIcon = L.divIcon({
       className: 'visitor-marker',
       html: '<span style="font-size: 20px;">🐔</span>',
@@ -975,10 +986,15 @@ async function loadVisitorStats() {
     });
 
     stats.visitors.forEach(visitor => {
-      L.marker([visitor.lat, visitor.lng], { icon: chickenIcon })
+      const marker = L.marker([visitor.lat, visitor.lng], { icon: chickenIcon })
         .addTo(visitorMap)
         .bindPopup(`${visitor.city}, ${visitor.country}`);
+      visitorMarkers.push(marker);
     });
+
+    // The map may have been created inside a collapsed <details> (zero-size on
+    // mobile); re-measure so tiles/markers aren't rendered off-center.
+    visitorMap.invalidateSize();
 
   } catch (err) {
     console.error('Failed to load visitor stats:', err);
