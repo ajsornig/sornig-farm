@@ -7,6 +7,7 @@ const { sendApprovalRequest, sendApprovalNotification, sendPasswordResetEmail, s
 const { atomicWriteJSON } = require('../atomic-write');
 const { getClientIp } = require('../security');
 const { geolocateIP } = require('../geo');
+const { getVisitedLocations, recordVisitedLocation, removeVisitedLocation } = require('../visited-locations');
 const { sendPtzCommand, getPresets, gotoPreset, setPreset, removePreset, VALID_OPS } = require('../ptz');
 const { getAiConfig, setAiTrack, setTrackTypes, setTrackBackTimes, getPtzGuard, setPtzGuard } = require('../reolink-api');
 const { createRateLimiter } = require('../security');
@@ -119,6 +120,7 @@ router.post('/login', (req, res) => {
   if (!result.isAdmin) {
     geolocateIP(ip).then(geo => {
       db.logActivity(result.username, 'login', { ip, ...(geo || {}) });
+      if (geo) recordVisitedLocation(result.username, geo);
     });
   }
   if (result.token) setSessionCookie(req, res, result.token);
@@ -223,6 +225,7 @@ router.get('/me', (req, res) => {
   if (!session.isAdmin) {
     geolocateIP(ip).then(geo => {
       db.logActivity(session.username, 'page_visit', { ip, ...(geo || {}) });
+      if (geo) recordVisitedLocation(session.username, geo);
     });
   }
   res.json({
@@ -350,32 +353,31 @@ router.get('/admin/activity', requireAdmin, (req, res) => {
   res.json(db.getActivityLog());
 });
 
-// One entry per user (latest known location) from the activity log. Shared by
-// the admin visitor map and the public /stats map so their pins correspond 1:1 —
-// the public route rounds these coords and drops the username for privacy.
-function latestVisitorsByUser() {
-  const log = db.getActivityLog();
-  const userMap = {};
-  log.forEach(entry => {
-    if (!entry.details || !entry.details.lat) return;
-    const existing = userMap[entry.username];
-    if (!existing || entry.timestamp > existing.lastSeen) {
-      userMap[entry.username] = {
-        username: entry.username,
-        city: entry.details.city || 'Unknown',
-        country: entry.details.country || 'Unknown',
-        lat: entry.details.lat,
-        lng: entry.details.lng,
-        lastSeen: entry.timestamp,
-        action: entry.action
-      };
-    }
-  });
-  return Object.values(userMap);
-}
-
+// Permanent worldwide visitor map: cell-bucketed pins (0.1 deg) with running
+// visit counts and per-visitor last-seen timestamps. Shared store backs both
+// the admin visitor map and the public /stats map — the public route rounds
+// coords (already rounded at storage) and drops usernames for privacy.
 router.get('/admin/visitor-map', requireAdmin, (req, res) => {
-  res.json(latestVisitorsByUser());
+  const locations = Object.entries(getVisitedLocations()).map(([key, v]) => ({
+    key,
+    lat: v.lat,
+    lng: v.lng,
+    city: v.city,
+    country: v.country,
+    count: v.count,
+    firstSeen: v.firstSeen,
+    lastSeen: v.lastSeen,
+    visitors: Object.entries(v.visitors || {})
+      .map(([username, lastSeen]) => ({ username, lastSeen }))
+      .sort((a, b) => b.lastSeen - a.lastSeen)
+  }));
+  res.json(locations);
+});
+
+router.delete('/admin/visitor-map/:key', requireAdmin, (req, res) => {
+  const ok = removeVisitedLocation(req.params.key);
+  if (!ok) return res.status(404).json({ error: 'Pin not found' });
+  res.json({ success: true });
 });
 
 router.delete('/admin/activity', requireAdmin, (req, res) => {
@@ -778,14 +780,15 @@ router.get('/status', (req, res) => {
 
 router.get('/stats', (req, res) => {
   const stats = db.getStats();
-  // Same per-user dedup as the admin visitor map, so the public map's pins
-  // correspond 1:1 with it — but round coordinates to ~0.1 deg (~11km) and drop
-  // usernames so the public map can't pinpoint or identify individual visitors.
-  const visitors = latestVisitorsByUser().map(v => ({
+  // Same store as the admin visitor map, so the public map's pins correspond
+  // 1:1 with it — coords are already cell-rounded to ~0.1 deg (~11km) and
+  // usernames are dropped so the public map can't identify individual visitors.
+  const visitors = Object.values(getVisitedLocations()).map(v => ({
     lat: Math.round(v.lat * 10) / 10,
     lng: Math.round(v.lng * 10) / 10,
     city: v.city,
-    country: v.country
+    country: v.country,
+    count: v.count
   }));
   res.json({ totalViews: stats.totalViews, visitors });
 });

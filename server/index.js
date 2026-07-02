@@ -6,11 +6,12 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 const { WebSocketServer } = require('ws');
 const config = require('../config.json');
-const { initDb, getSession, hasPtzAccess, hasPtzDriving, isUserApproved } = require('./db');
+const { initDb, getSession, hasPtzAccess, hasPtzDriving, isUserApproved, getActivityLog } = require('./db');
 const { setupChat } = require('./chat');
 const apiRoutes = require('./routes/api');
 const { initMailer } = require('./mailer');
 const { securityHeaders, createRateLimiter } = require('./security');
+const { backfillFromActivityLog } = require('./visited-locations');
 
 const PRIVACY_FLAG = path.join(__dirname, '../.privacy-mode');
 const HIDDEN_CAMS_DIR = path.join(__dirname, '../.hidden-cams');
@@ -56,6 +57,14 @@ function isAllowedOriginHost(originHost, reqHost) {
 
 initDb();
 initMailer();
+
+// Best-effort one-time seed of the permanent visitor map from the existing
+// activity log, so it isn't empty on first deploy. No-op if already seeded.
+try {
+  backfillFromActivityLog(getActivityLog());
+} catch (err) {
+  console.error('Visitor map backfill failed:', err.message);
+}
 
 app.use(securityHeaders);
 app.use(express.json({ limit: '64kb' }));

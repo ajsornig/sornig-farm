@@ -988,7 +988,7 @@ async function loadVisitorStats() {
     stats.visitors.forEach(visitor => {
       const marker = L.marker([visitor.lat, visitor.lng], { icon: chickenIcon })
         .addTo(visitorMap)
-        .bindPopup(`${visitor.city}, ${visitor.country}`);
+        .bindPopup(`${escapeHtml(visitor.city)}, ${escapeHtml(visitor.country)} · ${visitor.count} visit${visitor.count === 1 ? '' : 's'}`);
       visitorMarkers.push(marker);
     });
 

@@ -4,6 +4,7 @@ const { filterProfanity } = require('./profanity');
 const { isBot, isSuspicious } = require('./botDetect');
 const { getClientIp } = require('./security');
 const { geolocateIP } = require('./geo');
+const { recordVisitedLocation } = require('./visited-locations');
 
 const MAX_CONNECTIONS_PER_IP = 15;
 
@@ -98,7 +99,10 @@ function applyAuthenticatedSession(clientId, ws, session) {
     if (pending && !pending.verified) {
       pending.verified = true;
       if (!session.isAdmin) {
-        geolocateIP(pending.ip).then(location => { recordVisit(location); });
+        geolocateIP(pending.ip).then(location => {
+          recordVisit(location);
+          if (location) recordVisitedLocation(session.username, location);
+        });
       }
     }
   }

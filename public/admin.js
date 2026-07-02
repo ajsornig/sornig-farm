@@ -639,14 +639,30 @@ async function loadVisitorMapData() {
         iconAnchor: [12, 12]
       });
 
-      const lastSeenStr = new Date(v.lastSeen).toLocaleString();
+      const visitorList = (v.visitors || [])
+        .map(vv => `${escapeHtml(vv.username)} · last here ${escapeHtml(new Date(vv.lastSeen).toLocaleDateString())}`)
+        .join('<br>');
+      const popupHtml = `<strong>${escapeHtml(v.city)}, ${escapeHtml(v.country)}</strong> — ${v.count} visit${v.count === 1 ? '' : 's'}<br>${visitorList}<br><button class="deny-btn" onclick="deleteVisitorPin(${jsArg(v.key)})">Remove pin</button>`;
       const marker = L.marker([v.lat, v.lng], { icon })
         .addTo(adminVisitorMap)
-        .bindPopup(`<strong>${escapeHtml(v.username)}</strong><br>${escapeHtml(v.city)}, ${escapeHtml(v.country)}<br><small>Last: ${escapeHtml(lastSeenStr)}</small>`);
+        .bindPopup(popupHtml);
       visitorMarkers.push(marker);
     });
   } catch (err) {
     console.error('Failed to load visitor map:', err);
+  }
+}
+
+async function deleteVisitorPin(key) {
+  try {
+    const res = await fetch(`/api/admin/visitor-map/${encodeURIComponent(key)}`, {
+      method: 'DELETE'
+    });
+    if (res.ok) {
+      loadVisitorMapData();
+    }
+  } catch (err) {
+    console.error('Failed to delete visitor pin:', err);
   }
 }
 
