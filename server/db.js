@@ -44,6 +44,12 @@ function initDb() {
       data = { messages: [], users: {}, sessions: {}, stats: { totalViews: 0, visitors: [] }, favorites: [] };
     }
   }
+  // One-time cleanup: the per-visit stats.visitors array is dead (the visitor map
+  // moved to visited-locations.js); drop any historical entries so they stop
+  // bloating every data.json write. totalViews is preserved.
+  if (data.stats && Array.isArray(data.stats.visitors) && data.stats.visitors.length) {
+    data.stats.visitors = [];
+  }
   pruneExpiredSessions();
   return data;
 }
@@ -60,8 +66,47 @@ function pruneExpiredSessions() {
   if (pruned) saveData();
 }
 
+// Coalesce data.json writes. Callers used to trigger a full atomic rewrite of the
+// entire file on EVERY mutation (login, /me, each chat message, favorites, session
+// prune) — the top SD-card write-amplification source on the Pi. Now a write just
+// marks the data dirty and schedules a single flush; bursts of rapid mutations
+// collapse into one disk write. Worst-case data-loss window on an unclean power
+// loss is FLUSH_INTERVAL_MS; a graceful shutdown (the deploy's `kill` = SIGTERM)
+// flushes synchronously via flushDataSync(), so ordinary restarts lose nothing.
+const FLUSH_INTERVAL_MS = 3000;
+let dataDirty = false;
+let flushTimer = null;
+
 function saveData() {
-  atomicWriteJSON(DATA_FILE, data);
+  dataDirty = true;
+  if (!flushTimer) {
+    flushTimer = setTimeout(flushDataIfDirty, FLUSH_INTERVAL_MS);
+    if (flushTimer.unref) flushTimer.unref();
+  }
+}
+
+function flushDataIfDirty() {
+  flushTimer = null;
+  if (!dataDirty) return;
+  try {
+    atomicWriteJSON(DATA_FILE, data);
+    dataDirty = false;
+  } catch (err) {
+    // Keep it dirty and retry on the next tick rather than losing the write.
+    console.error('data.json flush failed, will retry:', err.message);
+    flushTimer = setTimeout(flushDataIfDirty, FLUSH_INTERVAL_MS);
+    if (flushTimer.unref) flushTimer.unref();
+  }
+}
+
+// Flush pending data synchronously — call from a graceful-shutdown handler so a
+// restart never drops the last few seconds of writes.
+function flushDataSync() {
+  if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+  if (dataDirty) {
+    atomicWriteJSON(DATA_FILE, data);
+    dataDirty = false;
+  }
 }
 
 function hashPassword(password) {
@@ -386,20 +431,10 @@ function pruneOldMessages(maxMessages = 500) {
 }
 
 function recordVisit(location) {
+  // Visitor pins now live in visited-locations.js; here we only keep the running
+  // total. (The old per-visit stats.visitors array is dead — nothing reads it —
+  // and dropping it shrinks every data.json write.)
   data.stats.totalViews++;
-  if (location && location.lat && location.lng) {
-    data.stats.visitors.push({
-      lat: location.lat,
-      lng: location.lng,
-      city: location.city || 'Unknown',
-      country: location.country || 'Unknown',
-      timestamp: Date.now()
-    });
-    // Keep only last 1000 visitor locations
-    if (data.stats.visitors.length > 1000) {
-      data.stats.visitors = data.stats.visitors.slice(-1000);
-    }
-  }
   saveData();
 }
 
@@ -507,6 +542,7 @@ function removeFavorite(filename) {
 module.exports = {
   USERNAME_RE,
   initDb,
+  flushDataSync,
   createUser,
   loginUser,
   getSession,

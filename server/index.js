@@ -6,12 +6,13 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 const { WebSocketServer } = require('ws');
 const config = require('../config.json');
-const { initDb, getSession, hasPtzAccess, hasPtzDriving, isUserApproved, getActivityLog } = require('./db');
+const { initDb, getSession, hasPtzAccess, hasPtzDriving, isUserApproved, getActivityLog, flushDataSync } = require('./db');
 const { setupChat } = require('./chat');
 const apiRoutes = require('./routes/api');
 const { initMailer } = require('./mailer');
 const { securityHeaders, createRateLimiter } = require('./security');
 const { backfillFromActivityLog } = require('./visited-locations');
+const { startInfraAlertPoller } = require('./infra-alerts');
 
 const PRIVACY_FLAG = path.join(__dirname, '../.privacy-mode');
 const HIDDEN_CAMS_DIR = path.join(__dirname, '../.hidden-cams');
@@ -242,3 +243,16 @@ setupChat(wss);
 server.listen(config.port, () => {
   console.log(`Chicken Stream running at http://localhost:${config.port}`);
 });
+
+// Proactive infra alerting (camera down / disk full / temp critical) over the
+// existing email/SMS path — see server/infra-alerts.js.
+startInfraAlertPoller();
+
+// data.json writes are coalesced (see db.js); flush any pending write on a
+// graceful shutdown so the deploy's `kill` (SIGTERM) / Ctrl-C never drops data.
+function gracefulShutdown() {
+  try { flushDataSync(); } catch (err) { console.error('Shutdown flush failed:', err.message); }
+  process.exit(0);
+}
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);

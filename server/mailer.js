@@ -139,10 +139,34 @@ async function sendBroadcast(subject, message, recipients, siteBaseUrl) {
   return results;
 }
 
+// Proactive infrastructure alert — one message to every EMAIL_TO recipient
+// (which includes the SMS gateway address), so the owner is notified when a
+// camera drops, the disk fills, temps spike, etc. without watching the dashboard.
+async function sendInfraAlert(message) {
+  if (!transporter) return;
+  for (const recipient of emailTo) {
+    try {
+      const isSms = recipient.includes('@vtext.com') ||
+                    recipient.includes('@txt.att.net') ||
+                    recipient.includes('@tmomail.net');
+      await transporter.sendMail({
+        from: emailFrom,
+        to: recipient,
+        subject: isSms ? '' : 'Sornig Farm ALERT',
+        text: message
+      });
+      console.log(`Infra alert sent to ${recipient}`);
+    } catch (err) {
+      console.error(`Failed to send infra alert to ${recipient}:`, err.message);
+    }
+  }
+}
+
 module.exports = {
   initMailer,
   sendApprovalRequest,
   sendApprovalNotification,
   sendPasswordResetEmail,
-  sendBroadcast
+  sendBroadcast,
+  sendInfraAlert
 };
