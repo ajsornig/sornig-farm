@@ -41,8 +41,9 @@ function clearSessionCookie(res) {
 }
 
 function sessionFromRequest(req) {
-  const token = (req.cookies && req.cookies[SESSION_COOKIE]) ||
-    req.headers['x-auth-token'] || req.query.token;
+  // Cookie (browser) or x-auth-token header (API clients) only. No ?token= query
+  // fallback: a session token in a URL is CSRF-exempt and leaks into logs/history.
+  const token = (req.cookies && req.cookies[SESSION_COOKIE]) || req.headers['x-auth-token'];
   return token ? db.getSession(token) : null;
 }
 

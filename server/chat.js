@@ -7,6 +7,11 @@ const { geolocateIP } = require('./geo');
 
 const MAX_CONNECTIONS_PER_IP = 15;
 
+// Expected production host (from SITE_URL) for validating the WS handshake Origin
+// without depending on the tunnel preserving the inbound Host header.
+let SITE_HOST = null;
+try { SITE_HOST = process.env.SITE_URL ? new URL(process.env.SITE_URL).host : null; } catch (e) { /* ignore */ }
+
 // When the real client IP can't be resolved (e.g. cf-connecting-ip missing) the
 // socket address is the loopback for every visitor, which would collapse the
 // per-IP cap and rate limit onto a single global bucket. Detect that case.
@@ -108,7 +113,10 @@ function setupChat(wss) {
     const wsOrigin = req.headers.origin;
     if (wsOrigin) {
       let ok = false;
-      try { ok = new URL(wsOrigin).host === req.headers.host; } catch (e) { ok = false; }
+      try {
+        const h = new URL(wsOrigin).host;
+        ok = h === req.headers.host || (SITE_HOST && h === SITE_HOST);
+      } catch (e) { ok = false; }
       if (!ok) { ws.close(1008, 'Bad origin'); return; }
     }
 

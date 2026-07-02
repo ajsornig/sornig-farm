@@ -16,6 +16,17 @@ const OP_TO_VELOCITY = {
 
 const VALID_OPS = [...Object.keys(OP_TO_VELOCITY), 'ZoomInc', 'ZoomDec', 'Stop'];
 
+// Escape values interpolated into the SOAP/XML envelope so a preset name can't
+// inject markup into the request.
+function xmlEscape(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 function makeWsseHeader(username, password) {
   const nonce = crypto.randomBytes(16);
   const created = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
@@ -124,7 +135,7 @@ async function setPreset(cameraConfig, name) {
   const { ip, username, password } = cameraConfig.ptz;
   const profileToken = await getProfileToken(ip, username, password);
 
-  const body = `<SetPreset xmlns="http://www.onvif.org/ver20/ptz/wsdl"><ProfileToken>${profileToken}</ProfileToken><PresetName>${name}</PresetName></SetPreset>`;
+  const body = `<SetPreset xmlns="http://www.onvif.org/ver20/ptz/wsdl"><ProfileToken>${profileToken}</ProfileToken><PresetName>${xmlEscape(name)}</PresetName></SetPreset>`;
   const resp = await soapRequest(ip, 'ptz_service', body, username, password);
   const tokenMatch = resp.match(/PresetToken>([^<]+)</);
   return { success: true, token: tokenMatch ? tokenMatch[1] : null };

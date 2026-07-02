@@ -38,8 +38,21 @@ function setCameraHidden(camId, hidden) {
 const app = express();
 const server = http.createServer(app);
 
-// Running behind the Cloudflare Tunnel — trust the proxy so req.ip resolves.
-app.set('trust proxy', true);
+// Running behind the Cloudflare Tunnel — cloudflared connects from loopback, so
+// trust ONLY the loopback hop for X-Forwarded-* (req.ip / req.secure). Trusting
+// every upstream would let a direct LAN client to :3000 spoof X-Forwarded-For
+// (poisoning rate-limit/geo) or X-Forwarded-Proto (downgrading the cookie).
+app.set('trust proxy', 'loopback');
+
+// Expected production host, from SITE_URL — used to validate the Origin on
+// cookie-authenticated mutations and chat WebSocket handshakes without depending
+// on the tunnel preserving the inbound Host header.
+let SITE_HOST = null;
+try { SITE_HOST = process.env.SITE_URL ? new URL(process.env.SITE_URL).host : null; } catch (e) { /* ignore */ }
+function isAllowedOriginHost(originHost, reqHost) {
+  if (!originHost) return false;
+  return originHost === reqHost || (SITE_HOST && originHost === SITE_HOST);
+}
 
 initDb();
 initMailer();
@@ -64,7 +77,7 @@ app.use((req, res, next) => {
   try { originHost = new URL(origin).host; } catch (e) {
     return res.status(403).json({ error: 'Invalid Origin header' });
   }
-  if (originHost !== req.headers.host) {
+  if (!isAllowedOriginHost(originHost, req.headers.host)) {
     return res.status(403).json({ error: 'Cross-origin request blocked' });
   }
   next();
@@ -102,7 +115,7 @@ app.post('/api/admin/privacy-mode', (req, res) => {
 // Camera streams and all saved footage are private: every media byte requires a
 // valid, approved session. The browser sends the httpOnly `sf_session` cookie
 // automatically on <video>/<img>/fetch, so this gate covers content that can't
-// carry the x-auth-token header. Header/query token also accepted (API clients).
+// carry the x-auth-token header. The header is also accepted (API clients).
 const PROTECTED_MEDIA_PREFIXES = [
   '/hls', '/hls2', '/hls3',
   '/favorites', '/highlights', '/motion-timelapse', '/chick-growth',
@@ -110,8 +123,11 @@ const PROTECTED_MEDIA_PREFIXES = [
 ];
 
 function sessionFromRequest(req) {
-  const token = (req.cookies && req.cookies.sf_session) ||
-    req.headers['x-auth-token'] || req.query.token;
+  // Cookie is the browser credential; x-auth-token header is the API-client
+  // fallback (cross-site JS can't set it without a CORS preflight we never grant).
+  // No ?token= query fallback — a session token in a URL is CSRF-exempt and leaks
+  // into logs/history.
+  const token = (req.cookies && req.cookies.sf_session) || req.headers['x-auth-token'];
   return token ? getSession(token) : null;
 }
 
