@@ -2924,3 +2924,41 @@ footer {
   outline: none;
   border-color: var(--forest-green);
 }
+
+/* Mobile rules for the admin Activity tab. This block must stay AFTER the
+   base rules above — they share specificity, so source order decides. */
+@media (max-width: 768px) {
+  #admin-visitor-map {
+    height: 250px;
+  }
+
+  .activity-filters {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .activity-filter-input {
+    flex: 1 1 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  #activity-table {
+    font-size: 0.8rem;
+  }
+
+  #activity-table th,
+  #activity-table td {
+    padding: 0.4rem 0.5rem;
+  }
+
+  /* Let long unbreakable values (IPv6 addresses) wrap rather than force the
+     table wide — but keep dates/headers breaking at spaces only. */
+  #activity-table td {
+    overflow-wrap: anywhere;
+  }
+
+  #activity-table td:first-child {
+    overflow-wrap: normal;
+  }
+}

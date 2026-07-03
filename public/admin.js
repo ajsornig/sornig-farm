@@ -712,14 +712,13 @@ function renderActivityLog() {
       </thead>
       <tbody>
         ${filtered.map((entry) => {
-          const origIndex = activityData.indexOf(entry);
           return `
-          <tr id="activity-row-${origIndex}">
+          <tr>
             <td>${new Date(entry.timestamp).toLocaleString()}</td>
             <td><strong>${escapeHtml(entry.username)}</strong></td>
             <td>${formatAction(entry.action)}</td>
             <td>${entry.details && entry.details.ip ? escapeHtml(entry.details.ip) : '-'}</td>
-            <td><button class="deny-btn" onclick="deleteActivityEntry(${origIndex})" title="Delete">&#10005;</button></td>
+            <td><button class="deny-btn" onclick="deleteActivityEntry(${entry.timestamp})" title="Delete">&#10005;</button></td>
           </tr>`;
         }).join('')}
       </tbody>
@@ -961,14 +960,17 @@ async function loadCaptureStats() {
   }
 }
 
-async function deleteActivityEntry(index) {
+async function deleteActivityEntry(timestamp) {
+  const entry = activityData.find(e => e.timestamp === timestamp);
+  if (!entry) return;
   try {
-    const res = await fetch(`/api/admin/activity/${index}`, {
+    const res = await fetch(`/api/admin/activity/${timestamp}?username=${encodeURIComponent(entry.username)}`, {
       method: 'DELETE',
       headers: {}
     });
     if ((await res.json()).success) {
-      document.getElementById(`activity-row-${index}`).remove();
+      activityData = activityData.filter(e => e !== entry);
+      renderActivityLog();
     }
   } catch (err) {
     console.error('Failed to delete activity entry:', err);
@@ -1330,8 +1332,8 @@ async function loadGrowthPending() {
     }
 
     list.innerHTML = dates.map(date => {
-      const candidates = data.dates[date];
-      const chosen = candidates.chosen || 3;
+      const candidates = data.dates[date].candidates || [];
+      const chosen = data.dates[date].chosen || 3;
       const dateLabel = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
       const thumbs = candidates.filter(c => c.filename).map(c => {

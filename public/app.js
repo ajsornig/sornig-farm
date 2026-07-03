@@ -158,6 +158,7 @@ function showLoggedInState(skipContentLoad = false) {
     loadCameras();
     loadFavorites();
     loadChickGrowth();
+    loadMotionTimelapse();
     loadVisitorStats();
   }
 }
@@ -355,8 +356,6 @@ async function doLogout() {
   updateContentVisibility();
 
   // Reconnect WebSocket as unauthenticated
-  wsIntentionalClose = true;
-  if (ws) ws.close();
   setupChat();
 }
 
@@ -579,35 +578,36 @@ function hideVideoOverlay() {
   document.getElementById('video-overlay').classList.add('hidden');
 }
 
-let wsIntentionalClose = false;
-
 function setupChat() {
-  // Close existing connection if any
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    wsIntentionalClose = true;
+  // Replace any existing connection (open or still connecting). Detach its
+  // reconnect handler first so its close can't spawn a second connection loop.
+  if (ws) {
+    ws.onclose = null;
     ws.close();
   }
 
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  ws = new WebSocket(`${protocol}//${location.host}/chat`);
-  wsIntentionalClose = false;
+  const socket = new WebSocket(`${protocol}//${location.host}/chat`);
+  ws = socket;
   humanVerified = false; // Reset on new connection
 
-  ws.onopen = () => {
+  socket.onopen = () => {
     if (authToken) {
-      ws.send(JSON.stringify({ type: 'auth', token: authToken }));
+      socket.send(JSON.stringify({ type: 'auth', token: authToken }));
     }
   };
 
-  ws.onmessage = (event) => {
+  socket.onmessage = (event) => {
     const data = JSON.parse(event.data);
     handleChatMessage(data);
   };
 
-  ws.onclose = () => {
-    if (!wsIntentionalClose) {
-      setTimeout(setupChat, 3000);
-    }
+  socket.onclose = () => {
+    // Reconnect only while this socket is still the active one — a newer
+    // setupChat call may have replaced it in the meantime.
+    setTimeout(() => {
+      if (ws === socket) setupChat();
+    }, 3000);
   };
 
   document.getElementById('send-btn').onclick = sendMessage;

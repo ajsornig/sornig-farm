@@ -111,6 +111,8 @@ router.post('/login', (req, res) => {
   }
   // Check if user is approved
   if (config.requireApproval && !db.isUserApproved(username)) {
+    // loginUser already created a session; discard it since it's never issued.
+    if (result.token) db.logoutUser(result.token);
     return res.json({
       success: true,
       pendingApproval: true,
@@ -386,12 +388,13 @@ router.delete('/admin/activity', requireAdmin, (req, res) => {
   res.json({ success: true });
 });
 
-router.delete('/admin/activity/:index', requireAdmin, (req, res) => {
-  const index = parseInt(req.params.index);
-  if (isNaN(index)) {
-    return res.status(400).json({ error: 'Invalid index' });
+router.delete('/admin/activity/:timestamp', requireAdmin, (req, res) => {
+  const timestamp = parseInt(req.params.timestamp);
+  const username = typeof req.query.username === 'string' ? req.query.username : '';
+  if (isNaN(timestamp)) {
+    return res.status(400).json({ error: 'Invalid timestamp' });
   }
-  const result = db.deleteActivityEntry(index);
+  const result = db.deleteActivityEntry(timestamp, username);
   if (result) {
     res.json({ success: true });
   } else {
@@ -567,7 +570,7 @@ router.get('/admin/motion-capture-frames', requireAdmin, (req, res) => {
         filename,
         cam: cam.label,
         url: `/api/admin/motion-capture-frames/${cam.label}/${filename}`,
-        time: filename.replace(today + '_', '').replace('.jpg', '').replace(/(\d{2})(\d{2})(\d{2})?/, (_, h, m, s) => s ? `${h}:${m}:${s}` : `${h}:${m}`)
+        time: filename.replace(/^\d{4}-\d{2}-\d{2}_/, '').replace('.jpg', '').replace(/(\d{2})(\d{2})(\d{2})?/, (_, h, m, s) => s ? `${h}:${m}:${s}` : `${h}:${m}`)
       }));
   });
 
@@ -646,8 +649,10 @@ router.get('/admin/chick-growth/pending', requireAdmin, (req, res) => {
     const match = f.match(/^(\d{4}-\d{2}-\d{2})_(\d)\.jpg$/);
     if (!match) return;
     const [, date, num] = match;
-    if (!dates[date]) dates[date] = [];
-    dates[date].push({
+    // { candidates, chosen } object per date — `chosen` used to be set as an
+    // expando property on the candidates array, which JSON serialization drops.
+    if (!dates[date]) dates[date] = { candidates: [], chosen: null };
+    dates[date].candidates.push({
       filename: f,
       number: parseInt(num),
       url: `/chick-growth/pending/${f}`
@@ -662,7 +667,7 @@ router.get('/admin/chick-growth/pending', requireAdmin, (req, res) => {
     // Figure out which candidate matches the current chosen frame
     if (fs.existsSync(chosenPath)) {
       const chosenSize = fs.statSync(chosenPath).size;
-      const match = dates[date].find(c => {
+      const match = dates[date].candidates.find(c => {
         const candidatePath = path.join(pendingDir, c.filename);
         return fs.existsSync(candidatePath) && fs.statSync(candidatePath).size === chosenSize;
       });
@@ -1173,6 +1178,7 @@ router.post('/camera/:id/guard', requireAuth, requireAdmin, async (req, res) => 
 router.get('/admin/chick-cam-ip', requireAuth, requireAdmin, (req, res) => {
   const cam3 = (config.cameras || []).find(c => c.id === 'cam3');
   if (!cam3) return res.status(404).json({ error: 'cam3 not found in config' });
+  if (!cam3.ptz || !cam3.ptz.ip) return res.status(404).json({ error: 'cam3 has no PTZ config' });
   res.json({ success: true, ip: cam3.ptz.ip });
 });
 
@@ -1186,7 +1192,7 @@ router.post('/admin/chick-cam-ip', requireAuth, requireAdmin, (req, res) => {
     const scriptPath = path.join(__dirname, '../../scripts/swap-chick-cam-ip.sh');
     const output = execSync(`sudo ${scriptPath} ${ip}`, { timeout: 15000, encoding: 'utf8' });
     const cam3 = config.cameras.find(c => c.id === 'cam3');
-    if (cam3) cam3.ptz.ip = ip;
+    if (cam3 && cam3.ptz) cam3.ptz.ip = ip;
     res.json({ success: true, ip, output });
   } catch (err) {
     console.error('Chick cam IP swap failed:', err.message);

@@ -8,7 +8,11 @@ const badWords = [
   'nazi', 'hitler', 'kkk', 'jihad', 'pedo', 'molest', 'kill', 'murder'
 ];
 
-// Create regex patterns that match whole words and common variations
+// Create regex patterns that match whole words and common variations.
+// Word boundaries are lookarounds against word chars AND the substitution
+// symbols: plain \b fails when the match starts/ends with a symbol (e.g.
+// "a$$" has no word boundary after the final "$"), which let the exact
+// obfuscations the substitutions target slip through.
 const patterns = badWords.map(word => {
   // Match the word with common letter substitutions
   const escaped = word
@@ -18,7 +22,7 @@ const patterns = badWords.map(word => {
     .replace(/o/gi, '[o0]')
     .replace(/s/gi, '[s$5]')
     .replace(/t/gi, '[t7]');
-  return new RegExp(`\\b${escaped}\\b`, 'gi');
+  return new RegExp(`(?<![\\w@$!])${escaped}(?![\\w@$!])`, 'gi');
 });
 
 function containsProfanity(text) {
@@ -42,7 +46,17 @@ function filterProfanity(text) {
 }
 
 function isUsernameClean(username) {
-  const lower = username.toLowerCase().replace(/[^a-z]/g, '');
+  // Normalize leetspeak substitutions to letters before stripping the rest,
+  // so "sh1t"/"a$$hole" style names don't slip through when digits/symbols
+  // are removed.
+  const lower = username.toLowerCase()
+    .replace(/[@4]/g, 'a')
+    .replace(/3/g, 'e')
+    .replace(/[1!]/g, 'i')
+    .replace(/0/g, 'o')
+    .replace(/[$5]/g, 's')
+    .replace(/7/g, 't')
+    .replace(/[^a-z]/g, '');
   return !badWords.some(word => lower.includes(word));
 }
 
