@@ -113,12 +113,17 @@ app.post('/api/admin/privacy-mode', (req, res) => {
   const session = sessionFromRequest(req);
   if (!session || !session.isAdmin) return res.status(403).json({ error: 'Admin required' });
 
-  if (isPrivacyMode()) {
-    fs.unlinkSync(PRIVACY_FLAG);
-    res.json({ enabled: false });
-  } else {
-    fs.writeFileSync(PRIVACY_FLAG, Date.now().toString());
-    res.json({ enabled: true });
+  try {
+    if (isPrivacyMode()) {
+      fs.unlinkSync(PRIVACY_FLAG);
+      res.json({ enabled: false });
+    } else {
+      fs.writeFileSync(PRIVACY_FLAG, Date.now().toString());
+      res.json({ enabled: true });
+    }
+  } catch (err) {
+    console.error('Privacy mode toggle failed:', err.message);
+    res.status(500).json({ error: 'Failed to toggle privacy mode' });
   }
 });
 
@@ -233,7 +238,13 @@ app.post('/api/admin/cameras/:id/enable', (req, res) => {
   if (!cam) return res.status(404).json({ error: 'Camera not found' });
 
   cam.enabled = !cam.enabled;
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+  try {
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+  } catch (err) {
+    cam.enabled = !cam.enabled; // roll back the in-memory toggle
+    console.error('Camera enable write failed:', err.message);
+    return res.status(500).json({ error: 'Failed to save camera config' });
+  }
   res.json({ id: cam.id, enabled: cam.enabled });
 });
 

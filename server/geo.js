@@ -3,9 +3,24 @@
 const geoCache = new Map();
 const GEO_CACHE_TTL = 24 * 60 * 60 * 1000; // 24h
 
-async function geolocateIP(ip) {
+function isPrivateIP(ip) {
+  return (
+    ip === '::1' ||
+    ip.startsWith('127.') ||
+    ip.startsWith('192.168.') ||
+    ip.startsWith('10.') ||
+    ip.startsWith('169.254.') ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(ip)
+  );
+}
+
+async function geolocateIP(rawIp) {
+  if (!rawIp) return null;
+  // Node reports IPv4 clients as IPv4-mapped IPv6 (::ffff:1.2.3.4); strip the
+  // prefix so private-range checks and the lookup see the plain IPv4 form.
+  const ip = rawIp.replace(/^::ffff:/i, '');
   // Skip localhost/private IPs
-  if (!ip || ip === '127.0.0.1' || ip === '::1' || ip.startsWith('192.168.') || ip.startsWith('10.')) {
+  if (isPrivateIP(ip)) {
     return null;
   }
 

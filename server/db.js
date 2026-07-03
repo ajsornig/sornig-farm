@@ -153,7 +153,7 @@ function createUser(username, password, isAdmin = false, email = null) {
     return { error: 'Username already exists' };
   }
   if (!USERNAME_RE.test(username)) {
-    return { error: 'Username must be 2-20 characters: letters, numbers, and . _ - only' };
+    return { error: 'Username must be 3-20 characters: letters, numbers, and . _ - only' };
   }
   if (password.length < MIN_PASSWORD_LENGTH) {
     return { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` };
@@ -477,12 +477,14 @@ function getActivityLog() {
   return loadActivityLog().reverse();
 }
 
-function deleteActivityEntry(index) {
+function deleteActivityEntry(timestamp, username) {
+  // Match by timestamp+username instead of list index: new activity is logged
+  // constantly, so an index captured by the admin page goes stale immediately.
   const log = loadActivityLog();
-  const reversed = log.reverse();
-  if (index < 0 || index >= reversed.length) return false;
-  reversed.splice(index, 1);
-  saveActivityLog(reversed.reverse());
+  const index = log.findIndex(e => e.timestamp === timestamp && e.username === username);
+  if (index === -1) return false;
+  log.splice(index, 1);
+  saveActivityLog(log);
   return true;
 }
 
