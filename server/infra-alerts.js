@@ -11,10 +11,16 @@ const { sendInfraAlert } = require('./mailer');
 const WIFI_LOG = path.join(__dirname, '../logs/wifi-monitor.log');
 const POLL_MS = 60 * 1000;            // wifi-monitor appends one line per minute
 const ALERT_COOLDOWN_MS = 30 * 60 * 1000; // don't re-send the same alert within 30 min
+// Only alert on a critical that PERSISTS across this many consecutive monitor
+// samples (~minutes). Filters out transient spikes — e.g. the nightly ffmpeg
+// time-lapse encodes briefly peg the CPU >80% for a single minute — while still
+// catching a genuinely stuck/pegged condition within a few minutes.
+const SUSTAIN_SAMPLES = 3;
 
-// message -> last-sent timestamp. In-memory only: a restart clears it, so an
-// ongoing outage may re-alert once after a restart — acceptable (and arguably
-// desirable) for an unattended box.
+// alert key -> last-sent timestamp. Keyed by the stable `key` (not the message,
+// which carries a changing metric value). In-memory only: a restart clears it, so
+// an ongoing outage may re-alert once after a restart — acceptable for an
+// unattended box.
 const lastSentAt = new Map();
 
 function poll() {
@@ -26,25 +32,34 @@ function poll() {
       return; // log not present yet
     }
     const lines = raw.split('\n').filter(Boolean);
-    if (lines.length === 0) return;
+    if (lines.length < SUSTAIN_SAMPLES) return; // not enough history yet
 
-    const entry = parseInfraLine(lines[lines.length - 1]);
-    if (!entry) return;
+    const recent = lines.slice(-SUSTAIN_SAMPLES).map(parseInfraLine);
+    if (recent.some(e => !e)) return; // a sample didn't parse — don't guess
+
+    // For each sample: the critical alerts keyed by stable id -> message.
+    const perSample = recent.map(e =>
+      new Map(generateInfraAlerts(e)
+        .filter(a => a.level === 'critical')
+        .map(a => [a.key, a.message]))
+    );
+    const latest = perSample[perSample.length - 1];
+    // Sustained = the critical is present in EVERY one of the last N samples.
+    const sustainedKeys = [...latest.keys()].filter(k => perSample.every(m => m.has(k)));
 
     const now = Date.now();
     const toSend = [];
-    for (const alert of generateInfraAlerts(entry)) {
-      if (alert.level !== 'critical') continue;
-      const last = lastSentAt.get(alert.message) || 0;
+    for (const key of sustainedKeys) {
+      const last = lastSentAt.get(key) || 0;
       if (now - last > ALERT_COOLDOWN_MS) {
-        toSend.push(alert.message);
-        lastSentAt.set(alert.message, now);
+        toSend.push(latest.get(key)); // current message text (with live value)
+        lastSentAt.set(key, now);
       }
     }
 
     if (toSend.length > 0) {
       // One combined message per poll — never a burst of separate texts.
-      sendInfraAlert('Sornig Farm infra alert:\n' + toSend.join('\n'));
+      sendInfraAlert('Sornig Farm infra alert (sustained ' + SUSTAIN_SAMPLES + '+ min):\n' + toSend.join('\n'));
     }
   } catch (err) {
     console.error('Infra alert poll failed:', err.message);

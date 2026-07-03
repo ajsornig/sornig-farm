@@ -97,40 +97,44 @@ function parseInfraLine(line) {
 }
 
 function generateInfraAlerts(entry) {
+  // Each alert has a stable `key` (independent of the changing metric value in the
+  // message) so callers can track the same condition across samples — e.g. the
+  // push-alert poller requires a critical to persist for several samples before
+  // texting, which the value-in-message text alone can't support.
   const alerts = [];
-  if (!entry) return [{ level: 'warning', message: 'No monitoring data available' }];
+  if (!entry) return [{ level: 'warning', key: 'nodata', message: 'No monitoring data available' }];
 
   const cam3Enabled = (config.cameras || []).some(c => c.id === 'cam3' && c.enabled);
 
-  if (!entry.pings.cam1.ok) alerts.push({ level: 'critical', message: 'Chicken Run camera ping FAILED' });
-  if (!entry.pings.cam2.ok) alerts.push({ level: 'critical', message: 'Chicken Coop camera ping FAILED' });
-  if (cam3Enabled && !entry.pings.cam3.ok) alerts.push({ level: 'critical', message: 'Chick Cam ping FAILED' });
+  if (!entry.pings.cam1.ok) alerts.push({ level: 'critical', key: 'cam1-ping', message: 'Chicken Run camera ping FAILED' });
+  if (!entry.pings.cam2.ok) alerts.push({ level: 'critical', key: 'cam2-ping', message: 'Chicken Coop camera ping FAILED' });
+  if (cam3Enabled && !entry.pings.cam3.ok) alerts.push({ level: 'critical', key: 'cam3-ping', message: 'Chick Cam ping FAILED' });
   if (!entry.streams.stream1.ok) {
-    alerts.push({ level: 'critical', message: entry.streams.stream1.age === null ? 'Stream 1 NO_FILE' : `Stream 1 stale (${entry.streams.stream1.age}s)` });
+    alerts.push({ level: 'critical', key: 'stream1', message: entry.streams.stream1.age === null ? 'Stream 1 NO_FILE' : `Stream 1 stale (${entry.streams.stream1.age}s)` });
   }
   if (!entry.streams.stream2.ok) {
-    alerts.push({ level: 'critical', message: entry.streams.stream2.age === null ? 'Stream 2 NO_FILE' : `Stream 2 stale (${entry.streams.stream2.age}s)` });
+    alerts.push({ level: 'critical', key: 'stream2', message: entry.streams.stream2.age === null ? 'Stream 2 NO_FILE' : `Stream 2 stale (${entry.streams.stream2.age}s)` });
   }
   if (cam3Enabled && !entry.streams.stream3.ok) {
-    alerts.push({ level: 'critical', message: entry.streams.stream3.age === null ? 'Stream 3 NO_FILE' : `Stream 3 stale (${entry.streams.stream3.age}s)` });
+    alerts.push({ level: 'critical', key: 'stream3', message: entry.streams.stream3.age === null ? 'Stream 3 NO_FILE' : `Stream 3 stale (${entry.streams.stream3.age}s)` });
   }
-  if (entry.eth0.state !== 'up') alerts.push({ level: 'critical', message: 'eth0 link DOWN' });
+  if (entry.eth0.state !== 'up') alerts.push({ level: 'critical', key: 'eth0', message: 'eth0 link DOWN' });
   const expectedFfmpeg = cam3Enabled ? 3 : 2;
-  if (entry.ffmpegCount < expectedFfmpeg) alerts.push({ level: 'warning', message: `Only ${entry.ffmpegCount} of ${expectedFfmpeg} ffmpeg process(es) running` });
+  if (entry.ffmpegCount < expectedFfmpeg) alerts.push({ level: 'warning', key: 'ffmpeg', message: `Only ${entry.ffmpegCount} of ${expectedFfmpeg} ffmpeg process(es) running` });
   if (entry.wlan1.signal === null) {
-    alerts.push({ level: 'warning', message: 'Primary uplink (wlan1) signal lost — failover active' });
+    alerts.push({ level: 'warning', key: 'wlan1', message: 'Primary uplink (wlan1) signal lost — failover active' });
     if (entry.wlan0.signal !== null && entry.wlan0.signal < -70) {
-      alerts.push({ level: 'warning', message: `Failover WiFi signal weak (${entry.wlan0.signal} dBm)` });
+      alerts.push({ level: 'warning', key: 'wlan0-weak', message: `Failover WiFi signal weak (${entry.wlan0.signal} dBm)` });
     }
   }
   if (entry.system.cpu !== null && entry.system.cpu > 80) {
-    alerts.push({ level: 'critical', message: `CPU usage high (${entry.system.cpu.toFixed(1)}%)` });
+    alerts.push({ level: 'critical', key: 'cpu-high', message: `CPU usage high (${entry.system.cpu.toFixed(1)}%)` });
   }
   if (entry.system.temp !== null && entry.system.temp > 75) {
-    alerts.push({ level: 'warning', message: `CPU temperature high (${entry.system.temp.toFixed(1)}°C)` });
+    alerts.push({ level: 'warning', key: 'temp-high', message: `CPU temperature high (${entry.system.temp.toFixed(1)}°C)` });
   }
   if (entry.system.temp !== null && entry.system.temp > 82) {
-    alerts.push({ level: 'critical', message: `CPU temperature critical (${entry.system.temp.toFixed(1)}°C) — throttling likely` });
+    alerts.push({ level: 'critical', key: 'temp-critical', message: `CPU temperature critical (${entry.system.temp.toFixed(1)}°C) — throttling likely` });
   }
 
   return alerts;
