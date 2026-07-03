@@ -2925,9 +2925,55 @@ footer {
   border-color: var(--forest-green);
 }
 
-/* Mobile rules for the admin Activity tab. This block must stay AFTER the
-   base rules above — they share specificity, so source order decides. */
+/* Mobile rules for the admin Activity and Users tabs. This block must stay
+   AFTER the base rules above — they share specificity, so source order decides. */
 @media (max-width: 768px) {
+  /* <main> is a flex container, so the panel's min-width:auto lets wide tab
+     content push the page beyond the screen; mobile Chrome then zooms the
+     whole layout out and never zooms back. */
+  #admin-panel {
+    min-width: 0;
+  }
+
+  /* Creation date is the least useful column on a phone — drop it so the
+     users table fits the screen. */
+  #users-table th:nth-child(4),
+  #users-table td:nth-child(4) {
+    display: none;
+  }
+
+  #users-table {
+    font-size: 0.8rem;
+  }
+
+  #users-table th,
+  #users-table td {
+    padding: 0.4rem 0.3rem;
+  }
+
+  /* Emails and usernames have no spaces — let them wrap rather than force
+     the table (and the whole page) wider than the screen. */
+  #users-table td {
+    overflow-wrap: anywhere;
+  }
+
+  #users-table td:nth-child(3) {
+    overflow-wrap: normal; /* don't split "Admin"/"User" mid-word */
+  }
+
+  #users-table .action-buttons {
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  #users-table .action-buttons button,
+  #users-table .driving-toggle {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    white-space: nowrap; /* wrap between buttons, not inside their labels */
+    margin-left: 0;
+  }
+
   #admin-visitor-map {
     height: 250px;
   }
