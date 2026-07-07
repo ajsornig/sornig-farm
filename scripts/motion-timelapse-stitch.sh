@@ -23,6 +23,9 @@ log() {
 stitch_combined() {
   local yesterday=$(date -d "yesterday" '+%Y-%m-%d')
 
+  # Prune old dailies first so it happens even when the stitch is skipped
+  find "$OUTPUT_DIR" -name "motion-timelapse-20*.mp4" -mtime +"$RETENTION_DAYS" -delete
+
   local run_count=$(ls "$RUN_FRAMES/${yesterday}_"*.jpg 2>/dev/null | wc -l)
   local coop_count=$(ls "$COOP_FRAMES/${yesterday}_"*.jpg 2>/dev/null | wc -l)
   local chick_count=$(ls "$CHICK_FRAMES/${yesterday}_"*.jpg 2>/dev/null | wc -l)
@@ -75,35 +78,56 @@ stitch_combined() {
   fi
 
   rm -f "$filelist"
-  find "$OUTPUT_DIR" -name "motion-timelapse-20*.mp4" -mtime +"$RETENTION_DAYS" -delete
 }
 
 stitch_weekly() {
-  local temp_dir=$(mktemp -d)
-  local filelist="$temp_dir/concat.txt"
+  local segments_dir="$BASE_DIR/motion-timelapse/weekly-segments"
+  mkdir -p "$segments_dir"
+
+  local filelist=$(mktemp)
   local idx=0
+  local encoded=0
 
-  for video in $(ls "$OUTPUT_DIR"/motion-timelapse-20*.mp4 2>/dev/null | sort); do
+  # Rolling week: newest 7 daily videos only (prune lag can leave an 8th on disk)
+  local selected=$(ls "$OUTPUT_DIR"/motion-timelapse-20*.mp4 2>/dev/null | sort | tail -n "$RETENTION_DAYS")
+
+  for video in $selected; do
     local date_str=$(basename "$video" .mp4 | sed 's/motion-timelapse-//')
-    local label=$(date -d "$date_str" '+%a, %b %-d')
+    local segment="$segments_dir/segment_${date_str}.mp4"
 
-    local temp_out="$temp_dir/segment_${idx}.mp4"
+    # Labeling forces a full re-encode, so cache the labeled segment per date
+    # and only encode days not seen before. nice + 2 threads keeps CPU under
+    # the infra-alert critical threshold (80%).
+    if [ ! -f "$segment" ] || [ "$video" -nt "$segment" ]; then
+      local label=$(date -d "$date_str" '+%a, %b %-d')
+      nice -n 19 ffmpeg -y -i "$video" \
+        -vf "drawtext=text='${label}':fontsize=28:fontcolor=white:x=20:y=h-50:shadowcolor=black@0.3:shadowx=1:shadowy=1" \
+        -c:v libx264 -crf 23 -preset medium -threads 2 \
+        -pix_fmt yuv420p \
+        "$segment" 2>/dev/null
 
-    ffmpeg -y -i "$video" \
-      -vf "drawtext=text='${label}':fontsize=28:fontcolor=white:x=20:y=h-50:shadowcolor=black@0.3:shadowx=1:shadowy=1" \
-      -c:v libx264 -crf 23 -preset medium \
-      -pix_fmt yuv420p \
-      "$temp_out" 2>/dev/null
-
-    if [ $? -eq 0 ]; then
-      echo "file '$temp_out'" >> "$filelist"
-      idx=$((idx + 1))
+      if [ $? -ne 0 ]; then
+        log "[weekly] WARN: Failed to label segment for $date_str, skipping"
+        rm -f "$segment"
+        continue
+      fi
+      encoded=$((encoded + 1))
     fi
+
+    echo "file '$segment'" >> "$filelist"
+    idx=$((idx + 1))
+  done
+
+  # Drop cached segments that fell out of the rolling week
+  for segment in "$segments_dir"/segment_*.mp4; do
+    [ -f "$segment" ] || continue
+    local seg_date=$(basename "$segment" .mp4 | sed 's/segment_//')
+    echo "$selected" | grep -q "motion-timelapse-${seg_date}.mp4" || rm -f "$segment"
   done
 
   if [ "$idx" -lt 2 ]; then
     log "[weekly] SKIP: Only $idx daily videos available, need at least 2"
-    rm -rf "$temp_dir"
+    rm -f "$filelist"
     return
   fi
 
@@ -115,12 +139,12 @@ stitch_weekly() {
     "$output" 2>/dev/null
 
   if [ $? -eq 0 ] && [ -f "$output" ]; then
-    log "[weekly] OK: Compiled $idx days into weekly montage"
+    log "[weekly] OK: Compiled $idx days into weekly montage ($encoded newly encoded)"
   else
     log "[weekly] ERROR: Failed to create weekly montage"
   fi
 
-  rm -rf "$temp_dir"
+  rm -f "$filelist"
 }
 
 case "$1" in
