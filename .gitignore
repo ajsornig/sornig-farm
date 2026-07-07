@@ -15,3 +15,12 @@ SornigReadMe.txt
 # data.json backups — contain password hashes + session tokens, never commit
 backups/
 restart-baseline.json
+# runtime/media dirs generated on the Pi — hundreds of MB of video/frames
+logs/
+motion-timelapse/
+public/hls*/
+public/motion-timelapse/
+public/chick-album/
+public/chick-growth/
+public/favorites/
+public/highlights/
