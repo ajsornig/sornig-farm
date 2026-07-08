@@ -26,6 +26,10 @@ stitch_combined() {
   # Prune old dailies first so it happens even when the stitch is skipped
   find "$OUTPUT_DIR" -name "motion-timelapse-20*.mp4" -mtime +"$RETENTION_DAYS" -delete
 
+  # Frames normally die right after their day is stitched, but a missed cron
+  # run (e.g. 2026-06-30) orphans that day's frames forever — sweep them here.
+  find "$RUN_FRAMES" "$COOP_FRAMES" "$CHICK_FRAMES" -name "20*.jpg" -mtime +"$RETENTION_DAYS" -delete
+
   local run_count=$(ls "$RUN_FRAMES/${yesterday}_"*.jpg 2>/dev/null | wc -l)
   local coop_count=$(ls "$COOP_FRAMES/${yesterday}_"*.jpg 2>/dev/null | wc -l)
   local chick_count=$(ls "$CHICK_FRAMES/${yesterday}_"*.jpg 2>/dev/null | wc -l)
