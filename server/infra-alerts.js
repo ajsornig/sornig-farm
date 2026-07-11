@@ -1,6 +1,8 @@
 const path = require('path');
 const { readLogTail, parseInfraLine, generateInfraAlerts } = require('./infra');
 const { sendInfraAlert } = require('./mailer');
+const { getCamStates } = require('./camera-state');
+const { maybeRunDiskPrune } = require('./disk-prune');
 
 // Proactive infra alerting. The dashboard already computes critical/warning
 // alerts from logs/wifi-monitor.log, but only when an admin has the tab open.
@@ -16,51 +18,111 @@ const ALERT_COOLDOWN_MS = 30 * 60 * 1000; // don't re-send the same alert within
 // time-lapse encodes briefly peg the CPU >80% for a single minute — while still
 // catching a genuinely stuck/pegged condition within a few minutes.
 const SUSTAIN_SAMPLES = 3;
+// Per incident (a key continuously sustained): first alert + 2 reminders, then
+// silence until the condition clears and recurs. Stops the every-30-min SMS
+// stream during a known all-night outage (2026-07-10 coop-cam incident).
+const MAX_ALERTS_PER_INCIDENT = 3;
 
-// alert key -> last-sent timestamp. Keyed by the stable `key` (not the message,
-// which carries a changing metric value). In-memory only: a restart clears it, so
-// an ongoing outage may re-alert once after a restart — acceptable for an
-// unattended box.
-const lastSentAt = new Map();
+// alert key -> { lastSentAt, sentCount }. Keyed by the stable `key` (not the
+// message, which carries a changing metric value). Keys drop out of the state
+// the moment they stop being sustained, so recovery resets the incident.
+// In-memory only: a restart clears it, so an ongoing outage may re-alert once
+// after a restart — acceptable for an unattended box.
+let alertState = {};
+
+// Pure send decision: which sustained criticals get (re)sent now, and the next
+// state. A key is sent when its cooldown elapsed AND it is under the incident
+// cap; keys absent from `sustainedAlerts` are dropped from the state entirely,
+// so a recovered condition starts a fresh incident if it recurs.
+function selectAlertsToSend(sustainedAlerts, state, now) {
+  const toSend = [];
+  const nextState = {};
+  for (const alert of sustainedAlerts) {
+    const prev = state[alert.key] || { lastSentAt: 0, sentCount: 0 };
+    // Never-sent keys fire immediately; only re-sends wait out the cooldown.
+    const cooldownElapsed = prev.sentCount === 0 || now - prev.lastSentAt > ALERT_COOLDOWN_MS;
+    const underCap = prev.sentCount < MAX_ALERTS_PER_INCIDENT;
+    if (cooldownElapsed && underCap) {
+      toSend.push(alert);
+      nextState[alert.key] = { lastSentAt: now, sentCount: prev.sentCount + 1 };
+    } else {
+      nextState[alert.key] = prev;
+    }
+  }
+  return { toSend, nextState };
+}
+
+// The last SUSTAIN_SAMPLES parsed monitor samples, or null if there aren't
+// enough clean ones yet (log missing, short, or a line failed to parse).
+function readRecentSamples() {
+  let raw;
+  try {
+    raw = readLogTail(WIFI_LOG, 64 * 1024);
+  } catch (err) {
+    if (err.code !== 'ENOENT') console.error('Infra alert poll: cannot read monitor log:', err.message);
+    return null;
+  }
+  const lines = raw.split('\n').filter(Boolean);
+  if (lines.length < SUSTAIN_SAMPLES) return null;
+  const recent = lines.slice(-SUSTAIN_SAMPLES).map(parseInfraLine);
+  if (recent.some(e => !e)) return null; // a sample didn't parse — don't guess
+  return recent;
+}
+
+function checkDiskPrune(latestEntry, now) {
+  try {
+    const summary = maybeRunDiskPrune(latestEntry.system, now);
+    if (summary && (summary.deleted.length > 0 || summary.failed.length > 0)) {
+      sendInfraAlert(
+        `Sornig Farm disk auto-prune ran: freed ~${summary.freedMb}MB ` +
+        `(${summary.deleted.length} deleted, ${summary.failed.length} failed) — ` +
+        `free space was ${summary.freeMbBefore}MB.`
+      );
+    }
+  } catch (err) {
+    console.error('Disk auto-prune failed:', err.message);
+  }
+}
 
 function poll() {
   try {
-    let raw;
+    const recent = readRecentSamples();
+    if (!recent) return;
+
+    // Fresh camera states each tick, so an admin-panel toggle takes effect on
+    // the very next poll. If they can't be loaded, alert on everything rather
+    // than stay silent during a real outage.
+    let camStates = null;
     try {
-      raw = readLogTail(WIFI_LOG, 64 * 1024);
+      camStates = getCamStates();
     } catch (err) {
-      return; // log not present yet
+      console.error('Infra alert poll: camera states unavailable:', err.message);
     }
-    const lines = raw.split('\n').filter(Boolean);
-    if (lines.length < SUSTAIN_SAMPLES) return; // not enough history yet
 
-    const recent = lines.slice(-SUSTAIN_SAMPLES).map(parseInfraLine);
-    if (recent.some(e => !e)) return; // a sample didn't parse — don't guess
-
-    // For each sample: the critical alerts keyed by stable id -> message.
+    // Per sample: critical, non-muted alerts keyed by stable id -> message.
+    // Muted alerts (cam disabled in admin panel) stay on the dashboard but are
+    // never pushed — the outage is intentional.
     const perSample = recent.map(e =>
-      new Map(generateInfraAlerts(e)
-        .filter(a => a.level === 'critical')
+      new Map(generateInfraAlerts(e, camStates)
+        .filter(a => a.level === 'critical' && !a.muted)
         .map(a => [a.key, a.message]))
     );
     const latest = perSample[perSample.length - 1];
     // Sustained = the critical is present in EVERY one of the last N samples.
-    const sustainedKeys = [...latest.keys()].filter(k => perSample.every(m => m.has(k)));
+    const sustained = [...latest.keys()]
+      .filter(key => perSample.every(m => m.has(key)))
+      .map(key => ({ key, message: latest.get(key) })); // current message (live value)
 
     const now = Date.now();
-    const toSend = [];
-    for (const key of sustainedKeys) {
-      const last = lastSentAt.get(key) || 0;
-      if (now - last > ALERT_COOLDOWN_MS) {
-        toSend.push(latest.get(key)); // current message text (with live value)
-        lastSentAt.set(key, now);
-      }
-    }
+    const { toSend, nextState } = selectAlertsToSend(sustained, alertState, now);
+    alertState = nextState;
 
     if (toSend.length > 0) {
       // One combined message per poll — never a burst of separate texts.
-      sendInfraAlert('Sornig Farm infra alert (sustained ' + SUSTAIN_SAMPLES + '+ min):\n' + toSend.join('\n'));
+      sendInfraAlert('Sornig Farm infra alert (sustained ' + SUSTAIN_SAMPLES + '+ min):\n' + toSend.map(a => a.message).join('\n'));
     }
+
+    checkDiskPrune(recent[recent.length - 1], now);
   } catch (err) {
     console.error('Infra alert poll failed:', err.message);
   }
@@ -73,4 +135,10 @@ function startInfraAlertPoller() {
   if (timer.unref) timer.unref();
 }
 
-module.exports = { startInfraAlertPoller };
+module.exports = {
+  startInfraAlertPoller,
+  selectAlertsToSend,
+  ALERT_COOLDOWN_MS,
+  MAX_ALERTS_PER_INCIDENT,
+  SUSTAIN_SAMPLES
+};
