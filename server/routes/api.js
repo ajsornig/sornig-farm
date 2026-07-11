@@ -13,7 +13,7 @@ const { getAiConfig, setAiTrack, setTrackTypes, setTrackBackTimes, getPtzGuard, 
 const { createRateLimiter } = require('../security');
 const { readLogTail, parseInfraLine, generateInfraAlerts, INFRA_HISTORY_COUNT } = require('../infra');
 const { getCamStates } = require('../camera-state');
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 
 const { isUsernameClean } = require('../profanity');
 
@@ -1192,7 +1192,7 @@ router.post('/admin/chick-cam-ip', requireAuth, requireAdmin, (req, res) => {
 
   try {
     const scriptPath = path.join(__dirname, '../../scripts/swap-chick-cam-ip.sh');
-    const output = execSync(`sudo ${scriptPath} ${ip}`, { timeout: 15000, encoding: 'utf8' });
+    const output = execFileSync('sudo', [scriptPath, ip], { timeout: 15000, encoding: 'utf8' });
     const cam3 = config.cameras.find(c => c.id === 'cam3');
     if (cam3 && cam3.ptz) cam3.ptz.ip = ip;
     res.json({ success: true, ip, output });

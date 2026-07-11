@@ -22,8 +22,8 @@
     </div>
     <div id="user-area">
       <div id="weather-widget" class="hidden"></div>
-      <span id="viewer-count"></span>
-      <span id="night-mode-badge" class="hidden">Night Vision</span>
+      <span id="viewer-count" role="status"></span>
+      <span id="night-mode-badge" class="hidden" role="status">Night Vision</span>
       <span id="user-status"></span>
       <button id="privacy-toggle" class="hidden" title="Privacy Mode">Go Dark</button>
       <a id="account-link" href="/account.html" class="hidden">Account</a>
@@ -37,7 +37,7 @@
       <div id="camera-tabs"></div>
       <div id="video-wrapper">
         <video id="video-player" controls autoplay muted playsinline webkit-playsinline></video>
-        <div id="video-overlay" class="hidden">
+        <div id="video-overlay" class="hidden" role="status">
           <p>Camera Offline</p>
         </div>
       </div>
@@ -99,7 +99,7 @@
         <span>Coop Chat</span>
         <button id="admin-clear-btn" class="admin-btn hidden" title="Clear all chat">Clear</button>
       </div>
-      <div id="chat-messages"></div>
+      <div id="chat-messages" role="log" aria-live="polite" aria-relevant="additions"></div>
 
       <div id="auth-section">
         <div id="account-form">
@@ -122,7 +122,7 @@
           <a href="#" id="forgot-back-link" class="forgot-link">Back to login</a>
         </div>
 
-        <div id="auth-error" class="hidden"></div>
+        <div id="auth-error" class="hidden" role="alert"></div>
       </div>
 
       <div id="chat-input-area" class="hidden">
@@ -161,6 +161,7 @@
   </footer>
 
   <script src="/vendor/glightbox.min.js"></script>
-  <script src="app.js?v=19"></script>
+  <script src="sun-times.js?v=1"></script>
+  <script src="app.js?v=21"></script>
 </body>
 </html>

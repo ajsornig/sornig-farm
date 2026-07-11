@@ -658,11 +658,16 @@ function handleChatMessage(data) {
 
   switch (data.type) {
     case 'history':
+      // Suppress live-region announcements while the log is rebuilt from
+      // scratch (e.g. on the 3s WS auto-reconnect) — otherwise screen
+      // readers announce the entire history every time.
+      messages.setAttribute('aria-live', 'off');
       chatHistory = data.messages;
       messages.innerHTML = '';
       data.messages.forEach(msg => appendMessage(msg));
       requestAnimationFrame(() => {
         messages.scrollTop = messages.scrollHeight;
+        messages.setAttribute('aria-live', 'polite');
       });
       break;
 
@@ -705,11 +710,11 @@ function handleChatMessage(data) {
 
 function updateViewerCount(count) {
   const el = document.getElementById('viewer-count');
-  if (count === 1) {
-    el.textContent = '1 viewer';
-  } else {
-    el.textContent = `${count} viewers`;
-  }
+  const text = count === 1 ? '1 viewer' : `${count} viewers`;
+  // The server broadcasts on every join/leave; skip the DOM write (and the
+  // resulting aria-live announcement) when the rendered text hasn't changed.
+  if (el.textContent === text) return;
+  el.textContent = text;
 }
 
 // Escape for safe interpolation into HTML TEXT or attribute VALUES (quotes
@@ -1060,10 +1065,9 @@ function getWeatherIcon(desc) {
   return '🌡️';
 }
 
-// Night mode badge
+// Night mode badge — real sunrise/sunset for the farm (sun-times.js)
 function updateNightMode() {
-  const hour = new Date().getHours();
-  const isNight = hour >= 21 || hour < 6;
+  const isNight = !SunTimes.isDaylight(Date.now());
   const badge = document.getElementById('night-mode-badge');
   if (!badge) return;
 
