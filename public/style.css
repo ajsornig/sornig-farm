@@ -1549,6 +1549,12 @@ details.collapsible-section:not([open]) summary h2::after {
   border-collapse: collapse;
 }
 
+/* A table can't shrink below its longest word per column, so its wrapper must
+   scroll rather than let it push the whole page wider than the viewport. */
+#capture-stats-table {
+  overflow-x: auto;
+}
+
 .admin-table th,
 .admin-table td {
   padding: 0.75rem;
@@ -3006,5 +3012,23 @@ footer {
 
   #activity-table td:first-child {
     overflow-wrap: normal;
+  }
+
+  /* Capture Stats (Media tab) — same page-widening disease as the Users and
+     Activity tables above: at 0.75rem padding and full font size its
+     min-content width (~425px) exceeds a phone viewport, which zooms the
+     whole admin panel out. Tighter type + padding brings min-content under
+     ~280px; the overflow-x:auto wrapper (base rule) is the backstop. */
+  #capture-stats-table table {
+    font-size: 0.8rem;
+  }
+
+  #capture-stats-table th,
+  #capture-stats-table td {
+    padding: 0.4rem 0.3rem;
+  }
+
+  #capture-stats-table td:first-child {
+    white-space: nowrap; /* keep "2026-07-11" on one line — it's the row key */
   }
 }

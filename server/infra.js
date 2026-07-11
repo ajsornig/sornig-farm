@@ -129,9 +129,11 @@ function collectCamAlerts(entry, camState) {
   }
   const stream = entry.streams[`stream${camNumber}`];
   if (stream && !stream.ok) {
+    // Use the cam's display name so ping + stream alerts for the same camera
+    // read as the same camera ("Chicken Coop stream stale", not "Stream 2 stale").
     const message = stream.age === null
-      ? `Stream ${camNumber} NO_FILE`
-      : `Stream ${camNumber} stale (${stream.age}s)`;
+      ? `${label} stream NO_FILE`
+      : `${label} stream stale (${stream.age}s)`;
     found.push({ level: 'critical', key: `stream${camNumber}`, message });
   }
   if (!camState.hidden) return found;
