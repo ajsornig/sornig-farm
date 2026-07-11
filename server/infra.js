@@ -1,7 +1,23 @@
 const fs = require('fs');
-const config = require('../config.json');
 
 const INFRA_HISTORY_COUNT = 60;
+
+// Disk is CRITICAL when free space drops below this many MB…
+const DISK_CRITICAL_FREE_MB = 2048;
+// …or when used space exceeds this percentage of the card.
+const DISK_CRITICAL_USED_PCT = 90;
+
+// Appended to alerts for cams the admin disabled via the panel — the dashboard
+// still shows them, but the push poller drops anything flagged `muted`.
+const MUTED_SUFFIX = ' (muted — camera disabled in admin panel)';
+
+// Fallback when a caller has no camera states available (e.g. legacy tests):
+// assume every cam is on so no outage is ever silently skipped.
+const DEFAULT_CAM_STATES = [
+  { id: 'cam1', name: 'Chicken Run', enabled: true, hidden: false },
+  { id: 'cam2', name: 'Chicken Coop', enabled: true, hidden: false },
+  { id: 'cam3', name: 'Chick Cam', enabled: true, hidden: false }
+];
 
 // Read only the tail of a (potentially large, unrotated) log so admin polls don't
 // load an ever-growing file in full. Returns whole lines (drops a leading partial).
@@ -96,30 +112,58 @@ function parseInfraLine(line) {
   };
 }
 
-function generateInfraAlerts(entry) {
+// Ping/stream alerts for one camera. A cam the owner disabled in config
+// (`enabled: false`) produces nothing — it is expected to be offline. A cam
+// hidden via the admin panel still alerts (dashboard should show the outage)
+// but flagged `muted` so the push poller skips it.
+function collectCamAlerts(entry, camState) {
+  const camIdMatch = camState.id.match(/^cam(\d+)$/);
+  if (!camIdMatch || camState.enabled === false) return [];
+  const camNumber = camIdMatch[1];
+  const label = camState.name || camState.id;
+
+  const found = [];
+  const ping = entry.pings[camState.id];
+  if (ping && !ping.ok) {
+    found.push({ level: 'critical', key: `${camState.id}-ping`, message: `${label} ping FAILED` });
+  }
+  const stream = entry.streams[`stream${camNumber}`];
+  if (stream && !stream.ok) {
+    const message = stream.age === null
+      ? `Stream ${camNumber} NO_FILE`
+      : `Stream ${camNumber} stale (${stream.age}s)`;
+    found.push({ level: 'critical', key: `stream${camNumber}`, message });
+  }
+  if (!camState.hidden) return found;
+  return found.map(a => ({ ...a, muted: true, message: a.message + MUTED_SUFFIX }));
+}
+
+// Critical when the SD card is nearly full — either absolute free MB or used
+// percentage. Null-safe: skips entirely when the monitor line had no disk field.
+function collectDiskAlert(system) {
+  if (system.diskUsed === null || system.diskTotal === null || !(system.diskTotal > 0)) return [];
+  const freeMb = system.diskTotal - system.diskUsed;
+  const usedPct = (system.diskUsed / system.diskTotal) * 100;
+  if (freeMb >= DISK_CRITICAL_FREE_MB && usedPct <= DISK_CRITICAL_USED_PCT) return [];
+  return [{
+    level: 'critical',
+    key: 'disk-full',
+    message: `Disk nearly full (${freeMb}MB free, ${usedPct.toFixed(1)}% used)`
+  }];
+}
+
+function generateInfraAlerts(entry, camStates) {
   // Each alert has a stable `key` (independent of the changing metric value in the
   // message) so callers can track the same condition across samples — e.g. the
   // push-alert poller requires a critical to persist for several samples before
   // texting, which the value-in-message text alone can't support.
-  const alerts = [];
   if (!entry) return [{ level: 'warning', key: 'nodata', message: 'No monitoring data available' }];
 
-  const cam3Enabled = (config.cameras || []).some(c => c.id === 'cam3' && c.enabled);
+  const states = Array.isArray(camStates) && camStates.length > 0 ? camStates : DEFAULT_CAM_STATES;
+  const alerts = states.flatMap(camState => collectCamAlerts(entry, camState));
 
-  if (!entry.pings.cam1.ok) alerts.push({ level: 'critical', key: 'cam1-ping', message: 'Chicken Run camera ping FAILED' });
-  if (!entry.pings.cam2.ok) alerts.push({ level: 'critical', key: 'cam2-ping', message: 'Chicken Coop camera ping FAILED' });
-  if (cam3Enabled && !entry.pings.cam3.ok) alerts.push({ level: 'critical', key: 'cam3-ping', message: 'Chick Cam ping FAILED' });
-  if (!entry.streams.stream1.ok) {
-    alerts.push({ level: 'critical', key: 'stream1', message: entry.streams.stream1.age === null ? 'Stream 1 NO_FILE' : `Stream 1 stale (${entry.streams.stream1.age}s)` });
-  }
-  if (!entry.streams.stream2.ok) {
-    alerts.push({ level: 'critical', key: 'stream2', message: entry.streams.stream2.age === null ? 'Stream 2 NO_FILE' : `Stream 2 stale (${entry.streams.stream2.age}s)` });
-  }
-  if (cam3Enabled && !entry.streams.stream3.ok) {
-    alerts.push({ level: 'critical', key: 'stream3', message: entry.streams.stream3.age === null ? 'Stream 3 NO_FILE' : `Stream 3 stale (${entry.streams.stream3.age}s)` });
-  }
   if (entry.eth0.state !== 'up') alerts.push({ level: 'critical', key: 'eth0', message: 'eth0 link DOWN' });
-  const expectedFfmpeg = cam3Enabled ? 3 : 2;
+  const expectedFfmpeg = states.filter(c => c.enabled !== false).length;
   if (entry.ffmpegCount < expectedFfmpeg) alerts.push({ level: 'warning', key: 'ffmpeg', message: `Only ${entry.ffmpegCount} of ${expectedFfmpeg} ffmpeg process(es) running` });
   if (entry.wlan1.signal === null) {
     alerts.push({ level: 'warning', key: 'wlan1', message: 'Primary uplink (wlan1) signal lost — failover active' });
@@ -136,8 +180,16 @@ function generateInfraAlerts(entry) {
   if (entry.system.temp !== null && entry.system.temp > 82) {
     alerts.push({ level: 'critical', key: 'temp-critical', message: `CPU temperature critical (${entry.system.temp.toFixed(1)}°C) — throttling likely` });
   }
+  alerts.push(...collectDiskAlert(entry.system));
 
   return alerts;
 }
 
-module.exports = { readLogTail, parseInfraLine, generateInfraAlerts, INFRA_HISTORY_COUNT };
+module.exports = {
+  readLogTail,
+  parseInfraLine,
+  generateInfraAlerts,
+  INFRA_HISTORY_COUNT,
+  DISK_CRITICAL_FREE_MB,
+  DISK_CRITICAL_USED_PCT
+};

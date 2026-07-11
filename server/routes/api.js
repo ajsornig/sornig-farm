@@ -12,6 +12,7 @@ const { sendPtzCommand, getPresets, gotoPreset, setPreset, removePreset, VALID_O
 const { getAiConfig, setAiTrack, setTrackTypes, setTrackBackTimes, getPtzGuard, setPtzGuard } = require('../reolink-api');
 const { createRateLimiter } = require('../security');
 const { readLogTail, parseInfraLine, generateInfraAlerts, INFRA_HISTORY_COUNT } = require('../infra');
+const { getCamStates } = require('../camera-state');
 const { execSync, execFileSync } = require('child_process');
 
 const { isUsernameClean } = require('../profanity');
@@ -890,9 +891,10 @@ router.get('/admin/infra', requireAdmin, (req, res) => {
     const lines = raw.split('\n').filter(Boolean).slice(-INFRA_HISTORY_COUNT);
     const history = lines.map(parseInfraLine).filter(Boolean);
     const latest = history.length > 0 ? history[history.length - 1] : null;
-    const alerts = generateInfraAlerts(latest);
+    const camStates = getCamStates(config);
+    const alerts = generateInfraAlerts(latest, camStates);
 
-    const cam3Enabled = (config.cameras || []).some(c => c.id === 'cam3' && c.enabled);
+    const cam3Enabled = camStates.some(c => c.id === 'cam3' && c.enabled);
 
     const baseline = readRestartBaseline();
     if (latest && baseline) {

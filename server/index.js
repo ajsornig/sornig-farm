@@ -13,28 +13,12 @@ const { initMailer } = require('./mailer');
 const { securityHeaders, createRateLimiter } = require('./security');
 const { backfillFromActivityLog } = require('./visited-locations');
 const { startInfraAlertPoller } = require('./infra-alerts');
+const { isCameraHidden, setCameraHidden } = require('./camera-state');
 
 const PRIVACY_FLAG = path.join(__dirname, '../.privacy-mode');
-const HIDDEN_CAMS_DIR = path.join(__dirname, '../.hidden-cams');
 
 function isPrivacyMode() {
   return fs.existsSync(PRIVACY_FLAG);
-}
-
-function isCameraHidden(camId) {
-  return fs.existsSync(path.join(HIDDEN_CAMS_DIR, camId));
-}
-
-function setCameraHidden(camId, hidden) {
-  if (!fs.existsSync(HIDDEN_CAMS_DIR)) {
-    fs.mkdirSync(HIDDEN_CAMS_DIR, { recursive: true });
-  }
-  const flagPath = path.join(HIDDEN_CAMS_DIR, camId);
-  if (hidden) {
-    fs.writeFileSync(flagPath, Date.now().toString());
-  } else if (fs.existsSync(flagPath)) {
-    fs.unlinkSync(flagPath);
-  }
 }
 
 const app = express();
