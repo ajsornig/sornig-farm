@@ -1060,10 +1060,9 @@ function getWeatherIcon(desc) {
   return '🌡️';
 }
 
-// Night mode badge
+// Night mode badge — real sunrise/sunset for the farm (sun-times.js)
 function updateNightMode() {
-  const hour = new Date().getHours();
-  const isNight = hour >= 21 || hour < 6;
+  const isNight = !SunTimes.isDaylight(Date.now());
   const badge = document.getElementById('night-mode-badge');
   if (!badge) return;
 
