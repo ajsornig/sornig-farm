@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { atomicWriteJSON } = require('./atomic-write');
+const { removeUserAttribution } = require('./visited-locations');
 
 const DATA_FILE = path.join(__dirname, '../data.json');
 const ACTIVITY_LOG_FILE = path.join(__dirname, '../logs/activity.json');
@@ -278,9 +279,21 @@ function deleteUser(username) {
       }
     });
     saveData();
+    sweepVisitorMapAttribution(username);
     return true;
   }
   return false;
+}
+
+// Privacy: a deleted/denied user's name must not linger on the admin visitor
+// map. Best-effort — the failure is logged, but a map-write error must never
+// block the account deletion itself.
+function sweepVisitorMapAttribution(username) {
+  try {
+    removeUserAttribution(username);
+  } catch (err) {
+    console.error('Visitor-map sweep failed for ' + username + ':', err);
+  }
 }
 
 function resetPassword(username, newPassword) {
@@ -379,6 +392,7 @@ function denyUser(username) {
     }
   });
   saveData();
+  sweepVisitorMapAttribution(username);
   return { success: true, email };
 }
 
