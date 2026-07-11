@@ -7,7 +7,8 @@ const { atomicWriteJSON } = require('./atomic-write');
 // been visited, with running counts and per-visitor last-seen timestamps. Cell
 // key = round each coord to 0.1 deg so nearby visitors from the same
 // city/region collapse onto one pin instead of stacking duplicates.
-const STORE_FILE = path.join(__dirname, '../data/visited-locations.json');
+// Overridable so tests can point the store at a temp file instead of live data.
+const STORE_FILE = process.env.VISITED_LOCATIONS_FILE || path.join(__dirname, '../data/visited-locations.json');
 // Written once after the first backfill so we never re-seed an intentionally
 // empty store (e.g. after an admin deletes pins) — deleted pins must stay gone.
 const SEEDED_FLAG = path.join(__dirname, '../data/.visited-seeded');
@@ -77,6 +78,28 @@ function removeVisitedLocation(key) {
   return true;
 }
 
+// Privacy sweep for account deletion/denial: strip a user's attribution from
+// every cell. Visitor keys are stored in ORIGINAL case (unlike data.json's
+// lowercase user keys), so matching must be case-insensitive. Cells are kept
+// even if their visitors object becomes empty — public pins survive as
+// anonymous, and the seeded-sentinel semantics are untouched (cells are never
+// deleted here). Returns the number of cells that had attribution removed.
+function removeUserAttribution(username) {
+  if (typeof username !== 'string' || username.length === 0) return 0;
+  getStore();
+  const usernameLower = username.toLowerCase();
+  let cellsTouched = 0;
+  Object.values(store).forEach(entry => {
+    if (!entry || !entry.visitors) return;
+    const matches = Object.keys(entry.visitors).filter(v => v.toLowerCase() === usernameLower);
+    if (matches.length === 0) return;
+    matches.forEach(v => { delete entry.visitors[v]; });
+    cellsTouched += 1;
+  });
+  if (cellsTouched > 0) saveStore();
+  return cellsTouched;
+}
+
 // One-time seed from the existing activity log, so the permanent map isn't empty
 // on first deploy. Guarded by a persistent sentinel (not by emptiness) so that an
 // intentionally-empty store — e.g. after an admin deletes pins — is never
@@ -113,5 +136,6 @@ module.exports = {
   recordVisitedLocation,
   getVisitedLocations,
   removeVisitedLocation,
+  removeUserAttribution,
   backfillFromActivityLog
 };
