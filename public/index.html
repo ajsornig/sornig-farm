@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sornig Farm - Live Chicken Cam</title>
-  <link rel="stylesheet" href="style.css?v=28">
+  <link rel="stylesheet" href="style.css?v=29">
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
   <link rel="stylesheet" href="/vendor/glightbox.min.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐔</text></svg>">
@@ -122,6 +122,14 @@
           <a href="#" id="forgot-back-link" class="forgot-link">Back to login</a>
         </div>
 
+        <div id="totp-form" class="hidden">
+          <p class="totp-hint">Enter the 6-digit code from your authenticator app (or a backup code)</p>
+          <input type="text" id="totp-code" placeholder="123456" inputmode="numeric" autocomplete="one-time-code" maxlength="9" aria-label="Two-factor authentication code">
+          <label class="totp-remember"><input type="checkbox" id="totp-remember" checked> Remember this device for 30 days</label>
+          <button id="totp-verify-btn">Verify</button>
+          <a href="#" id="totp-back-link" class="forgot-link">Back to login</a>
+        </div>
+
         <div id="auth-error" class="hidden" role="alert"></div>
       </div>
 
@@ -162,6 +170,6 @@
 
   <script src="/vendor/glightbox.min.js"></script>
   <script src="sun-times.js?v=1"></script>
-  <script src="app.js?v=21"></script>
+  <script src="app.js?v=22"></script>
 </body>
 </html>

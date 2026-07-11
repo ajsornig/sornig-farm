@@ -924,6 +924,60 @@ main {
   border-color: var(--forest-green);
 }
 
+#totp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+#totp-form input[type="text"] {
+  padding: 0.5rem 0.8rem;
+  border: 2px solid var(--wood-brown);
+  border-radius: 6px;
+  background: var(--cream);
+  color: var(--text-dark);
+  font-family: inherit;
+  text-align: center;
+  font-size: 1.05rem;
+  letter-spacing: 0.15em;
+}
+
+#totp-form input[type="text"]:focus {
+  outline: none;
+  border-color: var(--forest-green);
+}
+
+.totp-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.totp-remember {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+#totp-verify-btn {
+  padding: 0.6rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--barn-red);
+  color: var(--cream);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+#totp-verify-btn:hover {
+  background: var(--barn-red-light);
+}
+
 #forgot-submit-btn {
   padding: 0.6rem;
   background: var(--barn-red);

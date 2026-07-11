@@ -219,6 +219,16 @@ function setupAuthUI() {
     if (e.key === 'Enter') doForgotPassword();
   };
 
+  document.getElementById('totp-verify-btn').onclick = doTotpVerify;
+  document.getElementById('totp-code').onkeypress = (e) => {
+    if (e.key === 'Enter') doTotpVerify();
+  };
+  document.getElementById('totp-back-link').onclick = (e) => {
+    e.preventDefault();
+    hideTotpStep();
+    hideAuthError();
+  };
+
 
   document.querySelectorAll('.toggle-password').forEach(btn => {
     btn.onclick = () => {
@@ -261,6 +271,13 @@ async function doLogin() {
       return;
     }
 
+    if (data.totpRequired) {
+      // Password OK but a 2FA code is owed; no session exists yet.
+      pendingTotpToken = data.pendingToken;
+      showTotpStep();
+      return;
+    }
+
     currentUser = data.username;
     isAdmin = data.isAdmin;
     isApproved = data.approved || false;
@@ -273,6 +290,65 @@ async function doLogin() {
     hideAuthError();
   } catch (err) {
     showAuthError('Login failed');
+  }
+}
+
+let pendingTotpToken = null;
+
+function showTotpStep() {
+  document.getElementById('account-form').classList.add('hidden');
+  document.getElementById('totp-form').classList.remove('hidden');
+  hideAuthError();
+  const input = document.getElementById('totp-code');
+  input.value = '';
+  input.focus();
+}
+
+function hideTotpStep() {
+  pendingTotpToken = null;
+  document.getElementById('totp-form').classList.add('hidden');
+  document.getElementById('account-form').classList.remove('hidden');
+}
+
+async function doTotpVerify() {
+  const code = document.getElementById('totp-code').value.trim();
+  if (!code) {
+    showAuthError('Enter the code from your authenticator app');
+    return;
+  }
+  const rememberDevice = document.getElementById('totp-remember').checked;
+  try {
+    const res = await fetch('/api/login/totp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pendingToken: pendingTotpToken, code, rememberDevice })
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      showAuthError(data.error);
+      // Expired/attempt-capped pending login: back to the password step.
+      if (/expired/i.test(data.error)) hideTotpStep();
+      return;
+    }
+
+    hideTotpStep();
+    currentUser = data.username;
+    isAdmin = data.isAdmin;
+    isApproved = data.approved || false;
+    requireApproval = data.requireApproval || false;
+
+    if (data.usedBackupCode) {
+      alert('Backup code accepted. You have ' + data.backupCodesRemaining +
+        ' backup codes left — each works only once.');
+    }
+
+    // Session cookie was set on this response; reconnect chat to authenticate it.
+    setupChat();
+    showLoggedInState();
+    hideAuthError();
+  } catch (err) {
+    showAuthError('Verification failed');
   }
 }
 
