@@ -43,4 +43,4 @@ async function geolocateIP(rawIp) {
   return null;
 }
 
-module.exports = { geolocateIP };
+module.exports = { geolocateIP, isPrivateIP };

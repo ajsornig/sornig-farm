@@ -82,4 +82,24 @@ describe('removeUserAttribution', () => {
     assert.strictEqual(removeUserAttribution(null), 0);
     assert.strictEqual(removeUserAttribution(undefined), 0);
   });
+
+  it('sweeps a user out of EVERY cell they appear in, counting each touched cell', () => {
+    // Seed the same user (with different casing) into both cells through the
+    // public API, then sweep once.
+    const { recordVisitedLocation } = require('../server/visited-locations');
+    recordVisitedLocation('Multi', { lat: 43.1, lng: -83.3, city: 'Lapeer', country: 'United States' });
+    recordVisitedLocation('MULTI', { lat: 40.7, lng: -74.0, city: 'New York', country: 'United States' });
+
+    const touched = removeUserAttribution('multi');
+    assert.strictEqual(touched, 2, 'both cells must count as touched');
+
+    const store = getVisitedLocations();
+    assert.deepStrictEqual(Object.keys(store[CELL_A].visitors), ['Alice'], 'only the swept user leaves cell A');
+    assert.deepStrictEqual(store[CELL_B].visitors, {}, 'cell B back to anonymous');
+    assert.ok(store[CELL_A] && store[CELL_B], 'cells themselves survive');
+
+    const onDisk = JSON.parse(fs.readFileSync(storeFile, 'utf-8'));
+    assert.strictEqual(onDisk[CELL_A].visitors.Multi, undefined);
+    assert.strictEqual(onDisk[CELL_B].visitors.MULTI, undefined);
+  });
 });

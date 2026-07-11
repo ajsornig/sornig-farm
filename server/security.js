@@ -1,6 +1,8 @@
-// HTTP security helpers: client-IP extraction, response security headers, and a
-// lightweight in-memory rate limiter. Intentionally dependency-free so deploys
-// stay a simple `git pull` + restart (no npm install step to break on the Pi).
+// HTTP security helpers: client-IP extraction, protected-media path
+// normalization, response security headers, and a lightweight in-memory rate
+// limiter. Intentionally dependency-free so deploys stay a simple `git pull` +
+// restart (no npm install step to break on the Pi).
+const path = require('path');
 
 // Content-Security-Policy. 'unsafe-inline' is required for scripts because the
 // app attaches behaviour via generated inline onclick handlers and a few inline
@@ -48,6 +50,18 @@ function getClientIp(req) {
   return req.ip || (req.socket && req.socket.remoteAddress) || 'unknown';
 }
 
+// Normalize a request path the SAME way express.static/send will resolve it, so
+// the prefix check can't be slipped with //hls, /hls%2ffile (encoded slash),
+// /foo/../hls, backslashes, or mixed case. Match on this, never the raw req.path.
+function normalizeForGate(rawPath) {
+  let p = rawPath || '/';
+  try { p = decodeURIComponent(p); } catch (e) { /* malformed %-escape: match on raw */ }
+  p = p.replace(/\\/g, '/');           // backslash → slash (Windows-style separators)
+  p = path.posix.normalize(p);         // resolves '.', '..', collapses '//'
+  if (!p.startsWith('/')) p = '/' + p; // normalize() can drop the leading slash
+  return p.toLowerCase();
+}
+
 function securityHeaders(req, res, next) {
   res.setHeader('Content-Security-Policy', CSP);
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -88,4 +102,4 @@ function createRateLimiter({ windowMs, max, message = 'Too many requests, please
   };
 }
 
-module.exports = { getClientIp, securityHeaders, createRateLimiter };
+module.exports = { getClientIp, normalizeForGate, securityHeaders, createRateLimiter };

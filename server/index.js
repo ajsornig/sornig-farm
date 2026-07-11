@@ -10,7 +10,7 @@ const { initDb, getSession, hasPtzAccess, hasPtzDriving, isUserApproved, getActi
 const { setupChat } = require('./chat');
 const apiRoutes = require('./routes/api');
 const { initMailer } = require('./mailer');
-const { securityHeaders, createRateLimiter } = require('./security');
+const { securityHeaders, createRateLimiter, normalizeForGate } = require('./security');
 const { backfillFromActivityLog } = require('./visited-locations');
 const { startInfraAlertPoller } = require('./infra-alerts');
 const { isCameraHidden, setCameraHidden } = require('./camera-state');
@@ -130,18 +130,8 @@ function sessionFromRequest(req) {
   return token ? getSession(token) : null;
 }
 
-// Normalize a request path the SAME way express.static/send will resolve it, so
-// the prefix check can't be slipped with //hls, /hls%2ffile (encoded slash),
-// /foo/../hls, backslashes, or mixed case. Match on this, never the raw req.path.
-function normalizeForGate(rawPath) {
-  let p = rawPath || '/';
-  try { p = decodeURIComponent(p); } catch (e) { /* malformed %-escape: match on raw */ }
-  p = p.replace(/\\/g, '/');           // backslash → slash (Windows-style separators)
-  p = path.posix.normalize(p);         // resolves '.', '..', collapses '//'
-  if (!p.startsWith('/')) p = '/' + p; // normalize() can drop the leading slash
-  return p.toLowerCase();
-}
-
+// normalizeForGate (imported from ./security) resolves the request path the same
+// way express.static/send will, so the prefix check below can't be slipped.
 app.use((req, res, next) => {
   const p = normalizeForGate(req.path);
   const isProtected = PROTECTED_MEDIA_PREFIXES.some(
