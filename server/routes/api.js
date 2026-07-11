@@ -1,8 +1,10 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const config = require('../../config.json');
 const db = require('../db');
+const pending2fa = require('../pending-2fa');
 const { sendApprovalRequest, sendApprovalNotification, sendPasswordResetEmail, sendBroadcast } = require('../mailer');
 const { atomicWriteJSON } = require('../atomic-write');
 const { getClientIp } = require('../security');
@@ -41,6 +43,35 @@ function setSessionCookie(req, res, token) {
 }
 function clearSessionCookie(res) {
   res.clearCookie(SESSION_COOKIE, { path: '/' });
+}
+
+// "Remember this device for 30 days" after a successful 2FA login. Only the
+// sha256 of this token is stored server-side (db.trustedDevices).
+const TRUST_COOKIE = 'sf_trust';
+const TRUST_COOKIE_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
+
+// Shared tail of both login steps (password-only and TOTP-complete): issues
+// the session + cookie, logs viewer activity, and returns the login response.
+function finishLogin(req, res, username, extra = {}) {
+  const session = db.createSession(username);
+  if (!session) {
+    return res.status(500).json({ error: 'Session creation failed' });
+  }
+  if (!session.isAdmin) {
+    const ip = getClientIp(req);
+    geolocateIP(ip).then(geo => {
+      db.logActivity(session.username, 'login', { ip, ...(geo || {}) });
+      if (geo) recordVisitedLocation(session.username, geo);
+    });
+  }
+  setSessionCookie(req, res, session.token);
+  res.json({
+    success: true,
+    ...session,
+    approved: true,
+    requireApproval: config.requireApproval || false,
+    ...extra
+  });
 }
 
 function sessionFromRequest(req) {
@@ -106,29 +137,64 @@ router.post('/login', (req, res) => {
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password required' });
   }
-  const result = db.loginUser(username, password);
-  if (result.error) {
-    return res.status(401).json(result);
+  const cred = db.verifyCredentials(username, password);
+  if (cred.error) {
+    return res.status(401).json(cred);
   }
-  // Check if user is approved
+  // Check if user is approved (no session was created, so nothing to discard)
   if (config.requireApproval && !db.isUserApproved(username)) {
-    // loginUser already created a session; discard it since it's never issued.
-    if (result.token) db.logoutUser(result.token);
     return res.json({
       success: true,
       pendingApproval: true,
       message: 'Your account is pending admin approval.'
     });
   }
-  const ip = getClientIp(req);
-  if (!result.isAdmin) {
-    geolocateIP(ip).then(geo => {
-      db.logActivity(result.username, 'login', { ip, ...(geo || {}) });
-      if (geo) recordVisitedLocation(result.username, geo);
+  // 2FA gate: an enrolled admin on an untrusted device owes a TOTP code before
+  // any session exists. The pending token travels in the JSON body — never a
+  // cookie — so it carries no ambient authority the CSRF layer would need to cover.
+  const user = cred.user;
+  const trustToken = req.cookies && req.cookies[TRUST_COOKIE];
+  if (user.isAdmin && user.totpEnabled && !db.isTrustedDevice(user.username, trustToken)) {
+    return res.json({
+      totpRequired: true,
+      pendingToken: pending2fa.create(user.username.toLowerCase())
     });
   }
-  if (result.token) setSessionCookie(req, res, result.token);
-  res.json({ ...result, approved: true, requireApproval: config.requireApproval || false });
+  finishLogin(req, res, user.username);
+});
+
+router.post('/login/totp', (req, res) => {
+  const { pendingToken, code, rememberDevice } = req.body;
+  if (!pendingToken || !code) {
+    return res.status(400).json({ error: 'Code required' });
+  }
+  const entry = pending2fa.check(pendingToken);
+  if (!entry) {
+    return res.status(401).json({ error: 'Login expired, please start again' });
+  }
+  const result = db.verifyAndConsumeTotp(entry.usernameLower, code);
+  if (result.error) {
+    // Deliberately generic; after MAX_ATTEMPTS failures the pending entry is
+    // destroyed and the password step starts over.
+    pending2fa.recordFailure(pendingToken);
+    return res.status(401).json({ error: 'Invalid code' });
+  }
+  pending2fa.consume(pendingToken);
+  if (rememberDevice) {
+    const rawTrust = crypto.randomBytes(32).toString('hex');
+    db.addTrustedDevice(entry.usernameLower, rawTrust);
+    res.cookie(TRUST_COOKIE, rawTrust, {
+      httpOnly: true,
+      secure: !!req.secure,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: TRUST_COOKIE_MAX_AGE
+    });
+  }
+  const extra = result.method === 'backup'
+    ? { usedBackupCode: true, backupCodesRemaining: result.backupCodesRemaining }
+    : {};
+  finishLogin(req, res, entry.usernameLower, extra);
 });
 
 router.post('/logout', (req, res) => {
@@ -350,6 +416,43 @@ router.post('/admin/users/:username/email', requireAdmin, (req, res) => {
   if (result.error) {
     return res.status(400).json(result);
   }
+  res.json({ success: true });
+});
+
+// ===== Two-factor auth management (each admin manages their OWN 2FA) =====
+
+router.get('/admin/2fa/status', requireAdmin, (req, res) => {
+  const status = db.get2faStatus(req.session.username);
+  if (status.error) return res.status(404).json(status);
+  res.json(status);
+});
+
+router.post('/admin/2fa/setup', requireAdmin, (req, res) => {
+  const result = db.beginTotpSetup(req.session.username);
+  if (result.error) return res.status(400).json(result);
+  res.json(result);
+});
+
+router.post('/admin/2fa/enable', requireAdmin, (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'Code required' });
+  // Keep the caller's session; confirmTotpSetup revokes the user's others.
+  const keepToken = (req.cookies && req.cookies[SESSION_COOKIE]) || req.headers['x-auth-token'];
+  const result = db.confirmTotpSetup(req.session.username, code, keepToken);
+  if (result.error) return res.status(400).json(result);
+  db.logActivity(req.session.username, '2fa-enabled');
+  res.json(result);
+});
+
+router.post('/admin/2fa/disable', requireAdmin, (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'Code required' });
+  // Disabling requires proving possession of the authenticator (or a backup code).
+  const verify = db.verifyAndConsumeTotp(req.session.username, code);
+  if (verify.error) return res.status(401).json({ error: 'Invalid code' });
+  const result = db.disableTotp(req.session.username);
+  if (result.error) return res.status(400).json(result);
+  db.logActivity(req.session.username, '2fa-disabled');
   res.json({ success: true });
 });
 
