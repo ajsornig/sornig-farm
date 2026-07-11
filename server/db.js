@@ -557,6 +557,8 @@ function removeFavorite(filename) {
 
 module.exports = {
   USERNAME_RE,
+  hashPassword,
+  verifyPassword,
   initDb,
   flushDataSync,
   createUser,
