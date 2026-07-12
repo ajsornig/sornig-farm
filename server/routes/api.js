@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const config = require('../../config.json');
 const db = require('../db');
 const pending2fa = require('../pending-2fa');
+const { isPushEnabled, getPublicKey, sendPushAlert } = require('../push-alerts');
 const { sendApprovalRequest, sendApprovalNotification, sendPasswordResetEmail, sendBroadcast } = require('../mailer');
 const { atomicWriteJSON } = require('../atomic-write');
 const { getClientIp } = require('../security');
@@ -454,6 +455,67 @@ router.post('/admin/2fa/disable', requireAdmin, (req, res) => {
   if (result.error) return res.status(400).json(result);
   db.logActivity(req.session.username, '2fa-disabled');
   res.json({ success: true });
+});
+
+// ===== Web-push phone alerts (admin-only; infra criticals) =====
+
+router.get('/admin/push/public-key', requireAdmin, (req, res) => {
+  res.json({ enabled: isPushEnabled(), publicKey: getPublicKey() });
+});
+
+router.post('/admin/push/subscribe', requireAdmin, (req, res) => {
+  const { subscription } = req.body || {};
+  const endpoint = subscription && subscription.endpoint;
+  const keys = subscription && subscription.keys;
+  if (
+    typeof endpoint !== 'string' ||
+    !endpoint.startsWith('https://') ||
+    !keys ||
+    typeof keys.p256dh !== 'string' ||
+    typeof keys.auth !== 'string'
+  ) {
+    return res.status(400).json({ error: 'Invalid push subscription' });
+  }
+  db.addPushSubscription({
+    endpoint,
+    keys: { p256dh: keys.p256dh, auth: keys.auth },
+    username: req.session.username,
+    ua: req.headers['user-agent']
+  });
+  res.json({ success: true });
+});
+
+router.post('/admin/push/unsubscribe', requireAdmin, (req, res) => {
+  const { endpoint } = req.body || {};
+  if (typeof endpoint !== 'string') {
+    return res.status(400).json({ error: 'Endpoint required' });
+  }
+  const removed = db.removePushSubscription(endpoint);
+  res.json({ success: true, removed });
+});
+
+router.get('/admin/push/subscriptions', requireAdmin, (req, res) => {
+  const subs = db.getPushSubscriptions();
+  res.json({
+    count: subs.length,
+    subscriptions: subs.map(s => ({
+      endpoint: s.endpoint,
+      username: s.username,
+      ua: s.ua,
+      createdAt: s.createdAt
+    }))
+  });
+});
+
+router.post('/admin/push/test', requireAdmin, async (req, res) => {
+  if (!isPushEnabled()) {
+    return res.status(503).json({ error: 'Push is not configured (VAPID keys missing)' });
+  }
+  const result = await sendPushAlert(
+    'Sornig Farm',
+    'Test notification — push alerts are working 🐔'
+  );
+  res.json({ success: true, ...result });
 });
 
 router.get('/admin/activity', requireAdmin, (req, res) => {

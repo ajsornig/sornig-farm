@@ -10,6 +10,7 @@ const { initDb, getSession, hasPtzAccess, hasPtzDriving, isUserApproved, getActi
 const { setupChat } = require('./chat');
 const apiRoutes = require('./routes/api');
 const { initMailer } = require('./mailer');
+const { initWebPush } = require('./push-alerts');
 const { securityHeaders, createRateLimiter, normalizeForGate } = require('./security');
 const { backfillFromActivityLog } = require('./visited-locations');
 const { startInfraAlertPoller } = require('./infra-alerts');
@@ -42,6 +43,7 @@ function isAllowedOriginHost(originHost, reqHost) {
 
 initDb();
 initMailer();
+initWebPush();
 
 // Best-effort one-time seed of the permanent visitor map from the existing
 // activity log, so it isn't empty on first deploy. No-op if already seeded.

@@ -1,6 +1,7 @@
 const path = require('path');
 const { readLogTail, parseInfraLine, generateInfraAlerts } = require('./infra');
 const { sendInfraAlert } = require('./mailer');
+const { sendPushAlert } = require('./push-alerts');
 const { getCamStates } = require('./camera-state');
 const { maybeRunDiskPrune } = require('./disk-prune');
 
@@ -73,11 +74,13 @@ function checkDiskPrune(latestEntry, now) {
   try {
     const summary = maybeRunDiskPrune(latestEntry.system, now);
     if (summary && (summary.deleted.length > 0 || summary.failed.length > 0)) {
-      sendInfraAlert(
+      const pruneMessage =
         `Sornig Farm disk auto-prune ran: freed ~${summary.freedMb}MB ` +
         `(${summary.deleted.length} deleted, ${summary.failed.length} failed) — ` +
-        `free space was ${summary.freeMbBefore}MB.`
-      );
+        `free space was ${summary.freeMbBefore}MB.`;
+      sendInfraAlert(pruneMessage);
+      // Push is additive alongside email/SMS; sendPushAlert never rejects.
+      sendPushAlert('Sornig Farm', pruneMessage);
     }
   } catch (err) {
     console.error('Disk auto-prune failed:', err.message);
@@ -119,7 +122,10 @@ function poll() {
 
     if (toSend.length > 0) {
       // One combined message per poll — never a burst of separate texts.
-      sendInfraAlert('Sornig Farm infra alert (sustained ' + SUSTAIN_SAMPLES + '+ min):\n' + toSend.map(a => a.message).join('\n'));
+      const alertBody = toSend.map(a => a.message).join('\n');
+      sendInfraAlert('Sornig Farm infra alert (sustained ' + SUSTAIN_SAMPLES + '+ min):\n' + alertBody);
+      // Push is additive alongside email/SMS; sendPushAlert never rejects.
+      sendPushAlert('Sornig Farm ALERT', alertBody);
     }
 
     checkDiskPrune(recent[recent.length - 1], now);
