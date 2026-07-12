@@ -924,6 +924,129 @@ main {
   border-color: var(--forest-green);
 }
 
+#totp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+#totp-form input[type="text"] {
+  padding: 0.5rem 0.8rem;
+  border: 2px solid var(--wood-brown);
+  border-radius: 6px;
+  background: var(--cream);
+  color: var(--text-dark);
+  font-family: inherit;
+  text-align: center;
+  font-size: 1.05rem;
+  letter-spacing: 0.15em;
+}
+
+#totp-form input[type="text"]:focus {
+  outline: none;
+  border-color: var(--forest-green);
+}
+
+.totp-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.totp-remember {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+#totp-verify-btn {
+  padding: 0.6rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--barn-red);
+  color: var(--cream);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+#totp-verify-btn:hover {
+  background: var(--barn-red-light);
+}
+
+/* Admin System tab: Security (2FA) card */
+.twofa-card {
+  background: var(--cream);
+  border: 2px solid var(--wood-brown);
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 560px;
+}
+
+.twofa-confirm-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.twofa-confirm-row input {
+  padding: 0.5rem 0.8rem;
+  border: 2px solid var(--wood-brown);
+  border-radius: 6px;
+  background: var(--cream);
+  color: var(--text-dark);
+  font-family: inherit;
+  text-align: center;
+  letter-spacing: 0.15em;
+  width: 11rem;
+}
+
+.twofa-confirm-row input:focus {
+  outline: none;
+  border-color: var(--forest-green);
+}
+
+#twofa-qr img {
+  display: block;
+  border: 4px solid var(--cream);
+  border-radius: 4px;
+  background: #fff;
+  image-rendering: pixelated;
+  width: 180px;
+  height: 180px;
+}
+
+.twofa-secret {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.twofa-secret code {
+  background: var(--cream-dark);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  letter-spacing: 0.08em;
+}
+
+#twofa-backup-codes {
+  background: var(--cream-dark);
+  border: 1px dashed var(--wood-brown);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  line-height: 1.7;
+}
+
 #forgot-submit-btn {
   padding: 0.6rem;
   background: var(--barn-red);

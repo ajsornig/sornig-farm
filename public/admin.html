@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Panel - Sornig Farm</title>
-  <link rel="stylesheet" href="style.css?v=28">
+  <link rel="stylesheet" href="style.css?v=29">
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="/vendor/glightbox.min.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐔</text></svg>">
@@ -121,6 +121,40 @@
         <h3 style="margin-top:1.5rem;color:var(--wood-brown);">Trends (Last Hour)</h3>
         <div id="infra-sparklines" class="infra-sparklines"></div>
         <div id="infra-updated" class="infra-updated"></div>
+
+        <h3 style="margin-top:1.5rem;color:var(--wood-brown);">Security</h3>
+        <p class="admin-note">Two-factor authentication for your admin login. Each admin enrolls their own device.</p>
+        <div id="twofa-card" class="twofa-card">
+          <div id="twofa-status">Loading&hellip;</div>
+          <div id="twofa-actions"></div>
+
+          <div id="twofa-setup" class="hidden">
+            <p class="admin-note">1. Scan this QR code with your authenticator app (Google Authenticator, Authy&hellip;).<br>
+            2. Enter the 6-digit code the app shows to confirm and switch 2FA on.</p>
+            <div id="twofa-qr"></div>
+            <div class="twofa-secret">Can't scan? Enter this key manually: <code id="twofa-secret"></code></div>
+            <div class="twofa-confirm-row">
+              <input type="text" id="twofa-confirm-code" placeholder="123456" inputmode="numeric" maxlength="6" aria-label="Confirmation code">
+              <button class="admin-btn cam-show-btn" onclick="confirm2fa()">Confirm &amp; Enable</button>
+            </div>
+          </div>
+
+          <div id="twofa-backup" class="hidden">
+            <h4>Backup codes &mdash; save these now</h4>
+            <p class="admin-note">Each code logs you in once if you lose your phone. Copy them somewhere safe (SornigReadMe.txt). They will never be shown again.</p>
+            <pre id="twofa-backup-codes"></pre>
+            <button class="admin-btn cam-show-btn" onclick="ack2faBackup()">I saved these</button>
+          </div>
+
+          <div id="twofa-disable" class="hidden">
+            <div class="twofa-confirm-row">
+              <input type="text" id="twofa-disable-code" placeholder="Code or backup code" maxlength="9" aria-label="Code to disable 2FA">
+              <button class="admin-btn cam-hide-btn" onclick="confirmDisable2fa()">Disable 2FA</button>
+            </div>
+          </div>
+
+          <div id="twofa-result" class="hidden" role="status"></div>
+        </div>
       </div>
 
       <div id="admin-comms" class="admin-content hidden">
@@ -164,6 +198,7 @@
 
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script src="/vendor/glightbox.min.js"></script>
-  <script src="admin.js?v=35"></script>
+  <script src="/vendor/qrcode.js?v=1"></script>
+  <script src="admin.js?v=36"></script>
 </body>
 </html>

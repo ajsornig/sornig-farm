@@ -3,10 +3,12 @@ const path = require('path');
 const crypto = require('crypto');
 const { atomicWriteJSON } = require('./atomic-write');
 const { removeUserAttribution } = require('./visited-locations');
+const totp = require('./totp');
 
 const DATA_FILE = path.join(__dirname, '../data.json');
 const ACTIVITY_LOG_FILE = path.join(__dirname, '../logs/activity.json');
 const SESSION_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
+const TRUSTED_DEVICE_MAX_AGE = 30 * 24 * 60 * 60 * 1000; // 30 days ("remember this device")
 const ACTIVITY_MAX_ENTRIES = 200;
 const MIN_PASSWORD_LENGTH = 8;
 // Usernames are interpolated into HTML/JS on the admin panel, so restrict them
@@ -177,7 +179,9 @@ function createUser(username, password, isAdmin = false, email = null) {
   return { success: true, username, approvalToken, needsApproval: !isAdmin };
 }
 
-function loginUser(username, password) {
+// Password check WITHOUT session creation — the login route needs to hold the
+// session back until a 2FA-enrolled admin has also presented a TOTP code.
+function verifyCredentials(username, password) {
   const usernameLower = username.toLowerCase();
   const user = data.users[usernameLower];
   if (!user || !verifyPassword(password, user.passwordHash)) {
@@ -187,8 +191,14 @@ function loginUser(username, password) {
   // Auto-migrate legacy SHA-256 hashes to scrypt
   if (isLegacyHash(user.passwordHash)) {
     user.passwordHash = hashPassword(password);
+    saveData();
   }
+  return { success: true, user };
+}
 
+function createSession(username) {
+  const user = data.users[username.toLowerCase()];
+  if (!user) return null;
   const token = generateToken();
   data.sessions[token] = {
     username: user.username,
@@ -196,7 +206,14 @@ function loginUser(username, password) {
     createdAt: Date.now()
   };
   saveData();
-  return { success: true, token, username: user.username, isAdmin: user.isAdmin };
+  return { token, username: user.username, isAdmin: user.isAdmin };
+}
+
+function loginUser(username, password) {
+  const cred = verifyCredentials(username, password);
+  if (cred.error) return cred;
+  const session = createSession(username);
+  return { success: true, ...session };
 }
 
 function getSession(token) {
@@ -307,6 +324,9 @@ function resetPassword(username, newPassword) {
   data.users[usernameLower].passwordHash = hashPassword(newPassword);
   delete data.users[usernameLower].resetToken;
   delete data.users[usernameLower].resetTokenExpiry;
+  // A password reset must also revoke remembered 2FA devices — otherwise a
+  // stolen sf_trust cookie would survive the rotation.
+  delete data.users[usernameLower].trustedDevices;
   Object.keys(data.sessions).forEach(token => {
     if (data.sessions[token].username.toLowerCase() === usernameLower) {
       delete data.sessions[token];
@@ -331,6 +351,9 @@ function changePassword(username, currentPassword, newPassword, keepToken = null
   user.passwordHash = hashPassword(newPassword);
   // A password change revokes the user's OTHER sessions (log out any other
   // devices), but keeps the caller's current session so they stay logged in here.
+  // Remembered 2FA devices are revoked too — a rotation must invalidate any
+  // stolen sf_trust cookie.
+  delete user.trustedDevices;
   Object.keys(data.sessions).forEach(token => {
     if (token !== keepToken && data.sessions[token].username.toLowerCase() === usernameLower) {
       delete data.sessions[token];
@@ -338,6 +361,159 @@ function changePassword(username, currentPassword, newPassword, keepToken = null
   });
   saveData();
   return { success: true };
+}
+
+// ===== Two-factor auth (TOTP) — admin accounts only by policy (enforced at
+// the route layer; the data layer is user-agnostic) =====
+
+function beginTotpSetup(username) {
+  const usernameLower = username.toLowerCase();
+  const user = data.users[usernameLower];
+  if (!user) return { error: 'User not found' };
+  const secret = totp.generateSecret();
+  data.users[usernameLower] = { ...user, totpPendingSecret: secret };
+  saveData();
+  return {
+    success: true,
+    secret,
+    otpauth: totp.otpauthURI('Sornig Farm', user.username, secret)
+  };
+}
+
+// Flips 2FA on only after the user proves their authenticator produces a valid
+// code for the pending secret — a botched QR scan can never lock anyone out.
+// Revokes the user's OTHER sessions (keepToken survives) like changePassword.
+function confirmTotpSetup(username, code, keepToken = null) {
+  const usernameLower = username.toLowerCase();
+  const user = data.users[usernameLower];
+  if (!user) return { error: 'User not found' };
+  if (!user.totpPendingSecret) return { error: 'No 2FA setup in progress' };
+  const result = totp.verifyTotp(user.totpPendingSecret, code);
+  if (!result.ok) {
+    return { error: 'Code did not match. Check your authenticator app and try again.' };
+  }
+  const { codes, hashes } = totp.generateBackupCodes();
+  const updated = {
+    ...user,
+    totpSecret: user.totpPendingSecret,
+    totpEnabled: true,
+    totpLastUsedStep: result.step,
+    backupCodes: hashes,
+    trustedDevices: {}
+  };
+  delete updated.totpPendingSecret;
+  data.users[usernameLower] = updated;
+  Object.keys(data.sessions).forEach(token => {
+    if (token !== keepToken && data.sessions[token].username.toLowerCase() === usernameLower) {
+      delete data.sessions[token];
+    }
+  });
+  saveData();
+  return { success: true, backupCodes: codes };
+}
+
+function disableTotp(username) {
+  const usernameLower = username.toLowerCase();
+  const user = data.users[usernameLower];
+  if (!user) return { error: 'User not found' };
+  const cleaned = { ...user };
+  ['totpSecret', 'totpEnabled', 'totpPendingSecret', 'totpLastUsedStep', 'backupCodes', 'trustedDevices']
+    .forEach(k => delete cleaned[k]);
+  data.users[usernameLower] = cleaned;
+  saveData();
+  return { success: true };
+}
+
+// Verifies a 6-digit TOTP code (persisting the used step for replay
+// protection) or consumes a single-use backup code. Longer-than-6 input is
+// treated as a backup code.
+function verifyAndConsumeTotp(username, code) {
+  const usernameLower = username.toLowerCase();
+  const user = data.users[usernameLower];
+  if (!user || !user.totpEnabled || !user.totpSecret) {
+    return { error: 'Two-factor authentication is not enabled' };
+  }
+  const normalized = String(code || '').replace(/\s/g, '');
+  if (/^\d{6}$/.test(normalized)) {
+    const result = totp.verifyTotp(user.totpSecret, normalized, {
+      lastUsedStep: user.totpLastUsedStep || 0
+    });
+    if (!result.ok) return { error: 'Invalid code' };
+    data.users[usernameLower] = { ...user, totpLastUsedStep: result.step };
+    saveData();
+    return { success: true, method: 'totp' };
+  }
+  // Backup-code path: compare against every stored hash (no early exit).
+  const hash = totp.hashBackupCode(normalized);
+  const stored = Array.isArray(user.backupCodes) ? user.backupCodes : [];
+  let matchIndex = -1;
+  for (let i = 0; i < stored.length; i++) {
+    if (timingSafeEqualHex(hash, stored[i])) matchIndex = i;
+  }
+  if (matchIndex === -1) return { error: 'Invalid code' };
+  data.users[usernameLower] = {
+    ...user,
+    backupCodes: stored.filter((_, i) => i !== matchIndex)
+  };
+  saveData();
+  return { success: true, method: 'backup', backupCodesRemaining: stored.length - 1 };
+}
+
+// ===== Trusted devices ("remember this device for 30 days") — only the
+// sha256 of the cookie token is stored at rest =====
+
+function hashTrustToken(rawToken) {
+  return crypto.createHash('sha256').update(String(rawToken)).digest('hex');
+}
+
+function pruneTrustedDevices(user) {
+  const devices = user.trustedDevices || {};
+  const now = Date.now();
+  const kept = {};
+  let changed = false;
+  for (const [tokenHash, info] of Object.entries(devices)) {
+    if (info && now - info.createdAt <= TRUSTED_DEVICE_MAX_AGE) {
+      kept[tokenHash] = info;
+    } else {
+      changed = true;
+    }
+  }
+  return { kept, changed };
+}
+
+function addTrustedDevice(username, rawToken) {
+  const usernameLower = username.toLowerCase();
+  const user = data.users[usernameLower];
+  if (!user) return { error: 'User not found' };
+  const { kept } = pruneTrustedDevices(user);
+  kept[hashTrustToken(rawToken)] = { createdAt: Date.now() };
+  data.users[usernameLower] = { ...user, trustedDevices: kept };
+  saveData();
+  return { success: true };
+}
+
+function isTrustedDevice(username, rawToken) {
+  if (!rawToken || typeof rawToken !== 'string') return false;
+  const usernameLower = username.toLowerCase();
+  const user = data.users[usernameLower];
+  if (!user || !user.trustedDevices) return false;
+  const { kept, changed } = pruneTrustedDevices(user);
+  if (changed) {
+    data.users[usernameLower] = { ...user, trustedDevices: kept };
+    saveData();
+  }
+  return Boolean(kept[hashTrustToken(rawToken)]);
+}
+
+function get2faStatus(username) {
+  const user = data.users[username.toLowerCase()];
+  if (!user) return { error: 'User not found' };
+  return {
+    enabled: !!user.totpEnabled,
+    pending: !!user.totpPendingSecret,
+    backupCodesRemaining: Array.isArray(user.backupCodes) ? user.backupCodes.length : 0,
+    trustedDeviceCount: user.trustedDevices ? Object.keys(user.trustedDevices).length : 0
+  };
 }
 
 function createResetToken(email) {
@@ -563,6 +739,15 @@ module.exports = {
   flushDataSync,
   createUser,
   loginUser,
+  verifyCredentials,
+  createSession,
+  beginTotpSetup,
+  confirmTotpSetup,
+  disableTotp,
+  verifyAndConsumeTotp,
+  addTrustedDevice,
+  isTrustedDevice,
+  get2faStatus,
   getSession,
   logoutUser,
   getUser,

@@ -240,6 +240,7 @@ function setupAdminTabs() {
         loadCameraToggles();
         loadChickCamIp();
         loadInfraData();
+        load2faStatus();
         infraRefreshInterval = setInterval(loadInfraData, 60000);
       } else if (infraRefreshInterval) {
         clearInterval(infraRefreshInterval);
@@ -1587,6 +1588,132 @@ async function toggleCamera(camId) {
     }
   } catch (err) {
     console.error('Failed to toggle camera:', err);
+  }
+}
+
+// ===== Two-factor auth (Security card, System tab) =====
+
+function hide2faPanels() {
+  ['twofa-setup', 'twofa-backup', 'twofa-disable'].forEach(id => {
+    document.getElementById(id).classList.add('hidden');
+  });
+}
+
+function show2faResult(message, isError) {
+  const el = document.getElementById('twofa-result');
+  el.textContent = message;
+  el.classList.remove('hidden');
+  el.style.color = isError ? 'var(--barn-red)' : 'var(--forest-green)';
+}
+
+function clear2faResult() {
+  document.getElementById('twofa-result').classList.add('hidden');
+}
+
+async function load2faStatus() {
+  const statusEl = document.getElementById('twofa-status');
+  const actionsEl = document.getElementById('twofa-actions');
+  try {
+    const res = await fetch('/api/admin/2fa/status');
+    const data = await res.json();
+    if (data.error) {
+      statusEl.textContent = 'Could not load 2FA status';
+      return;
+    }
+    hide2faPanels();
+    clear2faResult();
+    if (data.enabled) {
+      statusEl.innerHTML = '<strong style="color:var(--forest-green);">Enabled</strong> — ' +
+        data.backupCodesRemaining + ' backup code(s) left, ' +
+        data.trustedDeviceCount + ' trusted device(s)';
+      actionsEl.innerHTML = '<button class="admin-btn cam-hide-btn" onclick="show2faDisable()">Disable…</button>';
+    } else {
+      statusEl.innerHTML = '<strong style="color:var(--barn-red);">Off</strong> — your admin login is password-only';
+      actionsEl.innerHTML = '<button class="admin-btn cam-show-btn" onclick="start2faSetup()">Enable 2FA…</button>';
+    }
+  } catch (err) {
+    statusEl.textContent = 'Could not load 2FA status';
+  }
+}
+
+async function start2faSetup() {
+  clear2faResult();
+  try {
+    const res = await fetch('/api/admin/2fa/setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.error) return show2faResult(data.error, true);
+
+    // Render the otpauth:// URI as a QR (vendored qrcode-generator, data-URI img)
+    const qr = qrcode(0, 'M');
+    qr.addData(data.otpauth);
+    qr.make();
+    document.getElementById('twofa-qr').innerHTML = qr.createImgTag(5, 8);
+    document.getElementById('twofa-secret').textContent = data.secret;
+
+    hide2faPanels();
+    document.getElementById('twofa-setup').classList.remove('hidden');
+    const input = document.getElementById('twofa-confirm-code');
+    input.value = '';
+    input.focus();
+  } catch (err) {
+    show2faResult('Setup failed — try again', true);
+  }
+}
+
+async function confirm2fa() {
+  const code = document.getElementById('twofa-confirm-code').value.trim();
+  if (!code) return show2faResult('Enter the 6-digit code from your app first', true);
+  try {
+    const res = await fetch('/api/admin/2fa/enable', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const data = await res.json();
+    if (data.error) return show2faResult(data.error, true);
+
+    hide2faPanels();
+    document.getElementById('twofa-backup-codes').textContent = data.backupCodes.join('\n');
+    document.getElementById('twofa-backup').classList.remove('hidden');
+    show2faResult('2FA is ON. Your next login will ask for a code.', false);
+  } catch (err) {
+    show2faResult('Enable failed — try again', true);
+  }
+}
+
+function ack2faBackup() {
+  // One-time display: wipe the codes from the DOM before re-rendering status.
+  document.getElementById('twofa-backup-codes').textContent = '';
+  load2faStatus();
+}
+
+function show2faDisable() {
+  clear2faResult();
+  hide2faPanels();
+  document.getElementById('twofa-disable').classList.remove('hidden');
+  const input = document.getElementById('twofa-disable-code');
+  input.value = '';
+  input.focus();
+}
+
+async function confirmDisable2fa() {
+  const code = document.getElementById('twofa-disable-code').value.trim();
+  if (!code) return show2faResult('Enter a current code (or a backup code) to disable', true);
+  try {
+    const res = await fetch('/api/admin/2fa/disable', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const data = await res.json();
+    if (data.error) return show2faResult(data.error, true);
+    load2faStatus();
+    show2faResult('2FA is off. Logins are password-only again.', false);
+  } catch (err) {
+    show2faResult('Disable failed — try again', true);
   }
 }
 

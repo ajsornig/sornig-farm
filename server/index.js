@@ -83,7 +83,9 @@ const authLimiter = createRateLimiter({
   max: 40,
   message: 'Too many attempts, please try again later.'
 });
-app.use(['/api/login', '/api/register', '/api/forgot-password', '/api/reset-password'], authLimiter);
+// Note: the '/api/login' prefix already covers '/api/login/totp' (app.use
+// prefix matching); it is listed explicitly so nobody "optimizes" it away.
+app.use(['/api/login', '/api/login/totp', '/api/register', '/api/forgot-password', '/api/reset-password'], authLimiter);
 
 app.use('/api', apiRoutes);
 
