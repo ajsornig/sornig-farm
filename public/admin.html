@@ -158,6 +158,18 @@
 
           <div id="twofa-result" class="hidden" role="status"></div>
         </div>
+
+        <h3 style="margin-top:1.5rem;color:var(--wood-brown);">Phone Alerts</h3>
+        <p class="admin-note">Push infra alerts (camera down, disk, temperature) straight to this device — instant, unlike the SMS gateway. On iPhone: Share &rarr; Add to Home Screen first, then enable from inside the installed app.</p>
+        <div id="push-card" class="twofa-card">
+          <div id="push-status">Loading&hellip;</div>
+          <div class="twofa-confirm-row">
+            <button id="push-enable-btn" class="admin-btn cam-show-btn hidden" onclick="enablePushAlerts()">Enable on this device</button>
+            <button id="push-disable-btn" class="admin-btn cam-hide-btn hidden" onclick="disablePushAlerts()">Disable this device</button>
+            <button id="push-test-btn" class="admin-btn cam-show-btn hidden" onclick="sendPushTest()">Send test notification</button>
+          </div>
+          <div id="push-result" class="hidden" role="status"></div>
+        </div>
       </div>
 
       <div id="admin-comms" class="admin-content hidden">
