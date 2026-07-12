@@ -152,6 +152,14 @@ app.use((req, res, next) => {
   next();
 });
 
+// The service worker must never be served stale: Cloudflare caches statics for
+// 4h (no origin cache headers), which would delay SW updates by up to 4h after
+// a deploy. no-cache makes Cloudflare and browsers revalidate every time.
+app.get('/sw.js', (req, res) => {
+  res.set('Cache-Control', 'no-cache');
+  res.sendFile(path.join(__dirname, '../public/sw.js'));
+});
+
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.get('/config/cameras', (req, res) => {
