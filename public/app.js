@@ -33,6 +33,16 @@ async function init() {
   updateNightMode();
   setInterval(updateNightMode, 60000);
   setInterval(loadWeather, 15 * 60000);
+  registerServiceWorker();
+}
+
+// Push-only service worker (see sw.js). Registration is fire-and-forget: on
+// browsers without SW support (or plain-HTTP dev) the site works unchanged.
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('/sw.js').catch(err => {
+    console.warn('Service worker registration failed:', err);
+  });
 }
 
 function setupCollapsibleSections() {

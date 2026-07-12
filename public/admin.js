@@ -241,6 +241,7 @@ function setupAdminTabs() {
         loadChickCamIp();
         loadInfraData();
         load2faStatus();
+        loadPushStatus();
         infraRefreshInterval = setInterval(loadInfraData, 60000);
       } else if (infraRefreshInterval) {
         clearInterval(infraRefreshInterval);
@@ -1714,6 +1715,129 @@ async function confirmDisable2fa() {
     show2faResult('2FA is off. Logins are password-only again.', false);
   } catch (err) {
     show2faResult('Disable failed — try again', true);
+  }
+}
+
+// ===== Phone alerts (web push, System tab) =====
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(ch => ch.charCodeAt(0)));
+}
+
+function showPushResult(message, isError) {
+  const el = document.getElementById('push-result');
+  el.textContent = message;
+  el.classList.remove('hidden');
+  el.style.color = isError ? 'var(--barn-red)' : 'var(--forest-green)';
+}
+
+async function loadPushStatus() {
+  const statusEl = document.getElementById('push-status');
+  const enableBtn = document.getElementById('push-enable-btn');
+  const disableBtn = document.getElementById('push-disable-btn');
+  const testBtn = document.getElementById('push-test-btn');
+  [enableBtn, disableBtn, testBtn].forEach(b => b.classList.add('hidden'));
+
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    // iOS Safari tab: PushManager only exists inside an installed web app.
+    statusEl.textContent = 'Push is not available in this browser. On iPhone: ' +
+      'Share → Add to Home Screen, then open the installed app and enable here.';
+    return;
+  }
+  try {
+    const keyData = await (await fetch('/api/admin/push/public-key')).json();
+    if (!keyData.enabled) {
+      statusEl.textContent = 'Push is not configured on the server yet (VAPID keys missing from .env).';
+      return;
+    }
+    const subs = await (await fetch('/api/admin/push/subscriptions')).json();
+    const reg = await navigator.serviceWorker.getRegistration();
+    const mySub = reg ? await reg.pushManager.getSubscription() : null;
+    const thisDevice = !!(mySub && subs.subscriptions.some(s => s.endpoint === mySub.endpoint));
+
+    statusEl.textContent = subs.count + ' device(s) subscribed' +
+      (thisDevice ? ' — including this one' : '');
+    if (thisDevice) {
+      disableBtn.classList.remove('hidden');
+    } else {
+      enableBtn.classList.remove('hidden');
+    }
+    if (subs.count > 0) testBtn.classList.remove('hidden');
+  } catch (err) {
+    statusEl.textContent = 'Could not load push status';
+  }
+}
+
+async function enablePushAlerts() {
+  try {
+    const keyData = await (await fetch('/api/admin/push/public-key')).json();
+    if (!keyData.enabled) return showPushResult('Server has no VAPID keys configured yet', true);
+
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.ready;
+
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      return showPushResult('Notification permission was not granted', true);
+    }
+
+    const subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
+    });
+    const res = await fetch('/api/admin/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscription: subscription.toJSON() })
+    });
+    const data = await res.json();
+    if (data.error) return showPushResult(data.error, true);
+
+    showPushResult('Phone alerts enabled on this device 🐔', false);
+    loadPushStatus();
+  } catch (err) {
+    showPushResult('Enable failed: ' + err.message, true);
+  }
+}
+
+async function disablePushAlerts() {
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    const subscription = reg ? await reg.pushManager.getSubscription() : null;
+    if (subscription) {
+      await fetch('/api/admin/push/unsubscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint: subscription.endpoint })
+      });
+      await subscription.unsubscribe();
+    }
+    showPushResult('Phone alerts disabled on this device', false);
+    loadPushStatus();
+  } catch (err) {
+    showPushResult('Disable failed: ' + err.message, true);
+  }
+}
+
+async function sendPushTest() {
+  try {
+    const res = await fetch('/api/admin/push/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.error) return showPushResult(data.error, true);
+    showPushResult(
+      'Test sent to ' + data.sent + ' device(s)' +
+      (data.failed ? ', ' + data.failed + ' failed' : '') +
+      (data.pruned ? ', ' + data.pruned + ' dead subscription(s) pruned' : ''),
+      false
+    );
+  } catch (err) {
+    showPushResult('Test failed: ' + err.message, true);
   }
 }
 

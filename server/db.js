@@ -27,7 +27,8 @@ let data = {
   stats: {
     totalViews: 0,
     visitors: []
-  }
+  },
+  pushSubscriptions: []
 };
 
 function initDb() {
@@ -40,11 +41,14 @@ function initDb() {
         users: loaded.users || {},
         sessions: loaded.sessions || {},
         stats: loaded.stats || { totalViews: 0, visitors: [] },
-        favorites: loaded.favorites || []
+        favorites: loaded.favorites || [],
+        // Explicitly whitelisted: keys absent here are silently dropped on the
+        // next save, which for subscriptions would mean push dying on restart.
+        pushSubscriptions: loaded.pushSubscriptions || []
       };
     } catch (err) {
       console.error('Failed to load data file, starting fresh:', err.message);
-      data = { messages: [], users: {}, sessions: {}, stats: { totalViews: 0, visitors: [] }, favorites: [] };
+      data = { messages: [], users: {}, sessions: {}, stats: { totalViews: 0, visitors: [] }, favorites: [], pushSubscriptions: [] };
     }
   }
   // One-time cleanup: the per-visit stats.visitors array is dead (the visitor map
@@ -709,6 +713,40 @@ function getUserByUnsubscribeToken(token) {
   return null;
 }
 
+// ===== Web-push subscriptions (admin phone alerts) =====
+
+function getPushSubscriptions() {
+  if (!data.pushSubscriptions) data.pushSubscriptions = [];
+  return data.pushSubscriptions;
+}
+
+// Upsert keyed on endpoint: re-subscribing from the same browser replaces the
+// old entry instead of stacking duplicates.
+function addPushSubscription({ endpoint, keys, username, ua }) {
+  if (!data.pushSubscriptions) data.pushSubscriptions = [];
+  data.pushSubscriptions = [
+    ...data.pushSubscriptions.filter(s => s.endpoint !== endpoint),
+    {
+      endpoint,
+      keys,
+      username,
+      ua: ua ? String(ua).slice(0, 120) : null,
+      createdAt: Date.now()
+    }
+  ];
+  saveData();
+  return { success: true };
+}
+
+function removePushSubscription(endpoint) {
+  if (!data.pushSubscriptions) return false;
+  const before = data.pushSubscriptions.length;
+  data.pushSubscriptions = data.pushSubscriptions.filter(s => s.endpoint !== endpoint);
+  if (data.pushSubscriptions.length === before) return false;
+  saveData();
+  return true;
+}
+
 function getFavorites() {
   if (!data.favorites) data.favorites = [];
   return [...data.favorites].sort((a, b) => b.starred - a.starred);
@@ -782,5 +820,8 @@ module.exports = {
   getUserByUnsubscribeToken,
   getFavorites,
   addFavorite,
-  removeFavorite
+  removeFavorite,
+  getPushSubscriptions,
+  addPushSubscription,
+  removePushSubscription
 };

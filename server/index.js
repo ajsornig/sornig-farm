@@ -10,6 +10,7 @@ const { initDb, getSession, hasPtzAccess, hasPtzDriving, isUserApproved, getActi
 const { setupChat } = require('./chat');
 const apiRoutes = require('./routes/api');
 const { initMailer } = require('./mailer');
+const { initWebPush } = require('./push-alerts');
 const { securityHeaders, createRateLimiter, normalizeForGate } = require('./security');
 const { backfillFromActivityLog } = require('./visited-locations');
 const { startInfraAlertPoller } = require('./infra-alerts');
@@ -42,6 +43,7 @@ function isAllowedOriginHost(originHost, reqHost) {
 
 initDb();
 initMailer();
+initWebPush();
 
 // Best-effort one-time seed of the permanent visitor map from the existing
 // activity log, so it isn't empty on first deploy. No-op if already seeded.
@@ -150,6 +152,14 @@ app.use((req, res, next) => {
     return res.status(403).json({ error: 'Account not approved' });
   }
   next();
+});
+
+// The service worker must never be served stale: Cloudflare caches statics for
+// 4h (no origin cache headers), which would delay SW updates by up to 4h after
+// a deploy. no-cache makes Cloudflare and browsers revalidate every time.
+app.get('/sw.js', (req, res) => {
+  res.set('Cache-Control', 'no-cache');
+  res.sendFile(path.join(__dirname, '../public/sw.js'));
 });
 
 app.use(express.static(path.join(__dirname, '../public')));
