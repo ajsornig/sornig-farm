@@ -34,6 +34,82 @@ async function init() {
   setInterval(updateNightMode, 60000);
   setInterval(loadWeather, 15 * 60000);
   registerServiceWorker();
+  setupInstallBanner();
+}
+
+// --- PWA install banner ---
+// "Sharing the app" is just sharing the URL; the site handles the install UX.
+// Android/desktop Chrome fires beforeinstallprompt -> real one-tap Install
+// button. iOS never fires it and only Safari can install PWAs, so there we
+// show a guided Add-to-Home-Screen hint instead. Hidden when already running
+// standalone, on wide screens, or after the user dismisses it once.
+const INSTALL_BANNER_DISMISSED_KEY = 'installBannerDismissed';
+const IOS_SHARE_ICON_SVG = '<svg class="ios-share-icon" viewBox="0 0 16 20" aria-hidden="true">'
+  + '<path d="M3 7 h10 v11 h-10 z M8 1 v11 M5 4 l3 -3 l3 3"/></svg>';
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  maybeShowInstallBanner();
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  hideInstallBanner(true);
+});
+
+function isStandaloneApp() {
+  return window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+}
+
+function hideInstallBanner(remember) {
+  document.getElementById('install-banner').classList.add('hidden');
+  if (remember) {
+    try { localStorage.setItem(INSTALL_BANNER_DISMISSED_KEY, '1'); } catch (e) {}
+  }
+}
+
+function maybeShowInstallBanner() {
+  if (isStandaloneApp()) return;
+  if (localStorage.getItem(INSTALL_BANNER_DISMISSED_KEY)) return;
+  if (!window.matchMedia('(max-width: 768px)').matches) return;
+
+  const banner = document.getElementById('install-banner');
+  const hint = document.getElementById('install-banner-hint');
+
+  if (deferredInstallPrompt) {
+    document.getElementById('install-banner-btn').classList.remove('hidden');
+    hint.textContent = 'Watch the chickens right from your home screen.';
+    banner.classList.remove('hidden');
+    return;
+  }
+
+  // iOS: no install API. Only Safari can add PWAs to the home screen, so the
+  // hint would be a dead end in Chrome/Firefox/Edge on iOS - stay hidden there.
+  const ua = navigator.userAgent;
+  const isIos = /iPhone|iPad|iPod/.test(ua)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isIosSafari = isIos && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|Chrome/.test(ua);
+  if (isIosSafari) {
+    hint.innerHTML = `Tap ${IOS_SHARE_ICON_SVG} then <strong>Add to Home Screen</strong>`;
+    banner.classList.remove('hidden');
+  }
+}
+
+function setupInstallBanner() {
+  document.getElementById('install-banner-close').onclick = () => hideInstallBanner(true);
+  document.getElementById('install-banner-btn').onclick = async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    const choice = await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    // Accepted: appinstalled handles the rest. Declined via the native dialog:
+    // hide for this visit but offer again next time.
+    hideInstallBanner(choice.outcome === 'accepted');
+  };
+  maybeShowInstallBanner();
 }
 
 // Push-only service worker (see sw.js). Registration is fire-and-forget: on

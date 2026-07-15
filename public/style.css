@@ -3155,3 +3155,68 @@ footer {
     white-space: nowrap; /* keep "2026-07-11" on one line — it's the row key */
   }
 }
+
+/* PWA install banner — fixed bottom bar, mobile only (JS gates on width too) */
+#install-banner {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--wood-dark);
+  color: var(--cream);
+  border: 2px solid var(--golden);
+  border-radius: 12px;
+  padding: 10px 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.install-banner-icon {
+  font-size: 1.6rem;
+}
+
+.install-banner-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.85rem;
+}
+
+.install-banner-text strong {
+  color: var(--golden);
+}
+
+#install-banner-hint .ios-share-icon {
+  display: inline-block;
+  vertical-align: -3px;
+  width: 14px;
+  height: 16px;
+  fill: none;
+  stroke: var(--cream);
+  stroke-width: 1.5;
+}
+
+#install-banner-btn {
+  background: var(--forest-green);
+  color: var(--cream);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+#install-banner-close {
+  background: none;
+  border: none;
+  color: var(--cream);
+  font-size: 1rem;
+  padding: 6px;
+  cursor: pointer;
+  opacity: 0.7;
+}
