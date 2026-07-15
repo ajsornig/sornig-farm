@@ -7,7 +7,7 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#FDF6E3">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="style.css?v=29">
+  <link rel="stylesheet" href="style.css?v=30">
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
   <link rel="stylesheet" href="/vendor/glightbox.min.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐔</text></svg>">
@@ -171,8 +171,18 @@
     <p>Welcome to the Sornig Farm! Watch our chickens live, 24/7.</p>
   </footer>
 
+  <div id="install-banner" class="hidden" role="dialog" aria-label="Install the Sornig Farm app">
+    <span class="install-banner-icon" aria-hidden="true">🐔</span>
+    <div class="install-banner-text">
+      <strong>Get the Sornig Farm app</strong>
+      <span id="install-banner-hint"></span>
+    </div>
+    <button id="install-banner-btn" class="hidden">Install</button>
+    <button id="install-banner-close" aria-label="Dismiss">&#10005;</button>
+  </div>
+
   <script src="/vendor/glightbox.min.js"></script>
   <script src="sun-times.js?v=1"></script>
-  <script src="app.js?v=23"></script>
+  <script src="app.js?v=24"></script>
 </body>
 </html>
