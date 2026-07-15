@@ -1562,6 +1562,45 @@ function setupPtzExtended() {
   document.getElementById('guard-timeout')?.addEventListener('change', toggleGuard);
 }
 
+// --- Background-resume recovery ---
+// iOS suspends the installed PWA (and background tabs) completely: the HLS
+// players freeze pointing at segments the server has since deleted, and the
+// chat socket dies without a clean close. When the app comes back after a
+// real suspension, rebuild whatever view is active instead of leaving dead
+// video that only a force-quit fixes.
+const RESUME_RELOAD_AFTER_MS = 10000;
+let hiddenSince = null;
+
+function recoverFromResume() {
+  if (ws && ws.readyState !== WebSocket.OPEN && ws.readyState !== WebSocket.CONNECTING) {
+    setupChat();
+  }
+
+  const gridVisible = !document.getElementById('video-grid').classList.contains('hidden');
+  if (gridVisible && cameras.length > 0) {
+    const activeTab = document.querySelector('.camera-tab.active');
+    if (activeTab) showAllCams(activeTab);
+  } else if (currentCamera) {
+    playStream(currentCamera.streamUrl, !!currentCamera.ptz);
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    hiddenSince = Date.now();
+    return;
+  }
+  const wasHiddenLongEnough = hiddenSince && Date.now() - hiddenSince >= RESUME_RELOAD_AFTER_MS;
+  hiddenSince = null;
+  if (wasHiddenLongEnough) recoverFromResume();
+});
+
+// Safari can also restore the page from the back-forward cache with JS state
+// intact but every connection dead — treat that like a long suspension.
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) recoverFromResume();
+});
+
 setupPtzExtended();
 setupCollapsibleSections();
 init();
