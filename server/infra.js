@@ -168,7 +168,11 @@ function generateInfraAlerts(entry, camStates) {
   const expectedFfmpeg = states.filter(c => c.enabled !== false).length;
   if (entry.ffmpegCount < expectedFfmpeg) alerts.push({ level: 'warning', key: 'ffmpeg', message: `Only ${entry.ffmpegCount} of ${expectedFfmpeg} ffmpeg process(es) running` });
   if (entry.wlan1.signal === null) {
-    alerts.push({ level: 'warning', key: 'wlan1', message: 'Primary uplink (wlan1) signal lost — failover active' });
+    // Critical, not warning: the push/SMS poller in infra-alerts.js only sends
+    // `critical` alerts, so as a warning this was dashboard-only and a real outage
+    // (2026-07-24, wedged BrosTrend firmware) went unnoticed for 5 days. Also,
+    // running on the weak wlan0 fallback risks stream instability.
+    alerts.push({ level: 'critical', key: 'wlan1', message: 'Primary uplink (wlan1) signal lost — failover active' });
     if (entry.wlan0.signal !== null && entry.wlan0.signal < -70) {
       alerts.push({ level: 'warning', key: 'wlan0-weak', message: `Failover WiFi signal weak (${entry.wlan0.signal} dBm)` });
     }

@@ -1,0 +1,7 @@
+[Unit]
+Description=wlan0 failover watchdog
+After=NetworkManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/ajsornig/chicken-stream/scripts/wlan0-watchdog.sh

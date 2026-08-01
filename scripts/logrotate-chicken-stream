@@ -19,4 +19,12 @@
     missingok
     notifempty
     copytruncate
+    # Without `su`, logrotate refuses to touch logs/ because the directory is
+    # group-writable and owned by ajsornig ("insecure permissions"), and silently
+    # skips every file — this disabled ALL rotation for a month (installed
+    # 2026-07-01, wifi-monitor.log grew to 14MB/84k+ lines before this was caught).
+    # root:root lets logrotate copytruncate every file regardless of owner —
+    # notably logs/wifi-monitor.log, owned by root (wifi-monitor.service runs as
+    # root), which a non-root logrotate could not have truncated.
+    su root root
 }
