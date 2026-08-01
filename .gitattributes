@@ -1,3 +1,9 @@
 # Shell scripts run on the Linux Pi — force LF so a Windows checkout/commit can't
 # introduce CRLF, which breaks the shebang ("bad interpreter") on a fresh clone.
 *.sh text eol=lf
+
+# systemd units and the logrotate config are also deployed verbatim to the Pi;
+# CRLF trips their parsers, so pin them to LF for the same reason.
+*.service text eol=lf
+*.timer text eol=lf
+logrotate-chicken-stream text eol=lf

@@ -87,3 +87,26 @@ test('disk alert is skipped when disk metrics are absent', () => {
 test('healthy line with all cams visible produces no alerts', () => {
   assert.deepStrictEqual(generateInfraAlerts(parseInfraLine(HEALTHY_LINE), camStates()), []);
 });
+
+test('lost wlan1 signal emits a critical alert (push/SMS poller only sends critical)', () => {
+  const line = HEALTHY_LINE.replace('wlan1=-50dBm', 'wlan1=?dBm');
+  const alerts = generateInfraAlerts(parseInfraLine(line), camStates());
+  const wlan1 = alerts.find(a => a.key === 'wlan1');
+  assert.ok(wlan1);
+  assert.strictEqual(wlan1.level, 'critical');
+});
+
+test('healthy wlan1 signal produces no wlan1 alert', () => {
+  const alerts = generateInfraAlerts(parseInfraLine(HEALTHY_LINE), camStates());
+  assert.ok(!alerts.some(a => a.key === 'wlan1'));
+});
+
+test('weak wlan0 fallback alert stays warning even though wlan1 escalated to critical', () => {
+  const line = HEALTHY_LINE.replace('wlan1=-50dBm', 'wlan1=?dBm').replace('wlan0=-50dBm', 'wlan0=-75dBm');
+  const alerts = generateInfraAlerts(parseInfraLine(line), camStates());
+  const wlan1 = alerts.find(a => a.key === 'wlan1');
+  const wlan0Weak = alerts.find(a => a.key === 'wlan0-weak');
+  assert.strictEqual(wlan1.level, 'critical');
+  assert.ok(wlan0Weak);
+  assert.strictEqual(wlan0Weak.level, 'warning');
+});

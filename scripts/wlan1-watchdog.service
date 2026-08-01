@@ -1,0 +1,11 @@
+[Unit]
+Description=wlan1 primary uplink watchdog
+After=NetworkManager.service
+
+[Service]
+Type=oneshot
+# Hard recovery (module unload/reload + settle + nmcli activation) runs ~80s
+# worst case; cap it well under the 5-minute timer interval so a wedged run
+# can never overlap the next one.
+TimeoutStartSec=180
+ExecStart=/home/ajsornig/chicken-stream/scripts/wlan1-watchdog.sh
