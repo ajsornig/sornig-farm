@@ -5,11 +5,11 @@ const { parseInfraLine, generateInfraAlerts, DISK_CRITICAL_FREE_MB } = require('
 // Real wifi-monitor line shape: cam2 ping failed (cam2=ms) and stream2 stale.
 const SAMPLE_LINE = '2026-07-10 02:30:28 | eth0=up@1000Mbps | wlan0=-50dBm | wlan1=-50dBm | ' +
   'cam1=17.8ms cam2=ms cam3=4.28ms wavlink=0.516ms | stream1=4s stream2=204s stream3=2s | ' +
-  'restarts=0/0/0 | ffmpeg=6 | cpu=10.0% mem=1000/8000MB load=0.5 temp=50.0C disk=9400/230000MB';
+  'restarts=0/0/0 cfdrops=0 | ffmpeg=6 | cpu=10.0% mem=1000/8000MB load=0.5 temp=50.0C disk=9400/230000MB';
 
 const HEALTHY_LINE = '2026-07-10 02:30:28 | eth0=up@1000Mbps | wlan0=-50dBm | wlan1=-50dBm | ' +
   'cam1=17.8ms cam2=2.1ms cam3=4.28ms wavlink=0.516ms | stream1=4s stream2=5s stream3=2s | ' +
-  'restarts=0/0/0 | ffmpeg=6 | cpu=10.0% mem=1000/8000MB load=0.5 temp=50.0C disk=9400/230000MB';
+  'restarts=0/0/0 cfdrops=0 | ffmpeg=6 | cpu=10.0% mem=1000/8000MB load=0.5 temp=50.0C disk=9400/230000MB';
 
 const camStates = (overrides = {}) => [
   { id: 'cam1', name: 'Chicken Run', enabled: true, hidden: false },
@@ -101,7 +101,7 @@ test('healthy wlan1 signal produces no wlan1 alert', () => {
   assert.ok(!alerts.some(a => a.key === 'wlan1'));
 });
 
-test('weak wlan0 fallback alert stays warning even though wlan1 escalated to critical', () => {
+test('weak wlan0 primary alert stays warning even when wlan1 (backup) also escalates to critical', () => {
   const line = HEALTHY_LINE.replace('wlan1=-50dBm', 'wlan1=?dBm').replace('wlan0=-50dBm', 'wlan0=-75dBm');
   const alerts = generateInfraAlerts(parseInfraLine(line), camStates());
   const wlan1 = alerts.find(a => a.key === 'wlan1');
@@ -109,4 +109,42 @@ test('weak wlan0 fallback alert stays warning even though wlan1 escalated to cri
   assert.strictEqual(wlan1.level, 'critical');
   assert.ok(wlan0Weak);
   assert.strictEqual(wlan0Weak.level, 'warning');
+});
+
+// Regression coverage: wlan0-weak used to be nested inside the wlan1-lost branch,
+// so it only ever fired when wlan1 ALSO happened to be unreadable at that exact
+// moment. Now that wlan0 is the primary uplink carrying all traffic, its signal
+// must be checked unconditionally.
+test('wlan0-weak warning fires on its own, with wlan1 signal perfectly healthy', () => {
+  const line = HEALTHY_LINE.replace('wlan0=-50dBm', 'wlan0=-75dBm');
+  const alerts = generateInfraAlerts(parseInfraLine(line), camStates());
+  const wlan0Weak = alerts.find(a => a.key === 'wlan0-weak');
+  assert.ok(wlan0Weak);
+  assert.strictEqual(wlan0Weak.level, 'warning');
+  assert.ok(!alerts.some(a => a.key === 'wlan1'));
+});
+
+// Regression guard for the 2026-08-02 wording fix: wlan1 (BrosTrend) is now the
+// BACKUP uplink, not primary, and losing its signal doesn't trigger a failover
+// (wlan0/primary was already carrying all traffic) — the message must not imply
+// otherwise.
+test('wlan1 critical message no longer claims it is the primary uplink or that failover occurred', () => {
+  const line = HEALTHY_LINE.replace('wlan1=-50dBm', 'wlan1=?dBm');
+  const alerts = generateInfraAlerts(parseInfraLine(line), camStates());
+  const wlan1 = alerts.find(a => a.key === 'wlan1');
+  assert.ok(wlan1);
+  assert.ok(!/primary/i.test(wlan1.message));
+  assert.ok(!/failover/i.test(wlan1.message));
+});
+
+test('parseInfraLine extracts cfDrops from the cfdrops field', () => {
+  const line = SAMPLE_LINE.replace('cfdrops=0', 'cfdrops=3');
+  const entry = parseInfraLine(line);
+  assert.strictEqual(entry.cfDrops, 3);
+});
+
+test('cfDrops defaults to 0 when the field is missing', () => {
+  const line = SAMPLE_LINE.replace(' cfdrops=0', '');
+  const entry = parseInfraLine(line);
+  assert.strictEqual(entry.cfDrops, 0);
 });

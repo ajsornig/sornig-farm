@@ -1,22 +1,48 @@
 #!/bin/bash
 # Network + stream health monitor
-# Logs eth0 link, wlan0/wlan1 signal, camera pings, Wavlink AP, stream freshness every minute
+# Logs eth0 link, wlan0/wlan1 signal, camera pings, Wavlink AP, stream freshness,
+# and Cloudflare Tunnel connection-drop events every minute
 # Output: ~/chicken-stream/logs/wifi-monitor.log
 
 LOG="/home/ajsornig/chicken-stream/logs/wifi-monitor.log"
 mkdir -p "$(dirname "$LOG")"
 
+# Wall-clock boundary for the cloudflared drop-event delta below. Epoch seconds,
+# updated at the end of each loop iteration.
+cf_since=$(date +%s)
+
 while true; do
   timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+
+  # Cloudflare Tunnel connection-drop events since the last iteration (a true
+  # per-minute delta, not a lifetime total — the cloudflared systemd unit's own
+  # process never restarts on these drops, so there's no free NRestarts-style
+  # counter like the camera services have below; journalctl is the only source).
+  # Uses the actual elapsed wall-clock time since the last check (via
+  # --since/--until "@<epoch>") rather than assuming a fixed 60s, since the loop
+  # body itself takes some time to run and a fixed guess would drift and
+  # mis-count events at the boundary. The explicit --until pins the window to
+  # end exactly where the NEXT iteration's --since will start, so back-to-back
+  # windows are contiguous with no gap and no double-count at the second they
+  # touch. journalctl can read the full systemd journal here because this
+  # script's own unit (wifi-monitor.service) already runs as root.
+  # NOTE: counts matching journal LINES, not distinct drop events — a single
+  # drop commonly logs more than one of these phrases, so this is a relative
+  # signal (did drops increase this minute?), not an exact event count.
+  cf_now=$(date +%s)
+  cf_drops=$(journalctl -u cloudflared --no-pager --since "@${cf_since}" --until "@${cf_now}" 2>/dev/null | grep -icE 'no recent network activity|connection with edge closed|Lost connection with the edge')
+  cf_drops=${cf_drops:-0}
+  cf_since=$cf_now
 
   # eth0 link state (camera network)
   eth0_state=$(cat /sys/class/net/eth0/operstate 2>/dev/null || echo "UNKNOWN")
   eth0_speed=$(cat /sys/class/net/eth0/speed 2>/dev/null || echo "?")
 
-  # wlan0 signal (home WiFi — fallback uplink)
+  # wlan0 signal (built-in — PRIMARY uplink as of 2026-08-02, route metric 600)
   wlan0_signal=$(sudo iw dev wlan0 link 2>/dev/null | grep 'signal:' | awk '{print $2}')
 
-  # wlan1 signal (BrosTrend 5GHz — primary uplink)
+  # wlan1 signal (BrosTrend 5GHz USB dongle — BACKUP uplink as of 2026-08-02,
+  # route metric 700; demoted after a firmware wedge + Cloudflare Tunnel issues)
   wlan1_signal=$(sudo iw dev wlan1 link 2>/dev/null | grep 'signal:' | awk '{print $2}')
 
   # Ping cameras
@@ -64,7 +90,7 @@ while true; do
   cpu_temp=$(awk '{printf "%.1f", $1/1000}' /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo "?")
   disk_info=$(df -BM / 2>/dev/null | awk 'NR==2{gsub("M",""); printf "%s/%s", $3, $2}' || echo "?/?")
 
-  echo "${timestamp} | eth0=${eth0_state}@${eth0_speed}Mbps | wlan0=${wlan0_signal:-?}dBm | wlan1=${wlan1_signal:-?}dBm | cam1=${ping1_ms}ms cam2=${ping2_ms}ms cam3=${ping3_ms}ms wavlink=${wavlink_ms}ms | stream1=${stream1_age}s stream2=${stream2_age}s stream3=${stream3_age}s | restarts=${restarts1}/${restarts2}/${restarts3} | ffmpeg=${ffmpeg_count} | cpu=${cpu_pct}% mem=${mem_info}MB load=${load_avg} temp=${cpu_temp}C disk=${disk_info}MB" >> "$LOG"
+  echo "${timestamp} | eth0=${eth0_state}@${eth0_speed}Mbps | wlan0=${wlan0_signal:-?}dBm | wlan1=${wlan1_signal:-?}dBm | cam1=${ping1_ms}ms cam2=${ping2_ms}ms cam3=${ping3_ms}ms wavlink=${wavlink_ms}ms | stream1=${stream1_age}s stream2=${stream2_age}s stream3=${stream3_age}s | restarts=${restarts1}/${restarts2}/${restarts3} cfdrops=${cf_drops} | ffmpeg=${ffmpeg_count} | cpu=${cpu_pct}% mem=${mem_info}MB load=${load_avg} temp=${cpu_temp}C disk=${disk_info}MB" >> "$LOG"
 
   sleep 60
 done

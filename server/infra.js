@@ -7,6 +7,10 @@ const DISK_CRITICAL_FREE_MB = 2048;
 // …or when used space exceeds this percentage of the card.
 const DISK_CRITICAL_USED_PCT = 90;
 
+// wlan0 (now the PRIMARY uplink, NetworkManager route metric 600 as of
+// 2026-08-02) is considered weak below this signal strength.
+const WLAN0_WEAK_SIGNAL_DBM = -70;
+
 // Appended to alerts for cams the admin disabled via the panel — the dashboard
 // still shows them, but the push poller drops anything flagged `muted`.
 const MUTED_SUFFIX = ' (muted — camera disabled in admin panel)';
@@ -78,6 +82,10 @@ function parseInfraLine(line) {
   };
 
   const restartsMatch = parts[pingIdx + 2].match(/restarts=(\d+)\/(\d+)(?:\/(\d+))?/);
+  // Cloudflare Tunnel connection-drop events since the previous monitor sample
+  // (a per-minute delta, not a lifetime count — see scripts/wifi-monitor.sh).
+  // Absent or unparseable simply means 0 drops, unlike a signal dBm's `?`.
+  const cfDropsMatch = parts[pingIdx + 2].match(/cfdrops=(\d+)/);
   const ffmpegMatch = parts[pingIdx + 3] && parts[pingIdx + 3].match(/ffmpeg=(\d+)/);
 
   let system = { cpu: null, memUsed: null, memTotal: null, load: null, temp: null, diskUsed: null, diskTotal: null };
@@ -108,6 +116,7 @@ function parseInfraLine(line) {
     streams: { stream1: parseStream('stream1'), stream2: parseStream('stream2'), stream3: parseStream('stream3') },
     restarts: restartsMatch ? { cam1: Number(restartsMatch[1]), cam2: Number(restartsMatch[2]), cam3: restartsMatch[3] ? Number(restartsMatch[3]) : 0 } : { cam1: 0, cam2: 0, cam3: 0 },
     ffmpegCount: ffmpegMatch ? Number(ffmpegMatch[1]) : 0,
+    cfDrops: cfDropsMatch ? Number(cfDropsMatch[1]) : 0,
     system
   };
 }
@@ -167,15 +176,24 @@ function generateInfraAlerts(entry, camStates) {
   if (entry.eth0.state !== 'up') alerts.push({ level: 'critical', key: 'eth0', message: 'eth0 link DOWN' });
   const expectedFfmpeg = states.filter(c => c.enabled !== false).length;
   if (entry.ffmpegCount < expectedFfmpeg) alerts.push({ level: 'warning', key: 'ffmpeg', message: `Only ${entry.ffmpegCount} of ${expectedFfmpeg} ffmpeg process(es) running` });
+  // wlan0 is the PRIMARY uplink as of 2026-08-02 (NetworkManager route metric
+  // 600 vs wlan1's 700), so its signal strength matters on its own — check it
+  // unconditionally rather than only when wlan1 also happens to be down.
+  if (entry.wlan0.signal !== null && entry.wlan0.signal < WLAN0_WEAK_SIGNAL_DBM) {
+    alerts.push({ level: 'warning', key: 'wlan0-weak', message: `Primary WiFi (wlan0) signal weak (${entry.wlan0.signal} dBm)` });
+  }
   if (entry.wlan1.signal === null) {
     // Critical, not warning: the push/SMS poller in infra-alerts.js only sends
-    // `critical` alerts, so as a warning this was dashboard-only and a real outage
-    // (2026-07-24, wedged BrosTrend firmware) went unnoticed for 5 days. Also,
-    // running on the weak wlan0 fallback risks stream instability.
-    alerts.push({ level: 'critical', key: 'wlan1', message: 'Primary uplink (wlan1) signal lost — failover active' });
-    if (entry.wlan0.signal !== null && entry.wlan0.signal < -70) {
-      alerts.push({ level: 'warning', key: 'wlan0-weak', message: `Failover WiFi signal weak (${entry.wlan0.signal} dBm)` });
-    }
+    // `critical` alerts, so as a warning a real outage (2026-07-24, wedged
+    // BrosTrend firmware) went unnoticed for 5 days. wlan1/BrosTrend is now the
+    // BACKUP uplink (roles reversed 2026-08-02 after that failure plus a
+    // Cloudflare Tunnel instability traced to it) — losing its signal doesn't
+    // affect the live site (wlan0/primary already carries all traffic), but it
+    // does mean there's no working fallback if wlan0 has a bad day. The push
+    // poller (infra-alerts.js) additionally requires this to sustain much
+    // longer than other criticals before paging, since the signal reading
+    // itself flakes for a few minutes at a time on a healthy link.
+    alerts.push({ level: 'critical', key: 'wlan1', message: 'Backup uplink (wlan1/BrosTrend) signal lost — site unaffected, but no redundancy left if wlan0 has an outage' });
   }
   if (entry.system.cpu !== null && entry.system.cpu > 80) {
     alerts.push({ level: 'critical', key: 'cpu-high', message: `CPU usage high (${entry.system.cpu.toFixed(1)}%)` });
@@ -197,5 +215,6 @@ module.exports = {
   generateInfraAlerts,
   INFRA_HISTORY_COUNT,
   DISK_CRITICAL_FREE_MB,
-  DISK_CRITICAL_USED_PCT
+  DISK_CRITICAL_USED_PCT,
+  WLAN0_WEAK_SIGNAL_DBM
 };
