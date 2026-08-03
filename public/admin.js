@@ -1079,11 +1079,16 @@ async function loadInfraData() {
     const d = data.latest;
 
     const networkSignals = [d.wlan1, d.wlan0].filter(w => w.signal !== null);
+    // wlan0 is the PRIMARY uplink and wlan1/BrosTrend the BACKUP as of
+    // 2026-08-02 (route metrics 600/700) — matches server/infra.js. wlan1 lost
+    // is 'critical' there (loss of redundancy), not just a dashboard 'warning',
+    // and wlan0-weak is independent of wlan1's state, not nested inside it.
     const wlan1Down = d.wlan1.signal === null;
+    const wlan0Weak = d.wlan0.signal !== null && d.wlan0.signal < -70;
     const networkStatus = worstStatus(
       d.eth0.state !== 'up' ? 'critical' : 'healthy',
-      wlan1Down ? 'warning' : 'healthy',
-      wlan1Down && d.wlan0.signal !== null && d.wlan0.signal < -70 ? 'warning' : 'healthy'
+      wlan1Down ? 'critical' : 'healthy',
+      wlan0Weak ? 'warning' : 'healthy'
     );
 
     const cam1Status = worstStatus(
@@ -1126,8 +1131,8 @@ async function loadInfraData() {
       <div class="infra-card ${networkStatus}">
         <div class="infra-card-title">Network</div>
         <div class="infra-card-row"><span>eth0</span><span>${escapeHtml(d.eth0.state)}${d.eth0.speed ? ' @ ' + d.eth0.speed + ' Mbps' : ''}</span></div>
-        <div class="infra-card-row"><span>wlan1 (primary)</span><span>${fmtSignal(d.wlan1.signal)}</span></div>
-        <div class="infra-card-row"><span>wlan0 (fallback)</span><span>${fmtSignal(d.wlan0.signal)}</span></div>
+        <div class="infra-card-row"><span>wlan0 (primary)</span><span>${fmtSignal(d.wlan0.signal)}</span></div>
+        <div class="infra-card-row"><span>wlan1 (backup)</span><span>${fmtSignal(d.wlan1.signal)}</span></div>
         <div class="infra-card-row"><span>Wavlink AP</span><span>${fmtMs(d.pings.wavlink)}</span></div>
       </div>
       <div class="infra-card ${cam1Status}">
@@ -1181,7 +1186,7 @@ async function loadInfraData() {
       ...(data.cam3Enabled ? [
         { label: 'Chick Cam Stream Age', values: h.map(e => e.streams.stream3 ? e.streams.stream3.age : null), color: 'var(--wood-brown)', unit: 's', threshold: 30, good: 'Under 30s is healthy' },
       ] : []),
-      { label: 'Fallback WiFi Signal', values: h.map(e => e.wlan0.signal), color: 'var(--wood-brown)', unit: ' dBm', threshold: null, good: 'Closer to 0 is stronger' }
+      { label: 'Primary WiFi Signal', values: h.map(e => e.wlan0.signal), color: 'var(--wood-brown)', unit: ' dBm', threshold: null, good: 'Closer to 0 is stronger' }
     ];
 
     document.getElementById('infra-sparklines').innerHTML = sparklines.map(s => {
