@@ -25,3 +25,16 @@ npm test       # node --test test/*.test.js  (scoped: scripts/test-preset.js sen
 - `backup.sh` handles backups (off-box to USB at /mnt/backup)
 - Static assets are Cloudflare-cached: bump `?v=` in BOTH `public/index.html` and `public/admin.html` when changing `style.css`/`app.js`
 - Operational details, credentials, and hardware history live in `SornigReadMe.txt` (untracked)
+
+## Agents & delegation
+
+- For non-trivial features: plan at the session level, delegate mechanical
+  implementation (clear spec already written, renames, repetitive edits) to
+  cheaper-model agents (Sonnet), then review the result at the session level.
+- For significant changes, spawn a Fable agent as an independent code-review
+  gate before testing; fix findings until it approves.
+- Fable's usage pool is separate from other models and can run out. If a Fable
+  agent is unavailable, use the strongest available model (e.g. Opus) for the
+  review/critic role instead — never skip the gate, and mention the substitution.
+- Don't delegate trivial tasks — spawning an agent costs more than doing it inline.
+- After 2+ context compactions, suggest a fresh session.
