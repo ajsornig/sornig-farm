@@ -24,3 +24,7 @@ public/chick-album/
 public/chick-growth/
 public/favorites/
 public/highlights/
+
+# Local Claude Code state — only launch.json is shared
+.claude/*
+!.claude/launch.json
