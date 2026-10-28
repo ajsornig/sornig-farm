@@ -1,5 +1,11 @@
 # TODO
 
+> **Sync note:** There is also a local todo list (not in this repo). Merge the
+> two: move any items that exist only locally into this file (leave out secrets,
+> IPs and credentials, since this repo is public), add any items that exist only
+> here to the local list, and treat this file as the shared copy from then on.
+> Delete this note once the lists are synced.
+
 ## Recurring
 
 - [ ] **Keep cloudflared up to date on the Pi.** It was installed from a `.deb`
